@@ -43,7 +43,8 @@ puis journal (visible dans `/#/debug`). `corosRead()` refuse les outils d'écrit
 ## Claude
 
 Clé API Anthropic saisie dans Réglages, stockée en `localStorage`, appels directs depuis le
-navigateur (`anthropic-dangerous-direct-browser-access`). Modèle par défaut : `claude-sonnet-5`.
+navigateur (`anthropic-dangerous-direct-browser-access`). Modèle par défaut : `claude-haiku-4-5`
+(le moins cher, 1 $ / 5 $ par million de tokens) ; Sonnet 5 sélectionnable dans Réglages.
 Utiliser une clé dédiée avec une limite de dépense.
 
 ## Déploiement GitHub Pages

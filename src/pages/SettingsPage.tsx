@@ -8,7 +8,7 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { disconnectCoros, startCorosLogin } from '@/lib/coros/client'
-import { DEFAULT_MODEL, useSettings } from '@/lib/store/settings'
+import { MODELS, useSettings } from '@/lib/store/settings'
 
 export function SettingsPage() {
   const connected = useCorosAuth((s) => s.connected)
@@ -75,14 +75,24 @@ export function SettingsPage() {
               Utilise une clé dédiée avec une limite de dépense.
             </p>
           </div>
-          <label className="mt-4 block text-sm font-medium">
-            Modèle
-            <Input
-              className="mt-1.5"
-              value={settings.model}
-              onChange={(e) => settings.set({ model: e.target.value.trim() || DEFAULT_MODEL })}
-            />
-          </label>
+          <p className="mt-4 text-sm font-medium">Modèle</p>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            {MODELS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => settings.set({ model: m.id })}
+                className={
+                  settings.model === m.id
+                    ? 'rounded-xl bg-accent p-3 text-left text-accent-foreground'
+                    : 'rounded-xl bg-muted p-3 text-left'
+                }
+              >
+                <div className="font-semibold">{m.label}</div>
+                <div className="text-xs opacity-75">{m.price} / M tokens</div>
+              </button>
+            ))}
+          </div>
         </Card>
 
         <Card>
