@@ -8,3 +8,5 @@ globalThis.localStorage ??= {
   key: () => null,
   length: 0,
 } as Storage
+// zustand/persist lit window.localStorage
+;(globalThis as { window?: unknown }).window ??= globalThis

@@ -2,7 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { initVault, setupAutoLock } from './lib/lock/vault'
+import { useSettings } from './lib/store/settings'
 import './index.css'
+
+// Avant le premier rendu : ouvre le coffre (ou le verrouille) et migre les anciennes données en clair.
+initVault()
+setupAutoLock(() => useSettings.getState().autoLockMinutes)
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -40,9 +40,24 @@ Tokens, client et état OAuth sont en `localStorage` (`coros.*`).
 Toute écriture passe par `corosWrite()` (`src/lib/coros/client.ts`) : confirmation obligatoire,
 puis journal (visible dans `/#/debug`). `corosRead()` refuse les outils d'écriture.
 
+## Verrou (Face ID / code)
+
+Aucun compte ni email : les secrets (clé API Anthropic, tokens et client OAuth COROS) sont dans un coffre
+local (`src/lib/lock/vault.ts`, clé `vault.v1`).
+
+- Une clé de données aléatoire (AES-GCM 256) chiffre le coffre.
+- Elle est chiffrée par le **code de secours** (PBKDF2-SHA256, 600 000 itérations, délai croissant après erreur)
+  et, si le navigateur prend en charge l'extension WebAuthn **PRF**, par un **passkey Face ID** : la sortie PRF
+  (HKDF) sert de clé. Sans PRF, Face ID ne protégerait rien côté navigateur : seul le code est proposé.
+- Verrouillage au lancement et après N minutes en arrière-plan. Code oublié → les secrets sont effacés, le plan reste.
+- Sans verrou, le coffre est stocké en clair (comportement d'avant). Les anciennes clés en clair sont migrées
+  au premier lancement.
+
+Attention sur iPhone : l'icône de l'écran d'accueil et le navigateur ont des stockages séparés.
+
 ## Claude
 
-Clé API Anthropic saisie dans Réglages, stockée en `localStorage`, appels directs depuis le
+Clé API Anthropic saisie dans Réglages, stockée dans le coffre local (chiffré si le verrou est actif), appels directs depuis le
 navigateur (`anthropic-dangerous-direct-browser-access`). Modèle par défaut : `claude-haiku-4-5`
 (le moins cher, 1 $ / 5 $ par million de tokens) ; Sonnet 5 sélectionnable dans Réglages.
 Utiliser une clé dédiée avec une limite de dépense.
@@ -87,7 +102,7 @@ Partager → « Sur l'écran d'accueil ».
     splits, ressenti, récupération, HRV, sommeil et propose les ajustements (et une nouvelle allure seuil si
     besoin). Appliquer reste un geste explicite, l'envoi sur la montre demande confirmation.
 
-`npm run check` lance les tests hors ligne (payload COROS, analyse GPX, VDOT, règles de volume, liaison auto).
+`npm run check` lance les tests hors ligne (payload COROS, analyse GPX, VDOT, règles de volume, liaison auto, coffre).
 
 ## Structure
 

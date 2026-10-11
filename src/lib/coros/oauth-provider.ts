@@ -5,16 +5,20 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js'
 import { SCOPES, redirectUrl } from './config'
-import { TOKENS_KEY, useCorosAuth } from './auth-store'
+import { vault } from '@/lib/lock/vault'
+import { TOKENS_KEY } from './auth-store'
 
 const CLIENT_KEY = 'coros.client'
 const VERIFIER_KEY = 'coros.pkceVerifier'
 const STATE_KEY = 'coros.oauthState'
 const DISCOVERY_KEY = 'coros.discovery'
 
+/** Tokens et client : dans le coffre. Vérificateur PKCE, state et découverte (éphémères) : en localStorage. */
+const SECRET_KEYS = new Set([TOKENS_KEY, CLIENT_KEY])
+
 function read<T>(key: string): T | undefined {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = SECRET_KEYS.has(key) ? vault.get(key) : localStorage.getItem(key)
     return raw ? (JSON.parse(raw) as T) : undefined
   } catch {
     return undefined
@@ -22,7 +26,13 @@ function read<T>(key: string): T | undefined {
 }
 
 function write(key: string, value: unknown) {
-  localStorage.setItem(key, JSON.stringify(value))
+  if (SECRET_KEYS.has(key)) vault.set(key, JSON.stringify(value))
+  else localStorage.setItem(key, JSON.stringify(value))
+}
+
+function remove(key: string) {
+  if (SECRET_KEYS.has(key)) vault.remove(key)
+  else localStorage.removeItem(key)
 }
 
 /**
@@ -80,7 +90,6 @@ class CorosOAuthProvider implements OAuthClientProvider {
 
   saveTokens(tokens: OAuthTokens) {
     write(TOKENS_KEY, tokens)
-    useCorosAuth.getState().refresh()
   }
 
   redirectToAuthorization(url: URL) {
@@ -110,11 +119,10 @@ class CorosOAuthProvider implements OAuthClientProvider {
   }
 
   invalidateCredentials(scope: 'all' | 'client' | 'tokens' | 'verifier' | 'discovery') {
-    if (scope === 'all' || scope === 'client') localStorage.removeItem(CLIENT_KEY)
-    if (scope === 'all' || scope === 'tokens') localStorage.removeItem(TOKENS_KEY)
-    if (scope === 'all' || scope === 'verifier') localStorage.removeItem(VERIFIER_KEY)
-    if (scope === 'all' || scope === 'discovery') localStorage.removeItem(DISCOVERY_KEY)
-    useCorosAuth.getState().refresh()
+    if (scope === 'all' || scope === 'client') remove(CLIENT_KEY)
+    if (scope === 'all' || scope === 'tokens') remove(TOKENS_KEY)
+    if (scope === 'all' || scope === 'verifier') remove(VERIFIER_KEY)
+    if (scope === 'all' || scope === 'discovery') remove(DISCOVERY_KEY)
   }
 }
 

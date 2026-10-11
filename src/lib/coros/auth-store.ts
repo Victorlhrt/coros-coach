@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { vault } from '@/lib/lock/vault'
 
 const TOKENS_KEY = 'coros.tokens'
 
@@ -7,10 +8,12 @@ interface CorosAuthState {
   refresh: () => void
 }
 
-/** Indique si des tokens COROS sont présents ; rafraîchi à chaque écriture/suppression. */
+/** Indique si des tokens COROS sont présents dans le coffre ; rafraîchi à chaque changement. */
 export const useCorosAuth = create<CorosAuthState>((set) => ({
-  connected: localStorage.getItem(TOKENS_KEY) !== null,
-  refresh: () => set({ connected: localStorage.getItem(TOKENS_KEY) !== null }),
+  connected: false,
+  refresh: () => set({ connected: vault.get(TOKENS_KEY) !== undefined }),
 }))
+
+vault.subscribe(() => useCorosAuth.getState().refresh())
 
 export { TOKENS_KEY }

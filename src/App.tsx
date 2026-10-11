@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { ConfirmSheet } from './components/ConfirmSheet'
+import { LockScreen } from './components/LockScreen'
 import { PullToRefresh } from './components/PullToRefresh'
 import { Toaster } from './components/Toaster'
 import { TabBar } from './components/TabBar'
@@ -8,6 +9,7 @@ import { Button } from './components/ui/button'
 import { useAutoLink } from './lib/coach/links'
 import { useWeeklyReview } from './lib/coach/review'
 import { finishCorosLogin } from './lib/coros/client'
+import { useVault } from './lib/lock/vault'
 import { useSettings } from './lib/store/settings'
 import { AdjustPage } from './pages/AdjustPage'
 import { DebugPage } from './pages/DebugPage'
@@ -19,8 +21,8 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TodayPage } from './pages/TodayPage'
 
 /**
- * COROS revient sur `/coros-coach/?code=…&state=…` (avant le #).
- * Lu une seule fois au chargement : le code ne s'échange qu'une fois, même sous StrictMode.
+ * COROS revient sur `/coros-coach/?code=…&state=…` (avant le #). On lit les paramètres au chargement
+ * et on nettoie l'URL, mais l'échange attend que le coffre soit ouvert (les tokens y sont écrits).
  */
 const callback = (() => {
   const params = new URLSearchParams(window.location.search)
@@ -28,25 +30,25 @@ const callback = (() => {
   const error = params.get('error_description') ?? params.get('error')
   if (!code && !error) return null
   window.history.replaceState(null, '', `${import.meta.env.BASE_URL}#/reglages`)
-  return code
-    ? { exchange: finishCorosLogin(code, params.get('state')), error: null }
-    : { exchange: null, error }
+  return { code, state: params.get('state'), error }
 })()
+let exchanged = false
 
 function useOAuthCallback() {
-  const [status, setStatus] = useState<'idle' | 'pending' | 'error'>(
-    !callback ? 'idle' : callback.exchange ? 'pending' : 'error',
-  )
+  const vaultStatus = useVault((s) => s.status)
+  const [status, setStatus] = useState<'idle' | 'pending' | 'error'>(!callback ? 'idle' : callback.code ? 'pending' : 'error')
   const [message, setMessage] = useState(callback?.error ?? null)
 
   useEffect(() => {
-    callback?.exchange
-      ?.then(() => setStatus('idle'))
+    if (vaultStatus !== 'open' || !callback?.code || exchanged) return
+    exchanged = true
+    finishCorosLogin(callback.code, callback.state)
+      .then(() => setStatus('idle'))
       .catch((err: unknown) => {
         setMessage(err instanceof Error ? err.message : String(err))
         setStatus('error')
       })
-  }, [])
+  }, [vaultStatus])
 
   return { status, message, dismiss: () => setStatus('idle') }
 }
@@ -84,12 +86,15 @@ function Shell() {
 
 export default function App() {
   const theme = useSettings((s) => s.theme)
+  const locked = useVault((s) => s.status === 'locked')
   const oauth = useOAuthCallback()
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f1013' : '#fafafa')
   }, [theme])
+
+  if (locked) return <LockScreen />
 
   if (oauth.status === 'pending') {
     return <div className="flex min-h-dvh items-center justify-center text-muted-foreground">Connexion à COROS…</div>

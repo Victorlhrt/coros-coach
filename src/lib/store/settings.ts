@@ -16,6 +16,8 @@ interface SettingsState {
   theme: 'dark' | 'light'
   /** Bilan automatique à chaque nouvelle semaine */
   autoReview: boolean
+  /** Verrouillage après N minutes en arrière-plan (si le verrou est actif) */
+  autoLockMinutes: number
   set: (patch: Partial<Omit<SettingsState, 'set'>>) => void
 }
 
@@ -27,11 +29,14 @@ export const useSettings = create<SettingsState>()(
       units: 'metric',
       theme: 'dark',
       autoReview: true,
+      autoLockMinutes: 5,
       set: (patch) => set(patch),
     }),
     {
       name: 'coach.settings',
       version: 1,
+      // La clé API vit dans le coffre (lib/lock/vault), jamais en clair dans les réglages.
+      partialize: ({ anthropicKey: _key, set: _set, ...rest }) => rest,
       // v0 avait Sonnet 5 par défaut : on passe au modèle le moins cher.
       migrate: (state, version) => {
         const s = state as SettingsState

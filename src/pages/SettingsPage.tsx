@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { RecordsCard } from '@/components/RecordsCard'
+import { SecurityCard } from '@/components/SecurityCard'
 import { ZonesEditor } from '@/components/ZonesEditor'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
@@ -74,9 +75,9 @@ export function SettingsPage() {
           <div className="mt-4 flex gap-3 rounded-xl bg-session-tempo/12 p-3 text-sm">
             <ShieldAlert className="size-5 shrink-0 text-session-tempo" />
             <p>
-              La clé reste <strong>dans ce navigateur</strong> (localStorage) et part directement chez Anthropic.
-              Toute personne ayant accès à ce téléphone, ou un script injecté dans la page, pourrait la lire.
-              Utilise une clé dédiée avec une limite de dépense.
+              La clé reste <strong>sur cet appareil</strong> et part directement chez Anthropic. Active le verrou ci-dessous pour
+              la chiffrer. Utilise une clé dédiée avec une limite de dépense. Attention : l’icône sur l’écran d’accueil et le
+              navigateur ont chacun leur propre stockage.
             </p>
           </div>
           <p className="mt-4 text-sm font-medium">Modèle</p>
@@ -116,6 +117,8 @@ export function SettingsPage() {
             ))}
           </div>
         </Card>
+
+        <SecurityCard />
 
         <RecordsCard />
 

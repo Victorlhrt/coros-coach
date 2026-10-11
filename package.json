@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "check": "tsx scripts/check-mapping.ts && tsx scripts/check-gpx.ts && tsx scripts/check-vdot.ts && tsx scripts/check-coach.ts"
+    "check": "tsx scripts/check-mapping.ts && tsx scripts/check-gpx.ts && tsx scripts/check-vdot.ts && tsx scripts/check-coach.ts && tsx scripts/check-vault.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
