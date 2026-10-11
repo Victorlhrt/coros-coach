@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { ConfirmSheet } from './components/ConfirmSheet'
+import { PullToRefresh } from './components/PullToRefresh'
+import { Toaster } from './components/Toaster'
 import { TabBar } from './components/TabBar'
 import { Button } from './components/ui/button'
 import { finishCorosLogin } from './lib/coros/client'
 import { useSettings } from './lib/store/settings'
+import { AdjustPage } from './pages/AdjustPage'
 import { DebugPage } from './pages/DebugPage'
 import { HistoryPage } from './pages/HistoryPage'
+import { OnboardingPage } from './pages/OnboardingPage'
 import { PlanPage } from './pages/PlanPage'
+import { SessionPage } from './pages/SessionPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TodayPage } from './pages/TodayPage'
 
@@ -52,17 +57,23 @@ function Shell() {
         key={location.pathname}
         className="animate-page-in mx-auto max-w-md px-4 pt-[env(safe-area-inset-top)] pb-[calc(5rem+env(safe-area-inset-bottom))]"
       >
-        <Routes>
-          <Route path="/" element={<TodayPage />} />
-          <Route path="/plan" element={<PlanPage />} />
-          <Route path="/historique" element={<HistoryPage />} />
-          <Route path="/reglages" element={<SettingsPage />} />
-          <Route path="/debug" element={<DebugPage />} />
-          <Route path="*" element={<TodayPage />} />
-        </Routes>
+        <PullToRefresh>
+          <Routes>
+            <Route path="/" element={<TodayPage />} />
+            <Route path="/plan" element={<PlanPage />} />
+            <Route path="/historique" element={<HistoryPage />} />
+            <Route path="/reglages" element={<SettingsPage />} />
+            <Route path="/objectif" element={<OnboardingPage />} />
+            <Route path="/seance/:id" element={<SessionPage />} />
+            <Route path="/ajuster" element={<AdjustPage />} />
+            <Route path="/debug" element={<DebugPage />} />
+            <Route path="*" element={<TodayPage />} />
+          </Routes>
+        </PullToRefresh>
       </main>
       <TabBar />
       <ConfirmSheet />
+      <Toaster />
     </>
   )
 }

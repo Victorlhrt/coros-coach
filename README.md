@@ -56,12 +56,31 @@ Utiliser une clé dédiée avec une limite de dépense.
 L'app est servie sur `https://<utilisateur>.github.io/coros-coach/`. Ajout à l'écran d'accueil :
 Partager → « Sur l'écran d'accueil ».
 
+## Fonctionnement
+
+1. **Objectif** (`/#/objectif`) : distance, date, temps visé, niveau, jours dispo, sortie longue, renfo.
+   « Lire mes données COROS » interroge `queryUserInfo`, `queryFitnessAssessmentOverview`,
+   `queryTrainingLoadAssessment`, `queryRecoveryStatus`, `querySportRecords` puis Claude en extrait le profil
+   (allure seuil, prédictions, volume) — les formats de réponse COROS ne sont pas documentés.
+2. **Génération** : un appel pour la structure (phases, volumes), puis un appel par bloc de 4 semaines.
+   Sortie JSON contrainte (`output_config.format` + Zod) ; si le schéma ou les règles métier (jours
+   disponibles, limites COROS) ne passent pas, on relance avec la liste des erreurs (2 fois max).
+3. **Envoi sur la montre** : le premier envoi crée le plan complet (`createTrainingPlan`, début entre
+   aujourd'hui et J+14, 4 à 16 semaines). Les envois suivants (séance ou semaine) passent par
+   `updateTrainingPlan` jour par jour ; un jour sans séance part comme repos. L'état de synchro de chaque
+   séance compare son contenu avec ce qui a été envoyé. Le renforcement reste dans l'app (non pris en
+   charge par COROS).
+4. **Ajuster ma semaine** : récup, HRV, sommeil, FC repos, charge et activités des 7 derniers jours →
+   Claude propose des remplacements / suppressions / ajouts, affichés avant/après, appliqués après accord.
+
+`npm run check` vérifie hors ligne qu'un plan type produit un payload COROS conforme.
+
 ## Structure
 
 ```
 src/
   lib/coros/   client MCP, fournisseur OAuth, écriture confirmée + journal, hooks
-  lib/coach/   prompts + schémas Zod (à venir)
+  lib/coach/   prompts, schémas Zod, génération, ajustement, zones, calculs
   lib/store/   réglages (Zustand persisté)
   components/  UI (style shadcn/ui), barre d'onglets, feuille de confirmation
   pages/       Aujourd'hui, Plan, Historique, Réglages, Debug

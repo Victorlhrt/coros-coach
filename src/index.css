@@ -25,6 +25,15 @@
   --session-recovery: oklch(0.72 0.11 195);
   --session-rest: oklch(0.6 0.01 260);
   --session-strength: oklch(0.62 0.19 300);
+  --session-race: var(--accent);
+
+  /* Zones d'intensité (graphique des blocs) */
+  --zone-1: oklch(0.72 0.08 220);
+  --zone-2: oklch(0.7 0.16 150);
+  --zone-3: oklch(0.65 0.16 250);
+  --zone-4: oklch(0.75 0.16 75);
+  --zone-5: oklch(0.65 0.22 30);
+  --zone-6: oklch(0.6 0.24 0);
 }
 
 .dark {
@@ -60,6 +69,7 @@
   --color-session-recovery: var(--session-recovery);
   --color-session-rest: var(--session-rest);
   --color-session-strength: var(--session-strength);
+  --color-session-race: var(--session-race);
   --radius-card: 1.125rem;
 }
 
@@ -89,4 +99,15 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-page-in { animation: none; }
+}
+
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+.animate-grow-x {
+  transform-origin: left;
+  animation: grow-x 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-grow-x { animation: none; }
 }

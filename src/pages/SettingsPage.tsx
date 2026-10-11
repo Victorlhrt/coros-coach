@@ -1,14 +1,17 @@
 import { useMutation } from '@tanstack/react-query'
-import { Bug, Eye, EyeOff, ShieldAlert, Watch } from 'lucide-react'
-import { useState } from 'react'
+import { Bug, Download, Eye, EyeOff, ShieldAlert, Upload, Watch } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { ZonesEditor } from '@/components/ZonesEditor'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { disconnectCoros, startCorosLogin } from '@/lib/coros/client'
+import { usePlan } from '@/lib/store/plan'
 import { MODELS, useSettings } from '@/lib/store/settings'
+import { toast } from '@/lib/toast'
 
 export function SettingsPage() {
   const connected = useCorosAuth((s) => s.connected)
@@ -113,10 +116,82 @@ export function SettingsPage() {
           </div>
         </Card>
 
+        <Card>
+          <CardTitle>Zones d’allure</CardTitle>
+          <div className="mt-4">
+            <ZonesEditor />
+          </div>
+        </Card>
+
+        <PlanData />
+
         <Link to="/debug" className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
           <Bug className="size-4" /> Debug MCP
         </Link>
       </div>
     </>
+  )
+}
+
+function PlanData() {
+  const store = usePlan()
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  function exportJson() {
+    const { goal, profile, zones, plan, coros } = usePlan.getState()
+    const blob = new Blob([JSON.stringify({ version: 1, goal, profile, zones, plan, coros }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `plan-coros-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function importJson(file: File) {
+    try {
+      store.importData(JSON.parse(await file.text()))
+      toast.success('Plan importé ✓')
+    } catch (err) {
+      toast.error(err)
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle>Plan</CardTitle>
+      <CardDescription className="mt-1">{store.plan ? `${store.plan.name} · ${store.plan.weeks.length} semaines` : 'Aucun plan.'}</CardDescription>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Button size="sm" variant="secondary" onClick={exportJson} disabled={!store.plan}>
+          <Download className="size-4" /> Exporter
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => fileInput.current?.click()}>
+          <Upload className="size-4" /> Importer
+        </Button>
+      </div>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void importJson(file)
+          e.target.value = ''
+        }}
+      />
+      {store.plan && (
+        <Button
+          size="sm"
+          variant="destructive"
+          className="mt-2 w-full"
+          onClick={() => {
+            if (confirm('Supprimer le plan de l’app ? (le plan sur la montre n’est pas touché)')) store.reset()
+          }}
+        >
+          Supprimer le plan
+        </Button>
+      )}
+    </Card>
   )
 }

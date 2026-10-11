@@ -1,0 +1,18 @@
+import { useQuery } from '@tanstack/react-query'
+import { normalizeActivities } from './activities'
+import { useCorosAuth } from './auth-store'
+import { fetchRunRecords } from './data'
+
+/** Activités course des 6 dernières semaines, rechargées à l'ouverture et au pull-to-refresh. */
+export function useActivities() {
+  const connected = useCorosAuth((s) => s.connected)
+  return useQuery({
+    queryKey: ['coros', 'activities'],
+    queryFn: async () => {
+      const raw = await fetchRunRecords(42)
+      return { raw, activities: normalizeActivities(raw) }
+    },
+    enabled: connected,
+    staleTime: 5 * 60 * 1000,
+  })
+}
