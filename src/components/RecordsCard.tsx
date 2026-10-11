@@ -14,7 +14,7 @@ import { Input } from './ui/input'
 
 /** Records des 12 derniers mois (COROS ou saisis) → VDOT, allure seuil et prédictions. */
 export function RecordsCard() {
-  const { records, setRecords, setZones, profile, setProfile } = usePlan()
+  const { records, setRecords, retuneZones, profile, setProfile } = usePlan()
   const connected = useCorosAuth((s) => s.connected)
   const vdot = bestVdot(records)
 
@@ -85,9 +85,9 @@ export function RecordsCard() {
           disabled={!vdot}
           onClick={() => {
             const pace = thresholdPace(vdot!)
-            setZones(zonesFromThreshold(pace))
+            const n = retuneZones(zonesFromThreshold(pace)).length
             if (profile) setProfile({ ...profile, thresholdPace: pace })
-            toast.success(`Zones recalculées (seuil ${formatPace(pace)}/km)`)
+            toast.success(`Zones recalculées (seuil ${formatPace(pace)}/km)${n ? ` · ${n} séance${n > 1 ? 's' : ''} à venir ajustée${n > 1 ? 's' : ''}` : ''}`)
           }}
         >
           Appliquer aux zones

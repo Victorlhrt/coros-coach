@@ -37,16 +37,19 @@ export function AdjustPage() {
 
   const apply = useMutation({
     mutationFn: async (changes: Adjustment['changes']) => {
-      store.applyChanges(changes)
+      // Zones d'abord : les séances proposées par le bilan sont déjà écrites aux nouvelles allures.
       const pace = review?.adjustment.newThresholdPace
+      let repaced: string[] = []
       if (pace && updateZones) {
-        store.setZones(zonesFromThreshold(pace))
+        repaced = store.retuneZones(zonesFromThreshold(pace))
         if (store.profile) store.setProfile({ ...store.profile, thresholdPace: pace })
       }
+      store.applyChanges(changes)
       if (week) store.setReviewStatus(week.number, 'applied')
       const { plan, coros } = usePlan.getState()
-      if (!coros.created || !plan || changes.length === 0) return 'local'
-      const sent = await pushDays(plan, changes.map((c) => c.date), 'les séances ajustées')
+      const dates = [...changes.map((c) => c.date), ...repaced]
+      if (!coros.created || !plan || dates.length === 0) return 'local'
+      const sent = await pushDays(plan, dates, 'les séances ajustées')
       return sent ? 'sent' : 'local'
     },
     onSuccess: (r) => {
@@ -120,8 +123,8 @@ export function AdjustPage() {
                 <div>
                   <p className="font-semibold">Nouvelle allure seuil : {formatPace(result.newThresholdPace)} /km</p>
                   <p className="text-sm text-muted-foreground">
-                    {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule toutes
-                    tes zones d’allure.
+                    {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule tes zones
+                    d’allure et les allures cibles des séances à venir (sauf l’allure course).
                   </p>
                 </div>
               </label>

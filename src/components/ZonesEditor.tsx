@@ -3,12 +3,13 @@ import { formatPace, parseClock } from '@/lib/coach/format'
 import { zoneColor } from '@/lib/coach/ui'
 import { zonesFromThreshold } from '@/lib/coach/zones'
 import { usePlan } from '@/lib/store/plan'
+import { toast } from '@/lib/toast'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 
 /** Zones d'allure éditables (mm:ss par km). Recalculables depuis l'allure seuil. */
 export function ZonesEditor() {
-  const { zones, setZones, profile } = usePlan()
+  const { zones, setZones, retuneZones, profile } = usePlan()
   const [threshold, setThreshold] = useState(profile?.thresholdPace ? formatPace(profile.thresholdPace) : formatPace(zones[3].paceSlow / 1.06))
 
   const edit = (zone: number, field: 'paceFast' | 'paceSlow', text: string) => {
@@ -26,7 +27,9 @@ export function ZonesEditor() {
           className="shrink-0"
           onClick={() => {
             const t = parseClock(threshold)
-            if (t) setZones(zonesFromThreshold(t))
+            if (!t) return
+            const n = retuneZones(zonesFromThreshold(t)).length
+            if (n) toast.success(`${n} séance${n > 1 ? 's' : ''} à venir ajustée${n > 1 ? 's' : ''} aux nouvelles zones`)
           }}
         >
           Recalculer

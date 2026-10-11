@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { today } from '@/lib/coach/dates'
 import { withIds } from '@/lib/coach/generate'
+import { repacePlan } from '@/lib/coach/repace'
 import type { Feedback } from '@/lib/coach/feedback'
 import type { Adjustment, Goal, Plan, Profile, Session, Zone } from '@/lib/coach/schema'
 import type { RaceRecord } from '@/lib/coach/vdot'
@@ -48,6 +50,8 @@ interface PlanState {
   setGoal: (goal: Goal) => void
   setProfile: (profile: Profile | null) => void
   setZones: (zones: Zone[]) => void
+  /** Nouvelle allure seuil : zones remplacées et allures des séances à venir recalculées. Renvoie les dates des séances modifiées. */
+  retuneZones: (zones: Zone[]) => string[]
   setPlan: (plan: Plan) => void
   setCoros: (patch: Partial<CorosSync>) => void
   markSynced: (hashes: Record<string, string>) => void
@@ -80,7 +84,7 @@ const EMPTY_SYNC: CorosSync = { planId: null, created: false, synced: {} }
 
 export const usePlan = create<PlanState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       goal: null,
       profile: null,
       zones: DEFAULT_ZONES,
@@ -94,6 +98,12 @@ export const usePlan = create<PlanState>()(
       setGoal: (goal) => set({ goal }),
       setProfile: (profile) => set({ profile }),
       setZones: (zones) => set({ zones }),
+      retuneZones: (zones) => {
+        const s = get()
+        const { plan, changed } = s.plan ? repacePlan(s.plan, s.zones, zones, s.goal, today()) : { plan: null, changed: [] }
+        set({ zones, plan })
+        return changed
+      },
       setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
       setCoros: (patch) => set((s) => ({ coros: { ...s.coros, ...patch } })),
       markSynced: (hashes) => set((s) => ({ coros: { ...s.coros, synced: { ...s.coros.synced, ...hashes } } })),
