@@ -10,7 +10,6 @@ export const MODELS = [
 export const DEFAULT_MODEL = MODELS[0].id
 
 interface SettingsState {
-  anthropicKey: string
   model: string
   units: 'metric' | 'imperial'
   theme: 'dark' | 'light'
@@ -24,7 +23,6 @@ interface SettingsState {
 export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
-      anthropicKey: '',
       model: DEFAULT_MODEL,
       units: 'metric',
       theme: 'dark',
@@ -34,12 +32,13 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: 'coach.settings',
-      version: 1,
-      // La clé API vit dans le coffre (lib/lock/vault), jamais en clair dans les réglages.
-      partialize: ({ anthropicKey: _key, set: _set, ...rest }) => rest,
+      version: 2,
+      // Liste explicite : aucun champ inconnu (ex. ancienne clé API) n'est réécrit.
+      partialize: ({ model, units, theme, autoReview, autoLockMinutes }) => ({ model, units, theme, autoReview, autoLockMinutes }),
       // v0 avait Sonnet 5 par défaut : on passe au modèle le moins cher.
       migrate: (state, version) => {
-        const s = state as SettingsState
+        // v2 : la clé API est sur le serveur, on l'efface des réglages locaux.
+        const { anthropicKey: _removed, ...s } = state as SettingsState & { anthropicKey?: string }
         return version < 1 && s.model === 'claude-sonnet-5' ? { ...s, model: DEFAULT_MODEL } : s
       },
     },

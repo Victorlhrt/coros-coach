@@ -3,22 +3,18 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { z } from 'zod'
 import { useSettings } from '@/lib/store/settings'
 
-export class MissingApiKeyError extends Error {
-  constructor() {
-    super('Ajoute ta clé API Anthropic dans Réglages.')
-  }
-}
-
+/** La clé API est côté serveur : le SDK parle au relais /api/claude (cookie de session). */
 function client() {
-  const { anthropicKey } = useSettings.getState()
-  if (!anthropicKey) throw new MissingApiKeyError()
-  // dangerouslyAllowBrowser ajoute l'en-tête anthropic-dangerous-direct-browser-access.
-  return new Anthropic({ apiKey: anthropicKey, dangerouslyAllowBrowser: true })
+  return new Anthropic({
+    apiKey: 'cle-geree-par-le-serveur',
+    baseURL: `${window.location.origin}/api/claude`,
+    dangerouslyAllowBrowser: true,
+  })
 }
 
 /** Message lisible pour une erreur de l'API Anthropic. */
 export function claudeErrorMessage(err: unknown) {
-  if (err instanceof Anthropic.AuthenticationError) return 'Clé API Anthropic refusée. Vérifie-la dans Réglages.'
+  if (err instanceof Anthropic.AuthenticationError) return 'Session expirée ou clé API du serveur refusée. Reconnecte-toi.'
   if (err instanceof Anthropic.RateLimitError) return 'Trop de requêtes vers Claude, réessaie dans une minute.'
   if (err instanceof Anthropic.NotFoundError) return 'Modèle Claude introuvable. Vérifie le modèle dans Réglages.'
   if (err instanceof Anthropic.APIError) return `Erreur Claude ${err.status ?? ''} : ${err.message}`
@@ -74,7 +70,7 @@ export async function callStructured<T>({
         lastErrors = parsed === null ? ['Réponse vide ou non conforme au schéma.'] : (validate?.(parsed) ?? [])
       }
     } catch (err) {
-      if (err instanceof Anthropic.APIError || err instanceof MissingApiKeyError) throw err
+      if (err instanceof Anthropic.APIError) throw err
       if (err instanceof Error && err.message === 'Claude a refusé la demande.') throw err
       lastErrors = [`JSON invalide : ${err instanceof Error ? err.message : String(err)}`]
     }

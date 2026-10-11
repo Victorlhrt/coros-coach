@@ -19,7 +19,6 @@ import { normalizeActivities } from '@/lib/coros/activities'
 import { mergeRecords } from '@/lib/coach/records'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { fetchProfileData, fetchRecords } from '@/lib/coros/data'
-import { useSettings } from '@/lib/store/settings'
 import { usePlan } from '@/lib/store/plan'
 
 const PREDICTION_KEY: Partial<Record<GoalDistance, keyof Profile['predictions']>> = {
@@ -48,7 +47,6 @@ export function OnboardingPage() {
   const navigate = useNavigate()
   const store = usePlan()
   const connected = useCorosAuth((s) => s.connected)
-  const hasKey = useSettings((s) => s.anthropicKey.length > 0)
   const [goal, setGoal] = useState<Goal>({ ...DEFAULT_GOAL, ...store.goal })
   const [targetText, setTargetText] = useState(goal.targetTime ? formatClock(goal.targetTime) : '')
   const [progress, setProgress] = useState<Progress | null>(null)
@@ -93,7 +91,7 @@ export function OnboardingPage() {
   }
 
   const targetOk = targetText.trim() === '' || parseClock(targetText) !== null
-  const canGenerate = hasKey && goal.days.length >= 2 && !weeks.error && targetOk && !!goal.currentWeeklyKm
+  const canGenerate = goal.days.length >= 2 && !weeks.error && targetOk && !!goal.currentWeeklyKm
 
   if (generate.isPending && progress) {
     return (
@@ -141,14 +139,12 @@ export function OnboardingPage() {
         <Button
           variant="secondary"
           className="mt-4 w-full"
-          disabled={!connected || !hasKey || readCoros.isPending}
+          disabled={!connected || readCoros.isPending}
           onClick={() => readCoros.mutate()}
         >
           {readCoros.isPending ? 'Lecture…' : store.profile ? 'Relire mes données' : 'Lire mes données COROS'}
         </Button>
-        {(!connected || !hasKey) && (
-          <p className="mt-2 text-xs text-muted-foreground">Connecte COROS et ajoute ta clé API dans Réglages.</p>
-        )}
+        {!connected && <p className="mt-2 text-xs text-muted-foreground">Connecte COROS dans Réglages.</p>}
         {readCoros.error && <p className="mt-2 text-sm text-destructive">{claudeErrorMessage(readCoros.error)}</p>}
       </Card>
 
@@ -232,8 +228,7 @@ export function OnboardingPage() {
       <CourseCard goal={goal} update={update} />
 
       {generate.error && <Card className="text-sm text-destructive whitespace-pre-line">{claudeErrorMessage(generate.error)}</Card>}
-      {!hasKey && <p className="text-center text-sm text-muted-foreground">Ajoute ta clé API Anthropic dans Réglages pour générer le plan.</p>}
-      {hasKey && !goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground">Indique ton volume actuel pour générer le plan.</p>}
+      {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground">Indique ton volume actuel pour générer le plan.</p>}
 
       <Button className="w-full" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate()}>
         <Sparkles className="size-5" />

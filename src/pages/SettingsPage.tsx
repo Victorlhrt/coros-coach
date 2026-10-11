@@ -1,16 +1,17 @@
 import { useMutation } from '@tanstack/react-query'
-import { Bug, Download, Eye, EyeOff, ShieldAlert, Upload, Watch } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Bug, Download, Upload, Watch } from 'lucide-react'
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { AccountCard } from '@/components/AccountCard'
 import { RecordsCard } from '@/components/RecordsCard'
 import { SecurityCard } from '@/components/SecurityCard'
 import { ZonesEditor } from '@/components/ZonesEditor'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { disconnectCoros, startCorosLogin } from '@/lib/coros/client'
+import { useVault } from '@/lib/lock/vault'
 import { usePlan } from '@/lib/store/plan'
 import { MODELS, useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
@@ -18,7 +19,7 @@ import { toast } from '@/lib/toast'
 export function SettingsPage() {
   const connected = useCorosAuth((s) => s.connected)
   const settings = useSettings()
-  const [showKey, setShowKey] = useState(false)
+  const vaultEncrypted = useVault((s) => s.encrypted)
 
   const login = useMutation({ mutationFn: startCorosLogin })
   const logout = useMutation({ mutationFn: disconnectCoros })
@@ -51,35 +52,8 @@ export function SettingsPage() {
         </Card>
 
         <Card>
-          <CardTitle>Clé API Anthropic</CardTitle>
-          <CardDescription className="mt-1">Utilisée pour générer et ajuster ton plan avec Claude.</CardDescription>
-          <div className="relative mt-4">
-            <Input
-              type={showKey ? 'text' : 'password'}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="sk-ant-…"
-              value={settings.anthropicKey}
-              onChange={(e) => settings.set({ anthropicKey: e.target.value.trim() })}
-              className="pr-12"
-            />
-            <button
-              type="button"
-              aria-label={showKey ? 'Masquer la clé' : 'Afficher la clé'}
-              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-muted-foreground"
-              onClick={() => setShowKey((v) => !v)}
-            >
-              {showKey ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
-            </button>
-          </div>
-          <div className="mt-4 flex gap-3 rounded-xl bg-session-tempo/12 p-3 text-sm">
-            <ShieldAlert className="size-5 shrink-0 text-session-tempo" />
-            <p>
-              La clé reste <strong>sur cet appareil</strong> et part directement chez Anthropic. Active le verrou ci-dessous pour
-              la chiffrer. Utilise une clé dédiée avec une limite de dépense. Attention : l’icône sur l’écran d’accueil et le
-              navigateur ont chacun leur propre stockage.
-            </p>
-          </div>
+          <CardTitle>Claude</CardTitle>
+          <CardDescription className="mt-1">La clé API est gardée par le serveur (variable ANTHROPIC_API_KEY), jamais sur l’appareil.</CardDescription>
           <p className="mt-4 text-sm font-medium">Modèle</p>
           <div className="mt-1.5 grid grid-cols-2 gap-2">
             {MODELS.map((m) => (
@@ -118,7 +92,9 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <SecurityCard />
+        <AccountCard />
+
+        {vaultEncrypted && <SecurityCard />}
 
         <RecordsCard />
 

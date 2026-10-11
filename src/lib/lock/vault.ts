@@ -1,10 +1,9 @@
 import { create } from 'zustand'
-import { useSettings } from '@/lib/store/settings'
 import { PBKDF2_ITERATIONS, fromB64, keyFromPin, keyFromPrf, open, openJson, random, seal, sealJson, toB64, type Sealed } from './crypto'
 import { passkeyPrf, registerPasskey } from './passkey'
 
 /**
- * Coffre des secrets (clé API Anthropic, tokens et client OAuth COROS).
+ * Coffre des secrets de l'appareil (tokens et client OAuth COROS). La clé API Anthropic est sur le serveur.
  * Une clé de données aléatoire chiffre le contenu ; elle est elle-même chiffrée par le code de secours
  * et, si le navigateur le permet, par le passkey Face ID (extension PRF).
  * Déverrouillé, le contenu vit en mémoire et les lectures restent synchrones.
@@ -14,7 +13,8 @@ const STORAGE_KEY = 'vault.v1'
 const FAILS_KEY = 'vault.fails'
 /** Anciennes clés en clair, migrées dans le coffre au premier lancement. */
 const LEGACY_KEYS = ['coros.tokens', 'coros.client']
-export const ANTHROPIC_KEY = 'anthropicKey'
+/** Ancienne clé API stockée sur l'appareil : effacée à l'ouverture (elle est maintenant sur le serveur). */
+const LEGACY_ANTHROPIC_KEY = 'anthropicKey'
 
 interface Wrap {
   salt: string
@@ -90,20 +90,9 @@ export const vault = {
   },
 }
 
-/** Une fois ouvert : on injecte la clé API dans les réglages et on suit ses changements. */
-let settingsBound = false
 function onOpened() {
   useVault.setState({ status: 'open' })
-  useSettings.setState({ anthropicKey: data[ANTHROPIC_KEY] ?? '' })
-  if (!settingsBound) {
-    settingsBound = true
-    useSettings.subscribe((s, prev) => {
-      if (s.anthropicKey !== prev.anthropicKey) {
-        if (s.anthropicKey) vault.set(ANTHROPIC_KEY, s.anthropicKey)
-        else vault.remove(ANTHROPIC_KEY)
-      }
-    })
-  }
+  vault.remove(LEGACY_ANTHROPIC_KEY)
   listeners.forEach((l) => l())
 }
 
@@ -113,24 +102,22 @@ export function initVault() {
   dek = null
   stored = readStored()
   if (!stored) {
-    const legacyKey = useSettings.getState().anthropicKey
     data = {}
     for (const k of LEGACY_KEYS) {
       const v = localStorage.getItem(k)
       if (v !== null) data[k] = v
     }
-    if (legacyKey) data[ANTHROPIC_KEY] = legacyKey
     stored = { mode: 'plain', data }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
-    LEGACY_KEYS.forEach((k) => localStorage.removeItem(k))
   }
+  // Jamais de copie en clair hors du coffre, même si une ancienne version en a laissé une.
+  LEGACY_KEYS.forEach((k) => localStorage.removeItem(k))
   if (stored.mode === 'plain') {
     data = stored.data
     useVault.setState({ encrypted: false, hasPasskey: false })
     onOpened()
   } else {
     useVault.setState({ status: 'locked', encrypted: true, hasPasskey: !!stored.passkey })
-    useSettings.setState({ anthropicKey: '' })
   }
 }
 
@@ -226,7 +213,6 @@ export function lockNow() {
 export function resetVault() {
   localStorage.removeItem(STORAGE_KEY)
   localStorage.removeItem(FAILS_KEY)
-  useSettings.setState({ anthropicKey: '' })
   window.location.reload()
 }
 

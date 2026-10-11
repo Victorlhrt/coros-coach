@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { ConfirmSheet } from './components/ConfirmSheet'
 import { LockScreen } from './components/LockScreen'
+import { LoginScreen } from './components/LoginScreen'
 import { PullToRefresh } from './components/PullToRefresh'
 import { Toaster } from './components/Toaster'
 import { TabBar } from './components/TabBar'
@@ -10,6 +11,9 @@ import { useAutoLink } from './lib/coach/links'
 import { useWeeklyReview } from './lib/coach/review'
 import { finishCorosLogin } from './lib/coros/client'
 import { useVault } from './lib/lock/vault'
+import { checkAuth, useAuth } from './lib/server/auth'
+import { startStateSync } from './lib/server/state-sync'
+import { toast } from './lib/toast'
 import { useSettings } from './lib/store/settings'
 import { AdjustPage } from './pages/AdjustPage'
 import { DebugPage } from './pages/DebugPage'
@@ -21,7 +25,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TodayPage } from './pages/TodayPage'
 
 /**
- * COROS revient sur `/coros-coach/?code=…&state=…` (avant le #). On lit les paramètres au chargement
+ * COROS revient sur `/?code=…&state=…` (avant le #). On lit les paramètres au chargement
  * et on nettoie l'URL, mais l'échange attend que le coffre soit ouvert (les tokens y sont écrits).
  */
 const callback = (() => {
@@ -87,13 +91,23 @@ function Shell() {
 export default function App() {
   const theme = useSettings((s) => s.theme)
   const locked = useVault((s) => s.status === 'locked')
+  const auth = useAuth((s) => s.status)
   const oauth = useOAuthCallback()
+
+  useEffect(() => {
+    void checkAuth()
+  }, [])
+  useEffect(() => {
+    if (auth === 'authenticated') startStateSync().catch((err) => toast.error(err))
+  }, [auth])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f1013' : '#fafafa')
   }, [theme])
 
+  if (auth === 'loading') return <div className="min-h-dvh" />
+  if (auth === 'anonymous') return <LoginScreen />
   if (locked) return <LockScreen />
 
   if (oauth.status === 'pending') {

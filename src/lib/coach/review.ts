@@ -103,12 +103,12 @@ export function useWeeklyReview() {
   const plan = usePlan((s) => s.plan)
   const reviews = usePlan((s) => s.reviews)
   const connected = useCorosAuth((s) => s.connected)
-  const { anthropicKey, autoReview } = useSettings()
+  const autoReview = useSettings((s) => s.autoReview)
   const now = today()
   const week = plan?.weeks.find((w) => w.start <= now && w.end >= now)
 
   useEffect(() => {
-    if (!plan || !week || week.number < 2 || !connected || !anthropicKey || !autoReview) return
+    if (!plan || !week || week.number < 2 || !connected || !autoReview) return
     const key = `${plan.id}:${week.number}`
     if (reviews[week.number] || attempted === key) return
     attempted = key
@@ -121,5 +121,5 @@ export function useWeeklyReview() {
         ),
       )
       .catch((err) => toast.error(`Bilan hebdo : ${claudeErrorMessage(err)}`))
-  }, [plan, week, reviews, connected, anthropicKey, autoReview])
+  }, [plan, week, reviews, connected, autoReview])
 }
