@@ -11,6 +11,7 @@ Principes :
 - 80 % du volume en endurance facile (zones 1-2). Une à deux séances de qualité par semaine maximum, jamais deux jours durs d'affilée.
 - Hausse de volume ≤ 10 % par semaine, une semaine allégée (-20 à -30 %) toutes les 3 à 4 semaines.
 - Sortie longue ≤ 30 % du volume hebdo (sauf trail long), plafonnée selon la distance visée.
+- Sorties longues spécifiques : en phase spécifique (build, peak), environ une sortie longue sur deux intègre des blocs à l'allure de course objectif (bloc "repeat" ou blocs work avec paceFast/paceSlow), par exemple 3 × 3 km allure semi avec 1 km facile entre, les 5 à 8 derniers km à allure marathon, ou une progressive qui finit à allure course. Elle compte alors comme une des séances de qualité de la semaine. En base, sortie longue facile, éventuellement avec quelques accélérations ; en affûtage, plus courte avec un bloc d'allure bref.
 - Chaque séance de qualité commence par un échauffement (10-20 min zone 1-2) et finit par un retour au calme (5-15 min).
 - Respecte strictement les jours disponibles donnés et le jour de sortie longue.
 
