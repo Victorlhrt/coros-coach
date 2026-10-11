@@ -36,6 +36,45 @@ export type Progress = { step: string; done: number; total: number }
 
 const CHUNK = 4
 
+/** Génération en cours, sauvegardée à chaque étape pour reprendre après un rechargement. */
+export interface PlanDraft {
+  goal: Goal
+  skeleton: Skeleton | null
+  /** Séances déjà écrites, par numéro de semaine. */
+  sessions: Record<number, SessionInput[]>
+}
+
+const DRAFT_KEY = 'coach.planDraft'
+
+export function loadDraft(): PlanDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    return raw ? (JSON.parse(raw) as PlanDraft) : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(draft: PlanDraft) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // Stockage indisponible : la génération continue, sans reprise possible.
+  }
+}
+
+let running = false
+/** Vrai tant qu'une génération tourne dans cet onglet (évite d'en relancer une en revenant sur l'écran). */
+export const isGenerating = () => running
+
+export function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // Rien à nettoyer.
+  }
+}
+
 /** Dates disponibles d'une semaine selon les jours choisis. */
 function availableDates(slot: WeekSlot, goal: Goal) {
   const dates: string[] = []
@@ -46,43 +85,70 @@ function availableDates(slot: WeekSlot, goal: Goal) {
   return dates.sort()
 }
 
+/**
+ * Structure du plan, puis séances par blocs de 4 semaines écrits en parallèle.
+ * Chaque étape terminée est sauvegardée : avec `resume`, seules les étapes manquantes sont relancées.
+ */
 export async function generatePlan(
   goal: Goal,
   profile: Profile | null,
   zones: Zone[],
   onProgress: (p: Progress) => void,
   records: RaceRecord[] = [],
+  resume: PlanDraft | null = null,
+): Promise<Plan> {
+  running = true
+  try {
+    return await buildPlan(goal, profile, zones, onProgress, records, resume)
+  } finally {
+    running = false
+  }
+}
+
+async function buildPlan(
+  goal: Goal,
+  profile: Profile | null,
+  zones: Zone[],
+  onProgress: (p: Progress) => void,
+  records: RaceRecord[],
+  resume: PlanDraft | null,
 ): Promise<Plan> {
   const { start, weeks: slots, error } = planWeeks(goal.raceDate)
   if (error) throw new Error(error)
   const chunks = Math.ceil(slots.length / CHUNK)
   const total = chunks + 1
   const context = `${describeGoal(goal)}\n\n${describeProfile(profile, records)}\n\nZones d’allure :\n${describeZones(zones)}`
+  const draft: PlanDraft = resume ?? { goal, skeleton: null, sessions: {} }
+  saveDraft(draft)
 
   onProgress({ step: 'Structure du plan', done: 0, total })
-  const skeleton = await callStructured({
-    system: COACH_SYSTEM,
-    prompt: `${context}
+  const skeleton =
+    draft.skeleton ??
+    (await callStructured({
+      system: COACH_SYSTEM,
+      prompt: `${context}
 
 Le plan compte ${slots.length} semaines (lundi-dimanche), du ${start} à la semaine de course :
 ${slots.map((s) => `Semaine ${s.number} : ${s.start} → ${s.end}`).join('\n')}
 
 Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine. La dernière semaine contient la course.
 Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parcours : où gérer, où relancer, allure cible par portion.`,
-    schema: SkeletonSchema,
-    maxTokens: 8000,
-    validate: (s) => {
-      const errors: string[] = []
-      if (s.weeks.length !== slots.length) errors.push(`Il faut exactement ${slots.length} semaines (reçu ${s.weeks.length}).`)
-      s.weeks.forEach((w, i) => {
-        if (w.number !== i + 1) errors.push(`Les semaines doivent être numérotées de 1 à ${slots.length} dans l’ordre.`)
-      })
-      if (s.planName.length > 60) errors.push('planName : 60 caractères maximum.')
-      if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
-      errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
-      return errors
-    },
-  })
+      schema: SkeletonSchema,
+      maxTokens: 8000,
+      validate: (s) => {
+        const errors: string[] = []
+        if (s.weeks.length !== slots.length) errors.push(`Il faut exactement ${slots.length} semaines (reçu ${s.weeks.length}).`)
+        s.weeks.forEach((w, i) => {
+          if (w.number !== i + 1) errors.push(`Les semaines doivent être numérotées de 1 à ${slots.length} dans l’ordre.`)
+        })
+        if (s.planName.length > 60) errors.push('planName : 60 caractères maximum.')
+        if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
+        errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
+        return errors
+      },
+    }))
+  draft.skeleton = skeleton
+  saveDraft(draft)
 
   const weeks: Week[] = slots.map((slot, i) => ({
     ...slot,
@@ -96,45 +162,51 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
     .map((w) => `Semaine ${w.number} (${w.start} → ${w.end}) : ${w.phase}, ${w.targetKm} km, sortie longue ${w.longRunKm} km — ${w.focus}`)
     .join('\n')
 
-  for (let c = 0; c < chunks; c++) {
-    const part = weeks.slice(c * CHUNK, (c + 1) * CHUNK)
-    onProgress({ step: `Semaines ${part[0].number} à ${part[part.length - 1].number}`, done: c + 1, total })
-    const allowed = new Map(part.map((w) => [w.number, availableDates(w, goal)]))
-    const previous = c > 0 ? weeks[c * CHUNK - 1] : null
+  const parts = Array.from({ length: chunks }, (_, c) => weeks.slice(c * CHUNK, (c + 1) * CHUNK))
+  const isDone = (part: Week[]) => part.every((w) => draft.sessions[w.number])
+  let done = 1 + parts.filter(isDone).length
+  const report = () => onProgress({ step: done < total ? `Séances, bloc ${done} sur ${chunks}` : 'Finalisation', done, total })
+  report()
 
-    const result = await callStructured({
-      system: COACH_SYSTEM,
-      prompt: `${context}
+  await Promise.all(
+    parts.map(async (part) => {
+      if (isDone(part)) return
+      const allowed = new Map(part.map((w) => [w.number, availableDates(w, goal)]))
+      const result = await callStructured({
+        system: COACH_SYSTEM,
+        prompt: `${context}
 
 Structure du plan :
 ${outline}
-${previous ? `\nSemaine précédente déjà écrite (${previous.number}) : ${previous.sessions.map((s) => `${s.date} ${s.type} « ${s.title} »`).join(' ; ')}\n` : ''}
+
+Les autres semaines sont écrites en parallèle selon cette même structure : respecte-la pour que l’enchaînement reste cohérent.
 Écris maintenant toutes les séances des semaines ${part.map((w) => w.number).join(', ')}.
 Dates autorisées (et seulement celles-ci) :
 ${part.map((w) => `Semaine ${w.number} : ${allowed.get(w.number)!.map((d) => `${d} (${WEEKDAYS[weekday(d)]})`).join(', ')}`).join('\n')}
 ${goal.raceDate <= part[part.length - 1].end ? `La course a lieu le ${goal.raceDate} : séance de type race ce jour-là, avec l’allure objectif.` : ''}
 Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séances au volume visé.`,
-      schema: WeeksSessionsSchema,
-      validate: (r) => {
-        const errors: string[] = []
-        for (const w of part) {
-          const got = r.weeks.find((x) => x.number === w.number)
-          if (!got) errors.push(`Semaine ${w.number} manquante.`)
-          else {
-            errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`))
-            errors.push(...checkWeekTotals(w, got.sessions, zones))
+        schema: WeeksSessionsSchema,
+        validate: (r) => {
+          const errors: string[] = []
+          for (const w of part) {
+            const got = r.weeks.find((x) => x.number === w.number)
+            if (!got) errors.push(`Semaine ${w.number} manquante.`)
+            else {
+              errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`))
+              errors.push(...checkWeekTotals(w, got.sessions, zones))
+            }
           }
-        }
-        return errors
-      },
-    })
+          return errors
+        },
+      })
+      for (const w of part) draft.sessions[w.number] = result.weeks.find((x) => x.number === w.number)!.sessions
+      saveDraft(draft)
+      done++
+      report()
+    }),
+  )
 
-    for (const w of part) {
-      const got = result.weeks.find((x) => x.number === w.number)!
-      w.sessions = withIds(got.sessions)
-    }
-  }
-
+  for (const w of weeks) w.sessions = withIds(draft.sessions[w.number])
   onProgress({ step: 'Terminé', done: total, total })
   return {
     id: crypto.randomUUID(),

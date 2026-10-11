@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { Bug, Download, Upload, Watch } from 'lucide-react'
+import { Bug, Download, Upload } from 'lucide-react'
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
@@ -30,9 +30,7 @@ export function SettingsPage() {
       <div className="space-y-4">
         <Card>
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-muted">
-              <Watch className="size-6" />
-            </div>
+            <img src="/coros-logo.png" alt="" className="size-11 rounded-2xl" />
             <div className="flex-1">
               <CardTitle>COROS</CardTitle>
               <CardDescription>{connected ? 'Connecté' : 'Non connecté'}</CardDescription>

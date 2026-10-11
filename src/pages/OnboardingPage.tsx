@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Activity, ChevronLeft, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { claudeErrorMessage } from '@/lib/coach/claude'
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, planWeeks, today } from '@/lib/coach/dates'
 import { formatClock, formatPace, parseClock } from '@/lib/coach/format'
-import { extractProfile, generatePlan, type Progress } from '@/lib/coach/generate'
+import { clearDraft, extractProfile, generatePlan, isGenerating, loadDraft, type PlanDraft, type Progress } from '@/lib/coach/generate'
 import { DISTANCES, type Goal, type GoalDistance, type Profile } from '@/lib/coach/schema'
 import { bestVdot, thresholdPace } from '@/lib/coach/vdot'
 import { computeVolume } from '@/lib/coach/volume'
@@ -74,17 +74,29 @@ export function OnboardingPage() {
   })
 
   const generate = useMutation({
-    mutationFn: async () => {
-      const final = { ...goal, targetTime: targetText.trim() ? parseClock(targetText) : null }
+    mutationFn: async (resume: PlanDraft | null) => {
+      const final = resume?.goal ?? { ...goal, targetTime: targetText.trim() ? parseClock(targetText) : null }
       store.setGoal(final)
-      return generatePlan(final, store.profile, store.zones, setProgress, store.records)
+      return generatePlan(final, store.profile, store.zones, setProgress, store.records, resume)
     },
     onSuccess: (plan) => {
+      clearDraft()
       store.setPlan(plan)
       navigate('/plan')
     },
+    // En cas d'échec, le brouillon est jeté : relancer repart de l'objectif affiché.
+    onError: () => clearDraft(),
     onSettled: () => setProgress(null),
   })
+
+  // Une génération interrompue par un rechargement reprend là où elle s'était arrêtée.
+  const resumed = useRef(false)
+  useEffect(() => {
+    if (resumed.current) return
+    resumed.current = true
+    const draft = loadDraft()
+    if (draft && !isGenerating()) generate.mutate(draft)
+  }, [generate])
 
   const toggleDay = (d: number) => {
     const days = goal.days.includes(d) ? goal.days.filter((x) => x !== d) : [...goal.days, d].sort()
@@ -106,7 +118,7 @@ export function OnboardingPage() {
             style={{ width: `${Math.max(8, (progress.done / progress.total) * 100)}%` }}
           />
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">Compte une à deux minutes. Garde l’app ouverte.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Compte moins d’une minute. Si l’app se recharge, la génération reprend où elle en était.</p>
       </div>
     )
   }
@@ -231,7 +243,7 @@ export function OnboardingPage() {
       {generate.error && <Card className="text-sm text-destructive whitespace-pre-line">{claudeErrorMessage(generate.error)}</Card>}
       {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground">Indique ton volume actuel pour générer le plan.</p>}
 
-      <Button className="w-full" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate()}>
+      <Button className="w-full" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate(null)}>
         <Sparkles className="size-5" />
         {store.plan ? 'Régénérer mon plan' : 'Générer mon plan'}
       </Button>
