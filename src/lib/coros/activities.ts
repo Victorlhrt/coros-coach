@@ -73,9 +73,44 @@ export function parseSeconds(o: Obj) {
   return clock(raw) ?? num(raw)
 }
 
-/** Normalise la réponse de querySportRecords (format non documenté, lecture tolérante). */
+/**
+ * Réponse texte du serveur COROS : une fiche numérotée par activité.
+ *   1. Outdoor Run — 2026-10-11
+ *      Time Window: startTimestamp=1791698430 | endTimestamp=1791704330
+ *      Duration: 1:33:45 | Distance: 21.11 km
+ *      Average Pace: 4:27 /km | Avg HR: 171 bpm | Calories: 1743 kcal
+ *      LabelId: 480957002474881327 | SportType: 100
+ * Chaque fiche devient un objet aux mêmes clés que le JSON, pour réutiliser la lecture tolérante.
+ */
+function parseTextRecords(text: string): Obj[] {
+  return text
+    .split(/^\s*\d+\.\s+/m)
+    .slice(1)
+    .map((block) => {
+      const [head, ...lines] = block.split('\n')
+      const header = head.match(/^(.*?)\s+[—–-]\s+(\d{4}-\d{2}-\d{2})\s*$/)
+      const o: Obj = header ? { name: header[1].trim(), date: header[2] } : { name: head.trim() }
+      for (const part of lines.flatMap((l) => l.split('|'))) {
+        const eq = part.match(/(\w+)=(\S+)/)
+        if (eq) {
+          o[eq[1]] = eq[2]
+          continue
+        }
+        const kv = part.match(/^\s*([^:]+?):\s*(.+?)\s*$/)
+        if (!kv) continue
+        const key = kv[1].replace(/\s+(\w)/g, (_, c: string) => c.toUpperCase())
+        o[key.charAt(0).toLowerCase() + key.slice(1)] = kv[2]
+      }
+      // L'allure arrive en « 4:27 /km » : on ne garde que l'horloge.
+      if (typeof o.averagePace === 'string') o.averagePace = o.averagePace.split(/\s/)[0]
+      return o
+    })
+    .filter((o) => o.labelId)
+}
+
+/** Normalise la réponse de querySportRecords : texte du serveur COROS, ou JSON (lecture tolérante). */
 export function normalizeActivities(raw: unknown): Activity[] {
-  return findRecords(raw)
+  return (typeof raw === 'string' ? parseTextRecords(raw) : findRecords(raw))
     .map((o) => {
       const date = parseDate(o)
       if (!date) return null
