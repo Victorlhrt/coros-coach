@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Thème : sombre par défaut (classe .dark sur <html>), clair en option. */
+:root {
+  --background: oklch(0.985 0.002 260);
+  --foreground: oklch(0.18 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.95 0.004 260);
+  --muted-foreground: oklch(0.5 0.01 260);
+  --border: oklch(0.91 0.005 260);
+  --accent: oklch(0.62 0.21 35); /* orange vif, lisible sur fond clair */
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.6 0.22 25);
+  --ring: var(--accent);
+
+  /* Code couleur des séances, partout dans l'app */
+  --session-easy: oklch(0.7 0.16 150);
+  --session-tempo: oklch(0.75 0.16 75);
+  --session-interval: oklch(0.65 0.22 20);
+  --session-long: oklch(0.65 0.16 250);
+  --session-recovery: oklch(0.72 0.11 195);
+  --session-rest: oklch(0.6 0.01 260);
+  --session-strength: oklch(0.62 0.19 300);
+}
+
+.dark {
+  --background: oklch(0.145 0.006 260);
+  --foreground: oklch(0.97 0.003 260);
+  --card: oklch(0.2 0.008 260);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.25 0.008 260);
+  --muted-foreground: oklch(0.68 0.01 260);
+  --border: oklch(0.28 0.008 260);
+  --accent: oklch(0.72 0.19 40);
+  --accent-foreground: oklch(0.15 0.01 260);
+  --destructive: oklch(0.65 0.21 25);
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+  --color-session-easy: var(--session-easy);
+  --color-session-tempo: var(--session-tempo);
+  --color-session-interval: var(--session-interval);
+  --color-session-long: var(--session-long);
+  --color-session-recovery: var(--session-recovery);
+  --color-session-rest: var(--session-rest);
+  --color-session-strength: var(--session-strength);
+  --radius-card: 1.125rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+    overscroll-behavior-y: contain;
+  }
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-page-in {
+  animation: page-in 180ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-in { animation: none; }
+}
