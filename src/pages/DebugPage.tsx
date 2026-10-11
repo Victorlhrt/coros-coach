@@ -81,6 +81,7 @@ export function DebugPage() {
 function ToolCard({ tool }: { tool: Tool }) {
   const write = isWriteTool(tool.name)
   const [args, setArgs] = useState('{}')
+  const [copied, setCopied] = useState(false)
   const run = useMutation({ mutationFn: () => corosRead(tool.name, JSON.parse(args) as Record<string, unknown>) })
 
   return (
@@ -111,7 +112,22 @@ function ToolCard({ tool }: { tool: Tool }) {
             </Button>
             {run.error && <p className="text-xs text-destructive">{run.error.message}</p>}
             {run.data !== undefined && (
-              <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-[11px]">{JSON.stringify(run.data, null, 2)}</pre>
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(typeof run.data === 'string' ? run.data : JSON.stringify(run.data, null, 2))
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 1500)
+                  }}
+                >
+                  <Copy className="size-4" /> {copied ? 'Copié' : 'Copier le résultat'}
+                </Button>
+                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-[11px] whitespace-pre-wrap">
+                  {typeof run.data === 'string' ? run.data : JSON.stringify(run.data, null, 2)}
+                </pre>
+              </>
             )}
           </div>
         )}
