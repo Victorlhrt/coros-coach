@@ -42,6 +42,8 @@ export interface PlanDraft {
   skeleton: Skeleton | null
   /** Séances déjà écrites, par numéro de semaine. */
   sessions: Record<number, SessionInput[]>
+  /** La dernière tentative a échoué : on ne reprend pas tout seul, seulement quand on relance. */
+  failed?: boolean
 }
 
 const DRAFT_KEY = 'coach.planDraft'
@@ -61,6 +63,12 @@ function saveDraft(draft: PlanDraft) {
   } catch {
     // Stockage indisponible : la génération continue, sans reprise possible.
   }
+}
+
+/** Garde les étapes réussies après un échec, sans reprise automatique au prochain affichage. */
+export function markDraftFailed() {
+  const draft = loadDraft()
+  if (draft) saveDraft({ ...draft, failed: true })
 }
 
 let running = false
@@ -118,7 +126,7 @@ async function buildPlan(
   const chunks = Math.ceil(slots.length / CHUNK)
   const total = chunks + 1
   const context = `${describeGoal(goal)}\n\n${describeProfile(profile, records)}\n\nZones d’allure :\n${describeZones(zones)}`
-  const draft: PlanDraft = resume ?? { goal, skeleton: null, sessions: {} }
+  const draft: PlanDraft = resume ? { ...resume, failed: false } : { goal, skeleton: null, sessions: {} }
   saveDraft(draft)
 
   onProgress({ step: 'Structure du plan', done: 0, total })
@@ -131,7 +139,7 @@ async function buildPlan(
 Le plan compte ${slots.length} semaines (lundi-dimanche), du ${start} à la semaine de course :
 ${slots.map((s) => `Semaine ${s.number} : ${s.start} → ${s.end}`).join('\n')}
 
-Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine. La dernière semaine contient la course.
+Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine. La dernière semaine contient la course, et son volume inclut la distance de la course.
 Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parcours : où gérer, où relancer, allure cible par portion.`,
       schema: SkeletonSchema,
       maxTokens: 8000,
@@ -254,7 +262,8 @@ export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
 
 /** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 %). */
 export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[]) {
-  if (!week.targetKm) return []
+  // Semaine de course : son volume dépend surtout de la course, la fourchette ne s'applique pas.
+  if (!week.targetKm || sessions.some((s) => s.type === 'race')) return []
   const km = sessions.reduce((a, s) => a + sessionTotals({ ...s, id: '' }, zones).meters, 0) / 1000
   const errors: string[] = []
   if (km < week.targetKm * 0.85 || km > week.targetKm * 1.15) {

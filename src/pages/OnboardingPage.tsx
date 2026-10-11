@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { claudeErrorMessage } from '@/lib/coach/claude'
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, planWeeks, today } from '@/lib/coach/dates'
 import { formatClock, formatPace, parseClock } from '@/lib/coach/format'
-import { clearDraft, extractProfile, generatePlan, isGenerating, loadDraft, type PlanDraft, type Progress } from '@/lib/coach/generate'
+import { clearDraft, extractProfile, generatePlan, isGenerating, loadDraft, markDraftFailed, type PlanDraft, type Progress } from '@/lib/coach/generate'
 import { DISTANCES, type Goal, type GoalDistance, type Profile } from '@/lib/coach/schema'
 import { bestVdot, thresholdPace } from '@/lib/coach/vdot'
 import { computeVolume } from '@/lib/coach/volume'
@@ -76,6 +76,9 @@ export function OnboardingPage() {
   const generate = useMutation({
     mutationFn: async (resume: PlanDraft | null) => {
       const final = resume?.goal ?? { ...goal, targetTime: targetText.trim() ? parseClock(targetText) : null }
+      // Même objectif qu'une génération qui a échoué : on garde les étapes déjà réussies.
+      const previous = loadDraft()
+      if (!resume && previous && JSON.stringify(previous.goal) === JSON.stringify(final)) resume = previous
       store.setGoal(final)
       return generatePlan(final, store.profile, store.zones, setProgress, store.records, resume)
     },
@@ -84,8 +87,7 @@ export function OnboardingPage() {
       store.setPlan(plan)
       navigate('/plan')
     },
-    // En cas d'échec, le brouillon est jeté : relancer repart de l'objectif affiché.
-    onError: () => clearDraft(),
+    onError: () => markDraftFailed(),
     onSettled: () => setProgress(null),
   })
 
@@ -95,7 +97,7 @@ export function OnboardingPage() {
     if (resumed.current) return
     resumed.current = true
     const draft = loadDraft()
-    if (draft && !isGenerating()) generate.mutate(draft)
+    if (draft && !draft.failed && !isGenerating()) generate.mutate(draft)
   }, [generate])
 
   const toggleDay = (d: number) => {
