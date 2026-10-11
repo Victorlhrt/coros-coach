@@ -5,15 +5,20 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import { Chip } from '@/components/ui/chip'
+import { CourseCard } from '@/components/CourseCard'
 import { Input } from '@/components/ui/input'
 import { claudeErrorMessage } from '@/lib/coach/claude'
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, planWeeks, today } from '@/lib/coach/dates'
 import { formatClock, formatPace, parseClock } from '@/lib/coach/format'
 import { extractProfile, generatePlan, type Progress } from '@/lib/coach/generate'
 import { DISTANCES, type Goal, type GoalDistance, type Profile } from '@/lib/coach/schema'
+import { bestVdot, thresholdPace } from '@/lib/coach/vdot'
+import { computeVolume } from '@/lib/coach/volume'
 import { zonesFromThreshold } from '@/lib/coach/zones'
+import { normalizeActivities } from '@/lib/coros/activities'
+import { mergeRecords } from '@/lib/coach/records'
 import { useCorosAuth } from '@/lib/coros/auth-store'
-import { fetchProfileData } from '@/lib/coros/data'
+import { fetchProfileData, fetchRecords } from '@/lib/coros/data'
 import { useSettings } from '@/lib/store/settings'
 import { usePlan } from '@/lib/store/plan'
 
@@ -26,8 +31,11 @@ const PREDICTION_KEY: Partial<Record<GoalDistance, keyof Profile['predictions']>
 
 const DEFAULT_GOAL: Goal = {
   distance: '10k',
-  trailKm: null,
-  trailElevation: null,
+  courseKm: null,
+  elevationGain: null,
+  terrain: 'road',
+  course: null,
+  currentWeeklyKm: null,
   raceDate: addDays(today(), 70),
   targetTime: null,
   level: 'intermediate',
@@ -41,7 +49,7 @@ export function OnboardingPage() {
   const store = usePlan()
   const connected = useCorosAuth((s) => s.connected)
   const hasKey = useSettings((s) => s.anthropicKey.length > 0)
-  const [goal, setGoal] = useState<Goal>(store.goal ?? DEFAULT_GOAL)
+  const [goal, setGoal] = useState<Goal>({ ...DEFAULT_GOAL, ...store.goal })
   const [targetText, setTargetText] = useState(goal.targetTime ? formatClock(goal.targetTime) : '')
   const [progress, setProgress] = useState<Progress | null>(null)
 
@@ -50,10 +58,19 @@ export function OnboardingPage() {
   const prediction = PREDICTION_KEY[goal.distance] && store.profile?.predictions[PREDICTION_KEY[goal.distance]!]
 
   const readCoros = useMutation({
-    mutationFn: async () => extractProfile(await fetchProfileData()),
-    onSuccess: (profile) => {
+    mutationFn: async () => {
+      const [raw, records] = await Promise.all([fetchProfileData(), fetchRecords().catch(() => [])])
+      const volume = computeVolume(normalizeActivities(raw.querySportRecords))
+      const profile = await extractProfile(raw)
+      return { profile: { ...profile, weeklyKm: volume.avg4w || profile.weeklyKm }, volume, records }
+    },
+    onSuccess: ({ profile, volume, records }) => {
       store.setProfile(profile)
-      if (profile.thresholdPace) store.setZones(zonesFromThreshold(profile.thresholdPace))
+      store.setVolume(volume)
+      if (records.length > 0) store.setRecords(mergeRecords(store.records, records))
+      const threshold = profile.thresholdPace ?? (records.length ? thresholdPace(bestVdot(records)!) : null)
+      if (threshold) store.setZones(zonesFromThreshold(threshold))
+      if (volume.avg4w > 0) update({ currentWeeklyKm: Math.round(Math.max(volume.avg4w, volume.lastMonthWeekly)) })
     },
   })
 
@@ -61,7 +78,7 @@ export function OnboardingPage() {
     mutationFn: async () => {
       const final = { ...goal, targetTime: targetText.trim() ? parseClock(targetText) : null }
       store.setGoal(final)
-      return generatePlan(final, store.profile, store.zones, setProgress)
+      return generatePlan(final, store.profile, store.zones, setProgress, store.records)
     },
     onSuccess: (plan) => {
       store.setPlan(plan)
@@ -76,7 +93,7 @@ export function OnboardingPage() {
   }
 
   const targetOk = targetText.trim() === '' || parseClock(targetText) !== null
-  const canGenerate = hasKey && goal.days.length >= 2 && !weeks.error && targetOk
+  const canGenerate = hasKey && goal.days.length >= 2 && !weeks.error && targetOk && !!goal.currentWeeklyKm
 
   if (generate.isPending && progress) {
     return (
@@ -116,7 +133,7 @@ export function OnboardingPage() {
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <Stat label="Allure seuil" value={store.profile.thresholdPace ? `${formatPace(store.profile.thresholdPace)} /km` : '—'} />
             <Stat label="VO2max" value={store.profile.vo2max ? String(store.profile.vo2max) : '—'} />
-            <Stat label="Volume récent" value={store.profile.weeklyKm != null ? `${Math.round(store.profile.weeklyKm)} km/sem` : '—'} />
+            <Stat label="Volume 4 sem." value={store.volume ? `${store.volume.avg4w} km/sem` : '—'} />
             <Stat label="Plus longue sortie" value={store.profile.longestRunKm != null ? `${store.profile.longestRunKm} km` : '—'} />
             <p className="col-span-2 text-muted-foreground">{store.profile.notes}</p>
           </dl>
@@ -146,16 +163,19 @@ export function OnboardingPage() {
           </div>
         </Field>
 
-        {goal.distance === 'trail' && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Distance (km)">
-              <Input inputMode="decimal" value={goal.trailKm ?? ''} onChange={(e) => update({ trailKm: Number(e.target.value) || null })} />
-            </Field>
-            <Field label="Dénivelé (m D+)">
-              <Input inputMode="numeric" value={goal.trailElevation ?? ''} onChange={(e) => update({ trailElevation: Number(e.target.value) || null })} />
-            </Field>
-          </div>
-        )}
+        <Field label="Volume actuel (km par semaine)">
+          <Input
+            inputMode="numeric"
+            placeholder="ex. 32"
+            value={goal.currentWeeklyKm ?? ''}
+            onChange={(e) => update({ currentWeeklyKm: Number(e.target.value.replace(',', '.')) || null })}
+          />
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {store.volume
+              ? `COROS : ${store.volume.avg4w} km/sem sur 4 semaines · mois dernier ${store.volume.lastMonthKm} km (${store.volume.lastMonthWeekly} km/sem) · ce mois-ci ${store.volume.thisMonthKm} km.`
+              : 'Le plan démarre de ce volume. « Lire mes données COROS » le calcule pour toi.'}
+          </p>
+        </Field>
 
         <Field label="Date de course">
           <Input type="date" min={addDays(today(), 28)} value={goal.raceDate} onChange={(e) => update({ raceDate: e.target.value })} />
@@ -209,8 +229,11 @@ export function OnboardingPage() {
         </label>
       </Card>
 
+      <CourseCard goal={goal} update={update} />
+
       {generate.error && <Card className="text-sm text-destructive whitespace-pre-line">{claudeErrorMessage(generate.error)}</Card>}
       {!hasKey && <p className="text-center text-sm text-muted-foreground">Ajoute ta clé API Anthropic dans Réglages pour générer le plan.</p>}
+      {hasKey && !goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground">Indique ton volume actuel pour générer le plan.</p>}
 
       <Button className="w-full" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate()}>
         <Sparkles className="size-5" />

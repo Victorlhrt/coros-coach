@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { CourseProfile } from './gpx'
 
 /** Types de séance, avec un code couleur cohérent partout dans l'app. */
 export const SESSION_TYPES = ['easy', 'tempo', 'interval', 'long', 'recovery', 'strength', 'race'] as const
@@ -58,6 +59,8 @@ export interface Plan {
   createdAt: string
   name: string
   overview: string
+  /** Conseils de gestion de course (parcours, segments) */
+  raceStrategy?: string
   startDate: string
   raceDate: string
   weeks: Week[]
@@ -68,10 +71,19 @@ export interface Plan {
 export const DISTANCES = { '5k': '5 km', '10k': '10 km', half: 'Semi-marathon', marathon: 'Marathon', trail: 'Trail' } as const
 export type GoalDistance = keyof typeof DISTANCES
 
+export const TERRAINS = { road: 'Route', mixed: 'Mixte', trail: 'Sentiers / montagne' } as const
+export type Terrain = keyof typeof TERRAINS
+
 export interface Goal {
   distance: GoalDistance
-  trailKm: number | null
-  trailElevation: number | null
+  /** Distance réelle du parcours (trail, ou lue dans le GPX) */
+  courseKm: number | null
+  elevationGain: number | null
+  terrain: Terrain
+  /** Profil analysé depuis un GPX */
+  course: CourseProfile | null
+  /** Volume actuel (km/semaine) : point de départ du plan */
+  currentWeeklyKm: number | null
   raceDate: string
   targetTime: number | null
   level: 'beginner' | 'intermediate' | 'advanced'
@@ -112,6 +124,7 @@ export interface Zone {
 export const SkeletonSchema = z.object({
   planName: z.string().describe('nom du plan, 60 caractères max'),
   overview: z.string().describe('présentation du plan, 600 caractères max'),
+  raceStrategy: z.string().describe('stratégie de course : gestion de l’allure selon le parcours et ses segments, 3 à 6 phrases'),
   weeks: z.array(
     z.object({
       number: z.number().int(),
@@ -129,7 +142,12 @@ export const WeeksSessionsSchema = z.object({
 })
 
 export const AdjustmentSchema = z.object({
-  summary: z.string().describe('bilan des 7 derniers jours et raison des changements, 2 à 4 phrases'),
+  summary: z.string().describe('bilan des 7 derniers jours (prévu vs réalisé, splits, fatigue) et raison des changements, 3 à 5 phrases'),
+  newThresholdPace: z
+    .number()
+    .int()
+    .nullable()
+    .describe('nouvelle allure seuil en s/km si les résultats (splits des séances de qualité) montrent une progression ou une régression nette, sinon null'),
   changes: z.array(
     z.object({
       date: z.string().describe('YYYY-MM-DD, une date de la semaine en cours à partir d’aujourd’hui'),

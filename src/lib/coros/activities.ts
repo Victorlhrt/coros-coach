@@ -10,7 +10,7 @@ export interface Activity {
   paceSecPerKm: number | null
 }
 
-type Obj = Record<string, unknown>
+export type Obj = Record<string, unknown>
 
 /** Premier tableau d'objets contenant des labelId, où qu'il soit dans la réponse. */
 function findRecords(node: unknown): Obj[] {
@@ -29,12 +29,12 @@ function findRecords(node: unknown): Obj[] {
   return []
 }
 
-function pick(o: Obj, re: RegExp, exclude?: RegExp) {
+export function pick(o: Obj, re: RegExp, exclude?: RegExp) {
   const key = Object.keys(o).find((k) => re.test(k) && !exclude?.test(k))
   return key ? o[key] : undefined
 }
 
-function num(v: unknown) {
+export function num(v: unknown) {
   if (typeof v === 'number') return v
   if (typeof v === 'string') {
     const n = parseFloat(v.replace(',', '.'))
@@ -44,7 +44,7 @@ function num(v: unknown) {
 }
 
 /** "1:02:03" / "45:10" → secondes */
-function clock(v: unknown) {
+export function clock(v: unknown) {
   if (typeof v !== 'string' || !v.includes(':')) return null
   const parts = v.split(':').map(Number)
   return parts.every(Number.isFinite) ? parts.reduce((a, p) => a * 60 + p, 0) : null
@@ -58,7 +58,7 @@ function parseDate(o: Obj) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : null
 }
 
-function parseMeters(o: Obj) {
+export function parseMeters(o: Obj) {
   const raw = pick(o, /distance/i)
   const n = num(raw)
   if (n === null) return null
@@ -68,7 +68,7 @@ function parseMeters(o: Obj) {
   return n < 300 ? n * 1000 : n
 }
 
-function parseSeconds(o: Obj) {
+export function parseSeconds(o: Obj) {
   const raw = pick(o, /workout.?time|duration|total.?time|^time$/i, /stamp/i)
   return clock(raw) ?? num(raw)
 }

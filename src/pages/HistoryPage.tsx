@@ -1,4 +1,5 @@
 import { History } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { TypeBadge } from '@/components/TypeBadge'
@@ -11,6 +12,7 @@ import type { Session } from '@/lib/coach/schema'
 import type { Activity } from '@/lib/coros/activities'
 import { useActivities } from '@/lib/coros/activity-hooks'
 import { useCorosAuth } from '@/lib/coros/auth-store'
+import { linkedActivity } from '@/lib/coach/links'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
@@ -19,16 +21,23 @@ type Row = { date: string; activity: Activity | null; planned: Session | null }
 
 export function HistoryPage() {
   const connected = useCorosAuth((s) => s.connected)
-  const { plan } = usePlan()
+  const { plan, links } = usePlan()
   const { data, isLoading, error } = useActivities()
 
   const now = today()
   const activities = data?.activities ?? []
   const plannedRuns = allSessions(plan).filter((s) => isRun(s) && s.date < now && s.date >= addDays(now, -42))
 
+  // Séances prévues avec leur activité liée (auto ou manuelle), puis les activités hors plan.
+  const linked = new Set<string>()
+  const plannedRows: Row[] = plannedRuns.map((s) => {
+    const activity = linkedActivity(s, links, activities)
+    if (activity) linked.add(activity.labelId)
+    return { date: s.date, activity, planned: s }
+  })
   const rows: Row[] = [
-    ...activities.map((a) => ({ date: a.date, activity: a, planned: plannedRuns.find((s) => s.date === a.date) ?? null })),
-    ...plannedRuns.filter((s) => !activities.some((a) => a.date === s.date)).map((s) => ({ date: s.date, activity: null, planned: s })),
+    ...plannedRows,
+    ...activities.filter((a) => !linked.has(a.labelId)).map((a) => ({ date: a.date, activity: a, planned: null })),
   ].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
@@ -71,12 +80,13 @@ export function HistoryPage() {
 
 function HistoryRow({ row }: { row: Row }) {
   const zones = usePlan((s) => s.zones)
+  const fb = usePlan((s) => (row.planned ? s.feedback[row.planned.id] : undefined))
   const units = useSettings((s) => s.units)
   const { activity, planned } = row
   const target = planned ? sessionTotals(planned, zones) : null
   const delta = activity?.meters && target?.meters ? (activity.meters - target.meters) / target.meters : null
 
-  return (
+  const body = (
     <Card className="p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-muted-foreground capitalize">{formatDay(row.date, { weekday: 'short', day: 'numeric', month: 'short' })}</p>
@@ -105,7 +115,20 @@ function HistoryRow({ row }: { row: Row }) {
           )}
         </p>
       )}
+      {fb && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          {'★'.repeat(fb.rating)}
+          {'☆'.repeat(5 - fb.rating)} · RPE {fb.rpe}/10{fb.tags.length > 0 && ` · ${fb.tags.join(', ')}`}
+        </p>
+      )}
     </Card>
+  )
+  return row.planned ? (
+    <Link to={`/seance/${row.planned.id}`} className="block">
+      {body}
+    </Link>
+  ) : (
+    body
   )
 }
 

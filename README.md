@@ -73,7 +73,21 @@ Partager → « Sur l'écran d'accueil ».
 4. **Ajuster ma semaine** : récup, HRV, sommeil, FC repos, charge et activités des 7 derniers jours →
    Claude propose des remplacements / suppressions / ajouts, affichés avant/après, appliqués après accord.
 
-`npm run check` vérifie hors ligne qu'un plan type produit un payload COROS conforme.
+5. **Profil de course** : GPX analysé dans le navigateur (distance, D+/D-, profil, montées et descentes
+   marquées) ou terrain + D+ saisis ; transmis à Claude, qui adapte la préparation et rédige une stratégie de course.
+6. **Volume de départ** : calculé depuis les activités COROS (4 dernières semaines, mois en cours / précédent),
+   modifiable. La génération refuse un départ trop bas/haut, une hausse > 10 % et des semaines dont les
+   séances ne totalisent pas le volume prévu (±15 %).
+7. **Records 12 mois** (Réglages) : meilleur temps par distance via `querySportRecords` filtré par distance,
+   ou saisi à la main → VDOT (Daniels), allure seuil, prédictions.
+8. **Activités liées** : chaque séance passée prend automatiquement l'activité COROS du même jour la plus
+   proche en distance (modifiable), avec ses splits (`queryActivityLapData`).
+9. **Ressenti** : note 1-5, RPE 1-10, sensations, commentaire par séance.
+10. **Bilan hebdo automatique** : à la première ouverture de chaque semaine, Claude analyse prévu/réalisé,
+    splits, ressenti, récupération, HRV, sommeil et propose les ajustements (et une nouvelle allure seuil si
+    besoin). Appliquer reste un geste explicite, l'envoi sur la montre demande confirmation.
+
+`npm run check` lance les tests hors ligne (payload COROS, analyse GPX, VDOT, règles de volume, liaison auto).
 
 ## Structure
 

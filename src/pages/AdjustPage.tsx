@@ -6,13 +6,13 @@ import { TypeBadge } from '@/components/TypeBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { proposeAdjustment } from '@/lib/coach/adapt'
 import { claudeErrorMessage } from '@/lib/coach/claude'
-import { formatDay } from '@/lib/coach/dates'
-import { formatDistance, formatDuration } from '@/lib/coach/format'
+import { formatDay, today } from '@/lib/coach/dates'
+import { formatDistance, formatDuration, formatPace } from '@/lib/coach/format'
 import { sessionTotals } from '@/lib/coach/metrics'
+import { runReview } from '@/lib/coach/review'
 import type { Adjustment, SessionInput, Zone } from '@/lib/coach/schema'
-import { fetchRecentData } from '@/lib/coros/data'
+import { zonesFromThreshold } from '@/lib/coach/zones'
 import { pushDays } from '@/lib/coros/sync'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
@@ -22,22 +22,29 @@ import { cn } from '@/lib/utils'
 export function AdjustPage() {
   const navigate = useNavigate()
   const store = usePlan()
-  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [now] = useState(today)
+  const week = store.plan?.weeks.find((w) => w.start <= now && w.end >= now)
+  const review = week ? store.reviews[week.number] : undefined
+  // Tout est coché par défaut : on retient seulement ce que l'utilisateur décoche.
+  const [unchecked, setUnchecked] = useState<Set<number>>(new Set())
+  const [updateZones, setUpdateZones] = useState(true)
 
   const analyse = useMutation({
-    mutationFn: async () => {
-      if (!store.plan || !store.goal) throw new Error('Crée d’abord un plan.')
-      const recent = await fetchRecentData()
-      return proposeAdjustment({ plan: store.plan, goal: store.goal, profile: store.profile, zones: store.zones, recent })
-    },
-    onSuccess: (a) => setSelected(new Set(a.changes.map((_, i) => i))),
+    mutationFn: runReview,
+    onSuccess: () => setUnchecked(new Set()),
   })
 
   const apply = useMutation({
     mutationFn: async (changes: Adjustment['changes']) => {
       store.applyChanges(changes)
+      const pace = review?.adjustment.newThresholdPace
+      if (pace && updateZones) {
+        store.setZones(zonesFromThreshold(pace))
+        if (store.profile) store.setProfile({ ...store.profile, thresholdPace: pace })
+      }
+      if (week) store.setReviewStatus(week.number, 'applied')
       const { plan, coros } = usePlan.getState()
-      if (!coros.created || !plan) return 'local'
+      if (!coros.created || !plan || changes.length === 0) return 'local'
       const sent = await pushDays(plan, changes.map((c) => c.date), 'les séances ajustées')
       return sent ? 'sent' : 'local'
     },
@@ -51,8 +58,9 @@ export function AdjustPage() {
     },
   })
 
-  const result = analyse.data
-  const chosen = result?.changes.filter((_, i) => selected.has(i)) ?? []
+  const result = review?.adjustment
+  const chosen = result?.changes.filter((_, i) => !unchecked.has(i)) ?? []
+  const pending = review?.status === 'pending'
 
   return (
     <div className="space-y-4 pb-4">
@@ -60,36 +68,64 @@ export function AdjustPage() {
         <Link to="/plan" aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="text-3xl font-extrabold tracking-tight">Ajuster ma semaine</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">Bilan de la semaine</h1>
       </header>
 
       {!result && !analyse.isPending && (
         <Card>
           <CardDescription>
-            Claude lit ta récupération, ta HRV, ton sommeil, ta FC de repos et tes activités des 7 derniers jours, puis propose des
-            changements pour le reste de la semaine. Rien n’est modifié sans ton accord.
+            Claude compare tes séances prévues avec les activités COROS liées et leurs splits, lit ta récupération, ta HRV, ton
+            sommeil et ta FC de repos, puis propose des changements pour le reste de la semaine. Rien n’est modifié sans ton accord.
           </CardDescription>
           <Button className="mt-4 w-full" onClick={() => analyse.mutate()}>
             <Wand2 className="size-5" /> Analyser ma semaine
           </Button>
-          {analyse.error && <p className="mt-3 text-sm text-destructive whitespace-pre-line">{claudeErrorMessage(analyse.error)}</p>}
         </Card>
       )}
+      {analyse.error && <Card className="text-sm text-destructive whitespace-pre-line">{claudeErrorMessage(analyse.error)}</Card>}
 
       {analyse.isPending && (
         <div className="space-y-3">
+          <p className="px-1 text-sm text-muted-foreground">Lecture des activités, des splits et de la récupération…</p>
           <Skeleton className="h-28" />
           <Skeleton className="h-40" />
           <Skeleton className="h-40" />
         </div>
       )}
 
-      {result && (
+      {result && !analyse.isPending && (
         <>
           <Card>
-            <p className="font-semibold">Bilan</p>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Bilan</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(review!.createdAt).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                {review!.status === 'applied' && ' · appliqué'}
+                {review!.status === 'dismissed' && ' · ignoré'}
+              </p>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">{result.summary}</p>
           </Card>
+
+          {result.newThresholdPace && pending && (
+            <Card>
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-5 accent-[var(--accent)]"
+                  checked={updateZones}
+                  onChange={(e) => setUpdateZones(e.target.checked)}
+                />
+                <div>
+                  <p className="font-semibold">Nouvelle allure seuil : {formatPace(result.newThresholdPace)} /km</p>
+                  <p className="text-sm text-muted-foreground">
+                    {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule toutes
+                    tes zones d’allure.
+                  </p>
+                </div>
+              </label>
+            </Card>
+          )}
 
           {result.changes.length === 0 ? (
             <p className="py-4 text-center text-muted-foreground">Aucun changement nécessaire. Continue comme prévu.</p>
@@ -98,9 +134,10 @@ export function AdjustPage() {
               <ChangeCard
                 key={i}
                 change={c}
-                checked={selected.has(i)}
+                checked={pending && !unchecked.has(i)}
+                disabled={!pending}
                 onToggle={() =>
-                  setSelected((s) => {
+                  setUnchecked((s) => {
                     const n = new Set(s)
                     if (n.has(i)) n.delete(i)
                     else n.add(i)
@@ -111,13 +148,22 @@ export function AdjustPage() {
             ))
           )}
 
-          {result.changes.length > 0 && (
-            <Button className="w-full" disabled={chosen.length === 0 || apply.isPending} onClick={() => apply.mutate(chosen)}>
-              Appliquer {chosen.length} changement{chosen.length > 1 ? 's' : ''}
-            </Button>
+          {pending && (
+            <>
+              <Button
+                className="w-full"
+                disabled={(chosen.length === 0 && !result.newThresholdPace) || apply.isPending}
+                onClick={() => apply.mutate(chosen)}
+              >
+                {chosen.length > 0 ? `Appliquer ${chosen.length} changement${chosen.length > 1 ? 's' : ''}` : 'Mettre à jour mes zones'}
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => week && store.setReviewStatus(week.number, 'dismissed')}>
+                Ignorer ce bilan
+              </Button>
+            </>
           )}
-          <Button variant="ghost" className="w-full" onClick={() => analyse.reset()}>
-            Recommencer
+          <Button variant="secondary" className="w-full" onClick={() => analyse.mutate()}>
+            <Wand2 className="size-5" /> Analyser à nouveau
           </Button>
         </>
       )}
@@ -125,16 +171,26 @@ export function AdjustPage() {
   )
 }
 
-function ChangeCard({ change, checked, onToggle }: { change: Adjustment['changes'][number]; checked: boolean; onToggle: () => void }) {
+function ChangeCard({
+  change,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  change: Adjustment['changes'][number]
+  checked: boolean
+  disabled: boolean
+  onToggle: () => void
+}) {
   const { plan, zones } = usePlan()
   const units = useSettings((s) => s.units)
   const before = allSessions(plan).filter((s) => s.date === change.date && s.type !== 'strength')
   const actionLabel = { replace: 'Modifiée', remove: 'Supprimée', add: 'Ajoutée' }[change.action]
 
   return (
-    <Card className={cn('p-4 transition-opacity', !checked && 'opacity-50')}>
+    <Card className={cn('p-4 transition-opacity', !checked && !disabled && 'opacity-50')}>
       <label className="flex items-start gap-3">
-        <input type="checkbox" className="mt-1 size-5 accent-[var(--accent)]" checked={checked} onChange={onToggle} />
+        <input type="checkbox" className="mt-1 size-5 accent-[var(--accent)]" checked={checked} disabled={disabled} onChange={onToggle} />
         <div className="flex-1">
           <p className="text-xs font-semibold tracking-wide text-accent uppercase">
             {actionLabel} · <span className="capitalize">{formatDay(change.date, { weekday: 'long', day: 'numeric' })}</span>

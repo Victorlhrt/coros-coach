@@ -1,7 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
 import { ChevronLeft, Repeat as RepeatIcon, Send } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { ActivityLinkCard } from '@/components/ActivityLinkCard'
 import { EmptyState } from '@/components/EmptyState'
+import { FeedbackCard } from '@/components/FeedbackCard'
 import { SyncBadge } from '@/components/SyncBadge'
 import { TypeBadge } from '@/components/TypeBadge'
 import { WorkoutChart } from '@/components/WorkoutChart'
@@ -24,6 +27,11 @@ export function SessionPage() {
   const { plan, zones, coros } = usePlan()
   const units = useSettings((s) => s.units)
   const session = allSessions(plan).find((s) => s.id === id)
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.hash === '#ressenti') document.getElementById('ressenti')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [location.hash])
 
   const push = useMutation({
     mutationFn: () => pushDays(plan!, [session!.date], `la séance du ${formatDay(session!.date)}`),
@@ -104,6 +112,9 @@ export function SessionPage() {
           </ul>
         </Card>
       )}
+
+      {session.date <= today() && session.type !== 'strength' && <ActivityLinkCard session={session} />}
+      {session.date <= today() && <FeedbackCard sessionId={session.id} />}
 
       <Card>
         <div className="flex items-center justify-between">

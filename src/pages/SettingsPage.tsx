@@ -3,6 +3,7 @@ import { Bug, Download, Eye, EyeOff, ShieldAlert, Upload, Watch } from 'lucide-r
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { RecordsCard } from '@/components/RecordsCard'
 import { ZonesEditor } from '@/components/ZonesEditor'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
@@ -116,11 +117,31 @@ export function SettingsPage() {
           </div>
         </Card>
 
+        <RecordsCard />
+
         <Card>
           <CardTitle>Zones d’allure</CardTitle>
           <div className="mt-4">
             <ZonesEditor />
           </div>
+        </Card>
+
+        <Card>
+          <label className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle>Bilan automatique</CardTitle>
+              <CardDescription className="mt-1">
+                À la première ouverture de chaque semaine, Claude analyse la semaine écoulée (splits, ressenti, récupération) et
+                propose les ajustements.
+              </CardDescription>
+            </div>
+            <input
+              type="checkbox"
+              className="size-6 shrink-0 accent-[var(--accent)]"
+              checked={settings.autoReview}
+              onChange={(e) => settings.set({ autoReview: e.target.checked })}
+            />
+          </label>
         </Card>
 
         <PlanData />
@@ -138,8 +159,9 @@ function PlanData() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   function exportJson() {
-    const { goal, profile, zones, plan, coros } = usePlan.getState()
-    const blob = new Blob([JSON.stringify({ version: 1, goal, profile, zones, plan, coros }, null, 2)], { type: 'application/json' })
+    const { goal, profile, zones, plan, coros, links, reviews, records, volume, feedback } = usePlan.getState()
+    const data = { version: 2, goal, profile, zones, plan, coros, links, reviews, records, volume, feedback }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

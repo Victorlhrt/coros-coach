@@ -3,6 +3,7 @@ import { WEEKDAYS, addDays, today, weekday } from './dates'
 import { COACH_SYSTEM, describeGoal, describeProfile, describeZones } from './prompts'
 import { AdjustmentSchema, type Adjustment, type Goal, type Plan, type Profile, type Session, type Zone } from './schema'
 import { validateSessions } from './validate'
+import type { RaceRecord } from './vdot'
 
 function describeSession(s: Session) {
   return JSON.stringify({ date: s.date, type: s.type, title: s.title, description: s.description, blocks: s.blocks, strengthMinutes: s.strengthMinutes })
@@ -15,14 +16,16 @@ export async function proposeAdjustment(params: {
   profile: Profile | null
   zones: Zone[]
   recent: Record<string, unknown>
+  /** Prévu vs réalisé des 7 derniers jours, avec les splits */
+  performance: string
+  records?: RaceRecord[]
 }): Promise<Adjustment> {
-  const { plan, goal, profile, zones, recent } = params
+  const { plan, goal, profile, zones, recent, performance, records = [] } = params
   const from = today()
   const week = plan.weeks.find((w) => w.start <= from && w.end >= from)
   if (!week) throw new Error('Aucune semaine du plan ne couvre aujourd’hui.')
 
   const remaining = week.sessions.filter((s) => s.date >= from)
-  const done = plan.weeks.flatMap((w) => w.sessions).filter((s) => s.date < from && s.date >= addDays(from, -7))
   const allowed: string[] = []
   for (let d = from; d <= week.end; d = addDays(d, 1)) if (goal.days.includes(weekday(d))) allowed.push(d)
 
@@ -34,23 +37,30 @@ export async function proposeAdjustment(params: {
     system: COACH_SYSTEM,
     prompt: `${describeGoal(goal)}
 
-${describeProfile(profile)}
+${describeProfile(profile, records)}
 
 Zones d’allure :
 ${describeZones(zones)}
 
 Semaine ${week.number}/${plan.weeks.length} (${week.phase}) : ${week.focus}. Volume visé ${week.targetKm} km.
 
-Séances prévues sur les 7 derniers jours :
-${done.map(describeSession).join('\n') || 'aucune'}
+Prévu vs réalisé sur les 7 derniers jours (activités COROS liées et splits) :
+${performance}
 
 Séances restantes cette semaine (à partir d’aujourd’hui ${from}) :
 ${remaining.map(describeSession).join('\n') || 'aucune'}
 
-Données COROS des 7 derniers jours (activités réalisées, récupération, HRV, sommeil, FC repos, charge) :
+Données COROS des 7 derniers jours (récupération, HRV, sommeil, FC repos, charge) :
 ${dump}
 
-Compare le prévu et le réalisé, évalue la fatigue, puis propose les ajustements nécessaires pour les séances restantes de la semaine.
+Analyse comme un coach :
+- séances réalisées ou manquées, volume réel vs prévu ;
+- splits des séances de qualité : allures tenues sur les répétitions, régularité, dérive en fin de séance ;
+- ressenti du coureur (note, RPE, sensations, commentaire) : un RPE élevé sur une séance facile, des jambes lourdes ou une douleur imposent d'alléger ; « allures trop faciles » avec un RPE bas autorise à durcir ;
+- fatigue : récupération, HRV vs normale, sommeil, FC de repos, ratio de charge.
+Une douleur signalée prime sur tout : réduis l'intensité et le volume, et conseille de consulter si elle persiste.
+Puis propose les ajustements des séances restantes de la semaine (intensité, volume, allures cibles).
+Si les splits montrent que les allures cibles sont clairement trop faciles ou trop dures, propose une nouvelle allure seuil (newThresholdPace).
 Dates modifiables : ${allowed.map((d) => `${d} (${WEEKDAYS[weekday(d)]})`).join(', ')}.
 - replace : remplace la séance prévue à cette date par "session".
 - remove : supprime la séance prévue ce jour (repos).

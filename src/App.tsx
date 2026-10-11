@@ -5,6 +5,8 @@ import { PullToRefresh } from './components/PullToRefresh'
 import { Toaster } from './components/Toaster'
 import { TabBar } from './components/TabBar'
 import { Button } from './components/ui/button'
+import { useAutoLink } from './lib/coach/links'
+import { useWeeklyReview } from './lib/coach/review'
 import { finishCorosLogin } from './lib/coros/client'
 import { useSettings } from './lib/store/settings'
 import { AdjustPage } from './pages/AdjustPage'
@@ -51,6 +53,8 @@ function useOAuthCallback() {
 
 function Shell() {
   const location = useLocation()
+  useAutoLink()
+  useWeeklyReview()
   return (
     <>
       <main

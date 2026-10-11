@@ -1,6 +1,7 @@
-import { DISTANCES, type Goal, type Profile, type Zone } from './schema'
+import { DISTANCES, TERRAINS, type Goal, type Profile, type Zone } from './schema'
 import { WEEKDAYS, formatDay } from './dates'
 import { formatClock, formatPace } from './format'
+import { RECORD_DISTANCES, bestVdot, predictTime, thresholdPace, type RaceRecord } from './vdot'
 
 export const COACH_SYSTEM = `Tu es un coach de course à pied expérimenté (méthodes type Daniels, Pfitzinger, Canova adaptées au niveau).
 Tu écris en français, avec un ton direct et bienveillant.
@@ -19,27 +20,67 @@ Format des blocs :
 - paceFast / paceSlow (secondes/km) pour les blocs de qualité (zones 3 à 6), tirés du tableau des zones ou de l'allure objectif ; null pour l'endurance, la récupération, l'échauffement et le retour au calme (pilotage à la fréquence cardiaque).
 - Un fractionné = un bloc "repeat" (repeats 1 à 20) contenant uniquement des étapes work et recovery.
 - Pas de séance de repos : un jour sans séance est un jour de repos.
-- Renforcement (type strength) : blocks vide, strengthMinutes renseigné, exercices dans la description.`
+- Volume : l'app additionne les distances ; un bloc en durée est converti avec l'allure médiane de sa zone (tableau des zones). Donne l'endurance et la sortie longue en distance pour que le volume soit exact, et respecte le volume hebdomadaire visé à ±10 %.
+- Renforcement (type strength) : blocks vide, strengthMinutes renseigné, exercices dans la description.
+
+Spécificité du parcours :
+- Si le parcours a du dénivelé, prépare-le : côtes courtes (VMA) et longues (seuil) en phase spécifique, sorties longues vallonnées, travail de descente (excentrique) avant une course descendante, renforcement des quadriceps.
+- Pour une séance en côte, l'allure n'a pas de sens : pilote à la zone FC (paceFast/paceSlow null) avec des cibles en durée, et précise dans la description « en côte de 6-8 % » par exemple.
+- En trail, raisonne en temps plutôt qu'en distance pour les sorties longues.`
 
 export function describeZones(zones: Zone[]) {
   return zones.map((z) => `Z${z.zone} ${z.name} : ${formatPace(z.paceFast)}–${formatPace(z.paceSlow)} /km`).join('\n')
 }
 
+export function describeCourse(goal: Goal) {
+  const c = goal.course
+  if (!c) {
+    if (!goal.elevationGain) return `Parcours : ${TERRAINS[goal.terrain].toLowerCase()}, profil non fourni.`
+    return `Parcours : ${TERRAINS[goal.terrain].toLowerCase()}, ${goal.elevationGain} m D+.`
+  }
+  const segments = [...c.segments]
+    .sort((a, b) => b.elevation - a.elevation)
+    .slice(0, 10)
+    .sort((a, b) => a.startKm - b.startKm)
+    .map((s) => `- ${s.kind === 'climb' ? 'montée' : 'descente'} km ${s.startKm} → ${s.endKm} : ${s.elevation} m, ${s.grade} %`)
+  return [
+    `Parcours (GPX « ${c.name} ») : ${c.distanceKm} km, ${c.gain} m D+, ${c.loss} m D-, altitude ${c.minEle}–${c.maxEle} m, terrain ${TERRAINS[goal.terrain].toLowerCase()}.`,
+    segments.length > 0 ? `Segments marquants :\n${segments.join('\n')}` : 'Parcours roulant, sans montée marquée.',
+  ].join('\n')
+}
+
 export function describeGoal(goal: Goal) {
+  const distance = goal.courseKm ?? goal.course?.distanceKm
   const lines = [
-    `Objectif : ${DISTANCES[goal.distance]}${goal.distance === 'trail' && goal.trailKm ? ` de ${goal.trailKm} km${goal.trailElevation ? `, ${goal.trailElevation} m D+` : ''}` : ''}`,
+    `Objectif : ${DISTANCES[goal.distance]}${distance && (goal.distance === 'trail' || goal.course) ? ` (${distance} km)` : ''}`,
     `Date de course : ${goal.raceDate} (${formatDay(goal.raceDate)})`,
     `Temps visé : ${goal.targetTime ? formatClock(goal.targetTime) : 'non précisé (finir en forme)'}`,
     `Niveau : ${{ beginner: 'débutant', intermediate: 'intermédiaire', advanced: 'confirmé' }[goal.level]}`,
     `Jours disponibles : ${goal.days.map((d) => WEEKDAYS[d]).join(', ')}`,
     `Jour de sortie longue : ${WEEKDAYS[goal.longRunDay]}`,
     `Renforcement : ${goal.strength ? 'oui, 1 séance de 20-30 min par semaine sur un jour disponible' : 'non'}`,
+    goal.currentWeeklyKm
+      ? `Volume actuel : ${goal.currentWeeklyKm} km/semaine. C’est le point de départ : la semaine 1 doit être proche de ce volume (jamais une baisse brutale), puis progresser.`
+      : 'Volume actuel : inconnu, pars prudemment.',
+    describeCourse(goal),
   ]
   return lines.join('\n')
 }
 
-export function describeProfile(profile: Profile | null) {
-  if (!profile) return 'Données COROS : indisponibles (pars d’un niveau prudent).'
+export function describeRecords(records: RaceRecord[]) {
+  if (records.length === 0) return ''
+  const v = bestVdot(records)!
+  const lines = records.map((r) => {
+    const d = RECORD_DISTANCES.find((x) => x.key === r.key)!
+    return `- ${d.label} : ${formatClock(r.seconds)}${r.date ? ` (${r.date})` : ''}`
+  })
+  const preds = RECORD_DISTANCES.map((d) => `${d.label} ${formatClock(predictTime(v, d.meters))}`).join(', ')
+  return `Records des 12 derniers mois :\n${lines.join('\n')}\nVDOT ${v} → allure seuil ${formatPace(thresholdPace(v))} /km ; équivalences : ${preds}.`
+}
+
+export function describeProfile(profile: Profile | null, records: RaceRecord[] = []) {
+  const rec = describeRecords(records)
+  if (!profile) return rec || 'Données COROS : indisponibles (pars d’un niveau prudent).'
   const p = profile.predictions
   const pred = [
     p.fiveK && `5 km ${formatClock(p.fiveK)}`,
@@ -57,6 +98,7 @@ export function describeProfile(profile: Profile | null) {
     profile.longestRunKm != null && `- plus longue sortie récente : ${profile.longestRunKm} km`,
     profile.runsPerWeek != null && `- sorties par semaine : ${profile.runsPerWeek}`,
     `- ${profile.notes}`,
+    rec,
   ]
     .filter(Boolean)
     .join('\n')

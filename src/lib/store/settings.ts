@@ -14,6 +14,8 @@ interface SettingsState {
   model: string
   units: 'metric' | 'imperial'
   theme: 'dark' | 'light'
+  /** Bilan automatique à chaque nouvelle semaine */
+  autoReview: boolean
   set: (patch: Partial<Omit<SettingsState, 'set'>>) => void
 }
 
@@ -24,6 +26,7 @@ export const useSettings = create<SettingsState>()(
       model: DEFAULT_MODEL,
       units: 'metric',
       theme: 'dark',
+      autoReview: true,
       set: (patch) => set(patch),
     }),
     {

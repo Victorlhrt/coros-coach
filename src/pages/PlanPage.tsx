@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { CalendarDays, Send, Wand2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ElevationChart } from '@/components/ElevationChart'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { SessionCard } from '@/components/SessionCard'
@@ -19,7 +20,7 @@ import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function PlanPage() {
-  const { plan, zones, coros } = usePlan()
+  const { plan, zones, coros, goal } = usePlan()
   const units = useSettings((s) => s.units)
   const [now] = useState(today)
   const current = plan?.weeks.find((w) => w.start <= now && w.end >= now)?.number ?? 1
@@ -71,6 +72,23 @@ export function PlanPage() {
           </Link>
         }
       />
+
+      {(goal?.course || plan.raceStrategy) && (
+        <Card className="mb-4 p-4">
+          <details>
+            <summary className="flex cursor-pointer list-none items-center justify-between">
+              <span className="font-semibold">Parcours et stratégie</span>
+              {goal?.course && (
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {goal.course.distanceKm} km · {goal.course.gain} m D+
+                </span>
+              )}
+            </summary>
+            {goal?.course && <ElevationChart course={goal.course} className="mt-3" />}
+            {plan.raceStrategy && <p className="mt-3 text-sm text-muted-foreground">{plan.raceStrategy}</p>}
+          </details>
+        </Card>
+      )}
 
       <Card className="p-4">
         <p className="text-sm font-medium text-muted-foreground">Progression du volume</p>

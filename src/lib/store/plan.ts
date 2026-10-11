@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { withIds } from '@/lib/coach/generate'
+import type { Feedback } from '@/lib/coach/feedback'
 import type { Adjustment, Goal, Plan, Profile, Session, Zone } from '@/lib/coach/schema'
+import type { RaceRecord } from '@/lib/coach/vdot'
+import type { Volume } from '@/lib/coach/volume'
 import { DEFAULT_ZONES } from '@/lib/coach/zones'
 
 interface CorosSync {
@@ -13,12 +16,35 @@ interface CorosSync {
   synced: Record<string, string>
 }
 
+/** Activité COROS liée à une séance. labelId null = déliée volontairement (pas de liaison auto). */
+export interface ActivityLink {
+  labelId: string | null
+  sportType: number
+  auto: boolean
+}
+
+/** Bilan hebdomadaire proposé par Claude. */
+export interface Review {
+  createdAt: string
+  adjustment: Adjustment
+  status: 'pending' | 'applied' | 'dismissed'
+}
+
 interface PlanState {
   goal: Goal | null
   profile: Profile | null
   zones: Zone[]
   plan: Plan | null
   coros: CorosSync
+  links: Record<string, ActivityLink>
+  /** Ressenti par séance */
+  feedback: Record<string, Feedback>
+  /** Records des 12 derniers mois (COROS ou saisis) */
+  records: RaceRecord[]
+  /** Volume réel calculé depuis COROS */
+  volume: Volume | null
+  /** Bilans par numéro de semaine */
+  reviews: Record<number, Review>
   setGoal: (goal: Goal) => void
   setProfile: (profile: Profile | null) => void
   setZones: (zones: Zone[]) => void
@@ -26,8 +52,28 @@ interface PlanState {
   setCoros: (patch: Partial<CorosSync>) => void
   markSynced: (hashes: Record<string, string>) => void
   applyChanges: (changes: Adjustment['changes']) => void
+  setLinks: (links: Record<string, ActivityLink>) => void
+  setRecords: (records: RaceRecord[]) => void
+  setFeedback: (sessionId: string, feedback: Feedback | null) => void
+  setVolume: (volume: Volume | null) => void
+  saveReview: (week: number, adjustment: Adjustment) => void
+  setReviewStatus: (week: number, status: Review['status']) => void
   importData: (data: unknown) => void
   reset: () => void
+}
+
+/** Objectif d'avant le profil de parcours (trailKm / trailElevation) → format actuel. */
+function migrateGoal(goal: unknown): Goal | null {
+  if (!goal || typeof goal !== 'object') return null
+  const g = goal as Record<string, unknown>
+  return {
+    courseKm: (g.trailKm as number | null) ?? null,
+    elevationGain: (g.trailElevation as number | null) ?? null,
+    terrain: g.distance === 'trail' ? 'trail' : 'road',
+    course: null,
+    currentWeeklyKm: null,
+    ...g,
+  } as Goal
 }
 
 const EMPTY_SYNC: CorosSync = { planId: null, created: false, synced: {} }
@@ -40,10 +86,15 @@ export const usePlan = create<PlanState>()(
       zones: DEFAULT_ZONES,
       plan: null,
       coros: EMPTY_SYNC,
+      links: {},
+      reviews: {},
+      records: [],
+      volume: null,
+      feedback: {},
       setGoal: (goal) => set({ goal }),
       setProfile: (profile) => set({ profile }),
       setZones: (zones) => set({ zones }),
-      setPlan: (plan) => set({ plan, coros: EMPTY_SYNC }),
+      setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
       setCoros: (patch) => set((s) => ({ coros: { ...s.coros, ...patch } })),
       markSynced: (hashes) => set((s) => ({ coros: { ...s.coros, synced: { ...s.coros.synced, ...hashes } } })),
       applyChanges: (changes) =>
@@ -60,20 +111,48 @@ export const usePlan = create<PlanState>()(
           })
           return { plan: { ...s.plan, weeks } }
         }),
+      setLinks: (links) => set((s) => ({ links: { ...s.links, ...links } })),
+      setRecords: (records) => set({ records }),
+      setFeedback: (sessionId, feedback) =>
+        set((s) => {
+          const next = { ...s.feedback }
+          if (feedback) next[sessionId] = feedback
+          else delete next[sessionId]
+          return { feedback: next }
+        }),
+      setVolume: (volume) => set({ volume }),
+      saveReview: (week, adjustment) =>
+        set((s) => ({ reviews: { ...s.reviews, [week]: { createdAt: new Date().toISOString(), adjustment, status: 'pending' } } })),
+      setReviewStatus: (week, status) =>
+        set((s) => (s.reviews[week] ? { reviews: { ...s.reviews, [week]: { ...s.reviews[week], status } } } : s)),
       importData: (data) => {
         const d = data as Partial<PlanState>
         if (!d || typeof d !== 'object' || !d.plan?.weeks) throw new Error('Fichier invalide : aucun plan trouvé.')
         set({
-          goal: d.goal ?? null,
+          goal: migrateGoal(d.goal),
           profile: d.profile ?? null,
           zones: d.zones ?? DEFAULT_ZONES,
           plan: d.plan,
           coros: d.coros ?? EMPTY_SYNC,
+          links: d.links ?? {},
+          reviews: d.reviews ?? {},
+          records: d.records ?? [],
+          feedback: d.feedback ?? {},
+          volume: d.volume ?? null,
         })
       },
-      reset: () => set({ plan: null, coros: EMPTY_SYNC }),
+      reset: () => set({ plan: null, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
     }),
-    { name: 'coach.plan' },
+    {
+      name: 'coach.plan',
+      version: 1,
+      // v0 : objectif sans profil de parcours (trailKm / trailElevation).
+      migrate: (state, version) => {
+        const s = state as Record<string, unknown>
+        if (version < 1) s.goal = migrateGoal(s.goal)
+        return { links: {}, reviews: {}, records: [], volume: null, feedback: {}, ...s } as unknown as PlanState
+      },
+    },
   ),
 )
 

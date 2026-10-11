@@ -1,19 +1,30 @@
 import { addDays, toCoros, today } from '@/lib/coach/dates'
+import { RECORD_DISTANCES, type RaceRecord } from '@/lib/coach/vdot'
+import { normalizeActivities } from './activities'
 import { corosRead } from './client'
 
 const RUN_CODES = [100, 101, 102, 103]
+
+interface RecordsQuery {
+  startDate: string
+  endDate: string
+  codes?: number[]
+  minKm?: number
+  maxKm?: number
+  limit?: number
+}
 
 /**
  * querySportRecords déclare tous ses filtres comme requis : on envoie d'abord des null,
  * puis des valeurs permissives si le serveur les refuse.
  */
-export async function fetchRunRecords(days: number) {
-  const base = { startDate: toCoros(addDays(today(), -days)), endDate: toCoros(today()), sportTypeCodes: RUN_CODES, limit: 100 }
+export async function querySportRecords({ startDate, endDate, codes = RUN_CODES, minKm, maxKm, limit = 100 }: RecordsQuery) {
+  const base = { startDate: toCoros(startDate), endDate: toCoros(endDate), sportTypeCodes: codes, limit }
   try {
     return await corosRead('querySportRecords', {
       ...base,
-      minDistanceKm: null,
-      maxDistanceKm: null,
+      minDistanceKm: minKm ?? null,
+      maxDistanceKm: maxKm ?? null,
       minDurationMinutes: null,
       maxDurationMinutes: null,
       maxAveragePace: null,
@@ -22,14 +33,44 @@ export async function fetchRunRecords(days: number) {
   } catch {
     return corosRead('querySportRecords', {
       ...base,
-      minDistanceKm: 0,
-      maxDistanceKm: 1000,
+      minDistanceKm: minKm ?? 0,
+      maxDistanceKm: maxKm ?? 1000,
       minDurationMinutes: 0,
       maxDurationMinutes: 6000,
       maxAveragePace: '59:59',
       locationKeyword: '',
     })
   }
+}
+
+export function fetchRunRecords(days: number) {
+  return querySportRecords({ startDate: addDays(today(), -days), endDate: today() })
+}
+
+/**
+ * Records des 12 derniers mois : pour chaque distance, les sorties de cette longueur (+0 à 8 %),
+ * hors trail et tapis, et on garde la meilleure allure ramenée à la distance exacte.
+ */
+export async function fetchRecords(): Promise<RaceRecord[]> {
+  const results = await Promise.all(
+    RECORD_DISTANCES.map(async (d) => {
+      const km = d.meters / 1000
+      const raw = await querySportRecords({
+        startDate: addDays(today(), -365),
+        endDate: today(),
+        codes: [100, 103],
+        minKm: Math.floor(km * 0.99 * 100) / 100,
+        maxKm: Math.ceil(km * 1.08 * 100) / 100,
+        limit: 100,
+      }).catch(() => null)
+      const best = normalizeActivities(raw)
+        .filter((a) => a.meters && a.seconds && a.meters >= d.meters * 0.99 && a.meters <= d.meters * 1.08)
+        .map((a) => ({ a, seconds: Math.round(a.seconds! * (d.meters / a.meters!)) }))
+        .sort((x, y) => x.seconds - y.seconds)[0]
+      return best ? { key: d.key, seconds: best.seconds, date: best.a.date, source: 'coros' as const } : null
+    }),
+  )
+  return results.filter((r) => r !== null)
 }
 
 /** Lance plusieurs lectures en parallèle ; une lecture en échec n'empêche pas les autres. */
