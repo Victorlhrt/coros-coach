@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { ArrowDown, ChevronLeft, Wand2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -86,7 +87,7 @@ export function AdjustPage() {
 
       {analyse.isPending && (
         <div className="space-y-3">
-          <p className="px-1 text-sm text-muted-foreground">Lecture des activités, des splits et de la récupération…</p>
+          <TextShimmer as="p" className="px-1 text-sm">Lecture des activités, des splits et de la récupération…</TextShimmer>
           <Skeleton className="h-28" />
           <Skeleton className="h-40" />
           <Skeleton className="h-40" />

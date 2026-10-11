@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Activity, ChevronLeft, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -98,7 +99,7 @@ export function OnboardingPage() {
       <div className="flex min-h-[70dvh] flex-col justify-center px-2">
         <Sparkles className="size-10 text-accent" />
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Ton plan se construit</h1>
-        <p className="mt-2 text-muted-foreground">{progress.step}…</p>
+        <TextShimmer as="p" className="mt-2 text-lg font-medium">{`${progress.step}…`}</TextShimmer>
         <div className="mt-6 h-2 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-accent transition-[width] duration-700"
@@ -142,7 +143,7 @@ export function OnboardingPage() {
           disabled={!connected || readCoros.isPending}
           onClick={() => readCoros.mutate()}
         >
-          {readCoros.isPending ? 'Lecture…' : store.profile ? 'Relire mes données' : 'Lire mes données COROS'}
+          {readCoros.isPending ? <TextShimmer>Lecture de tes données…</TextShimmer> : store.profile ? 'Relire mes données' : 'Lire mes données COROS'}
         </Button>
         {!connected && <p className="mt-2 text-xs text-muted-foreground">Connecte COROS dans Réglages.</p>}
         {readCoros.error && <p className="mt-2 text-sm text-destructive">{claudeErrorMessage(readCoros.error)}</p>}

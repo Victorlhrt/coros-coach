@@ -49,6 +49,26 @@
   --destructive: oklch(0.65 0.21 25);
 }
 
+/* Variables lues par les composants Arc UI (src/components/arc), reliées au thème de l'app. */
+:root {
+  --text-muted: var(--muted-foreground);
+  --text-secondary: var(--muted-foreground);
+  --accent-strong: var(--accent);
+  --success: var(--session-easy);
+  --warning: var(--session-tempo);
+  --danger: var(--destructive);
+  --font-display: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --tracking-display: -0.02em;
+  --tracking-body: 0;
+  --leading-body: 1.5;
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-standard: 240ms;
+  --duration-fast: 160ms;
+  --space-2: 0.5rem;
+}
+
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);

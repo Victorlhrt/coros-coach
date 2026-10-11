@@ -1,4 +1,6 @@
 import { ArrowRight, Moon, Sparkles, Star, Wand2 } from 'lucide-react'
+import { SlotText } from '@/components/arc/slot-text/slot-text'
+import { TextReveal } from '@/components/arc/text-reveal/text-reveal'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EmptyState } from '@/components/EmptyState'
@@ -116,7 +118,7 @@ export function TodayPage() {
               <p className="text-sm text-muted-foreground">{week.focus}</p>
             </div>
             <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight">
-              {activities.isLoading ? <Skeleton className="h-9 w-32" /> : formatDistance(done, units)}
+              {activities.isLoading ? <Skeleton className="h-9 w-32" /> : <SlotText value={formatDistance(done, units)} />}
               <span className="text-lg font-semibold text-muted-foreground"> / {formatDistance(planned, units, 0)}</span>
             </p>
             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted">
@@ -152,7 +154,7 @@ function TodayCard({ session }: { session: Session }) {
   return (
     <Card className="overflow-hidden">
       <TypeBadge type={session.type} />
-      <h2 className="mt-2 text-3xl leading-tight font-extrabold tracking-tight">{session.title}</h2>
+      <TextReveal as="h2" text={session.title} className="mt-2 text-3xl leading-tight font-extrabold tracking-tight" />
       <p className="mt-2 text-muted-foreground">{session.description}</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <BigStat label="Durée" value={formatDuration(seconds)} />
@@ -172,7 +174,7 @@ function BigStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="text-4xl font-extrabold tabular-nums tracking-tight">{value}</p>
+      <SlotText value={value} className="text-4xl font-extrabold tracking-tight" />
     </div>
   )
 }

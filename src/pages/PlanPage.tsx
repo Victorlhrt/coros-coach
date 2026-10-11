@@ -1,4 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
+import { SlotText } from '@/components/arc/slot-text/slot-text'
+import { TextMorph } from '@/components/arc/text-morph/text-morph'
 import { CalendarDays, Send, Wand2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -132,7 +134,7 @@ export function PlanPage() {
             <p className="text-sm font-semibold text-accent">{PHASE_LABEL[week.phase]}</p>
             <h2 className="text-2xl font-extrabold tracking-tight">Semaine {week.number}</h2>
           </div>
-          <p className="text-2xl font-extrabold tabular-nums">{formatDistance(volumes[week.number - 1], units, 0)}</p>
+          <SlotText value={formatDistance(volumes[week.number - 1], units, 0)} className="text-2xl font-extrabold" />
         </div>
         <p className="mt-1 px-1 text-sm text-muted-foreground">{week.focus}</p>
 
@@ -173,7 +175,7 @@ export function PlanPage() {
           {week.end >= now && (
             <Button className="w-full" onClick={() => push.mutate(week)} disabled={push.isPending}>
               <Send className="size-5" />
-              {!coros.created ? 'Envoyer le plan sur la montre' : pending > 0 ? `Envoyer la semaine (${pending} à jour)` : 'Renvoyer la semaine'}
+              <TextMorph>{!coros.created ? 'Envoyer le plan sur la montre' : pending > 0 ? `Envoyer la semaine (${pending} à jour)` : 'Renvoyer la semaine'}</TextMorph>
             </Button>
           )}
           {week.number === current && (

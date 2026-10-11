@@ -1,4 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
+import { SlotText } from '@/components/arc/slot-text/slot-text'
+import { TextMorph } from '@/components/arc/text-morph/text-morph'
 import { ChevronLeft, Repeat as RepeatIcon, Send } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -69,12 +71,12 @@ export function SessionPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Durée</p>
-            <p className="text-4xl font-extrabold tabular-nums tracking-tight">{formatDuration(seconds)}</p>
+            <SlotText value={formatDuration(seconds)} className="text-4xl font-extrabold tracking-tight" />
           </div>
           {meters > 0 && (
             <div>
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Distance est.</p>
-              <p className="text-4xl font-extrabold tabular-nums tracking-tight">{formatDistance(meters, units)}</p>
+              <SlotText value={formatDistance(meters, units)} className="text-4xl font-extrabold tracking-tight" />
             </div>
           )}
         </div>
@@ -127,7 +129,7 @@ export function SessionPage() {
           session.date >= today() && (
             <Button className="mt-4 w-full" onClick={() => push.mutate()} disabled={push.isPending || status === 'synced'}>
               <Send className="size-5" />
-              {!coros.created ? 'Envoyer le plan sur la montre' : status === 'synced' ? 'À jour sur la montre' : 'Envoyer sur la montre'}
+              <TextMorph>{!coros.created ? 'Envoyer le plan sur la montre' : status === 'synced' ? 'À jour sur la montre' : 'Envoyer sur la montre'}</TextMorph>
             </Button>
           )
         )}
