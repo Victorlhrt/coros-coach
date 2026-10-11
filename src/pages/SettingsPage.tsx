@@ -13,7 +13,7 @@ import { useCorosAuth } from '@/lib/coros/auth-store'
 import { disconnectCoros, startCorosLogin } from '@/lib/coros/client'
 import { useVault } from '@/lib/lock/vault'
 import { usePlan } from '@/lib/store/plan'
-import { MODELS, useSettings } from '@/lib/store/settings'
+import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
 
 export function SettingsPage() {
@@ -47,29 +47,6 @@ export function SettingsPage() {
             </Button>
           )}
           {login.error && <p className="mt-3 text-sm text-destructive">{login.error.message}</p>}
-        </Card>
-
-        <Card>
-          <CardTitle>Claude</CardTitle>
-          <CardDescription className="mt-1">La clé API est gardée par le serveur (variable ANTHROPIC_API_KEY), jamais sur l’appareil.</CardDescription>
-          <p className="mt-4 text-sm font-medium">Modèle</p>
-          <div className="mt-1.5 grid grid-cols-2 gap-2">
-            {MODELS.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => settings.set({ model: m.id })}
-                className={
-                  settings.model === m.id
-                    ? 'rounded-xl bg-accent p-3 text-left text-accent-foreground'
-                    : 'rounded-xl bg-muted p-3 text-left'
-                }
-              >
-                <div className="font-semibold">{m.label}</div>
-                <div className="text-xs opacity-75">{m.price} / M tokens</div>
-              </button>
-            ))}
-          </div>
         </Card>
 
         <Card>
