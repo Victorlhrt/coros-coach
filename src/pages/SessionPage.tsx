@@ -1,7 +1,5 @@
-import { useMutation } from '@tanstack/react-query'
 import { SlotText } from '@/components/arc/slot-text/slot-text'
-import { TextMorph } from '@/components/arc/text-morph/text-morph'
-import { ChevronLeft, Repeat as RepeatIcon, Send } from 'lucide-react'
+import { ChevronLeft, Repeat as RepeatIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActivityLinkCard } from '@/components/ActivityLinkCard'
@@ -10,7 +8,6 @@ import { FeedbackCard } from '@/components/FeedbackCard'
 import { SyncBadge } from '@/components/SyncBadge'
 import { TypeBadge } from '@/components/TypeBadge'
 import { WorkoutChart } from '@/components/WorkoutChart'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { formatDay, today } from '@/lib/coach/dates'
 import { formatDistance, formatDuration, formatPace, paceUnit, type Units } from '@/lib/coach/format'
@@ -18,10 +15,9 @@ import { sessionTotals } from '@/lib/coach/metrics'
 import type { Step, Zone } from '@/lib/coach/schema'
 import { STEP_LABEL, zoneColor } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
-import { pushDays, syncStatus } from '@/lib/coros/sync'
+import { syncStatus } from '@/lib/coros/sync'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
-import { toast } from '@/lib/toast'
 
 export function SessionPage() {
   const { id } = useParams()
@@ -34,12 +30,6 @@ export function SessionPage() {
   useEffect(() => {
     if (location.hash === '#ressenti') document.getElementById('ressenti')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [location.hash])
-
-  const push = useMutation({
-    mutationFn: () => pushDays(plan!, [session!.date], `la séance du ${formatDay(session!.date)}`),
-    onSuccess: (ok) => ok && toast.success('Envoyé sur la montre ✓'),
-    onError: toast.error,
-  })
 
   if (!plan || !session) {
     return (
@@ -123,15 +113,8 @@ export function SessionPage() {
           <p className="font-semibold">Montre</p>
           <SyncBadge status={status} />
         </div>
-        {status === 'app-only' ? (
+        {status === 'app-only' && (
           <p className="mt-2 text-sm text-muted-foreground">Le renforcement n’est pas pris en charge par COROS : suis-le depuis l’app.</p>
-        ) : (
-          session.date >= today() && (
-            <Button className="mt-4 w-full" onClick={() => push.mutate()} disabled={push.isPending || status === 'synced'}>
-              <Send className="size-5" />
-              <TextMorph>{!coros.created ? 'Envoyer le plan sur la montre' : status === 'synced' ? 'À jour sur la montre' : 'Envoyer sur la montre'}</TextMorph>
-            </Button>
-          )
         )}
       </Card>
 
