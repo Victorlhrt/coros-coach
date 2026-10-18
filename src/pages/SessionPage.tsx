@@ -22,7 +22,7 @@ import { useSettings } from '@/lib/store/settings'
 export function SessionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { plan, zones, coros } = usePlan()
+  const { plan, zones, coros, links } = usePlan()
   const units = useSettings((s) => s.units)
   const session = allSessions(plan).find((s) => s.id === id)
   const location = useLocation()
@@ -105,8 +105,8 @@ export function SessionPage() {
         </Card>
       )}
 
-      {session.date <= today() && session.type !== 'strength' && <ActivityLinkCard session={session} />}
-      {session.date <= today() && <FeedbackCard sessionId={session.id} />}
+      {session.type !== 'strength' && <ActivityLinkCard session={session} />}
+      {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
 
       <Card>
         <div className="flex items-center justify-between">

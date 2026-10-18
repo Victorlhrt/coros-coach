@@ -1,5 +1,5 @@
 import { Link2, Link2Off } from 'lucide-react'
-import { addDays, formatDay } from '@/lib/coach/dates'
+import { diffDays, formatDay } from '@/lib/coach/dates'
 import { formatClock, formatDistance, formatDuration, formatPace, paceUnit } from '@/lib/coach/format'
 import { linkedActivity } from '@/lib/coach/links'
 import type { Session } from '@/lib/coach/schema'
@@ -20,7 +20,8 @@ export function ActivityLinkCard({ session }: { session: Session }) {
   const link = links[session.id]
   const laps = useLaps(activity?.labelId, activity?.sportType)
 
-  const candidates = activities.filter((a) => a.date >= addDays(session.date, -2) && a.date <= addDays(session.date, 2))
+  // Toutes les activités chargées (6 semaines), les plus proches de la date prévue d'abord : une séance faite en avance ou en retard reste liable.
+  const candidates = [...activities].sort((a, b) => Math.abs(diffDays(session.date, a.date)) - Math.abs(diffDays(session.date, b.date)))
 
   return (
     <Card>
@@ -91,13 +92,19 @@ export function ActivityLinkCard({ session }: { session: Session }) {
             value={activity?.labelId ?? ''}
             onChange={(e) => {
               const picked = activities.find((a) => a.labelId === e.target.value)
-              setLinks({ [session.id]: { labelId: picked?.labelId ?? null, sportType: picked?.sportType ?? 100, auto: false } })
+              // L'activité choisie quitte la séance à laquelle elle avait été liée automatiquement.
+              const released = Object.fromEntries(
+                Object.entries(links)
+                  .filter(([id, l]) => id !== session.id && l.auto && picked && l.labelId === picked.labelId)
+                  .map(([id, l]) => [id, { ...l, labelId: null, auto: false }]),
+              )
+              setLinks({ ...released, [session.id]: { labelId: picked?.labelId ?? null, sportType: picked?.sportType ?? 100, auto: false } })
             }}
           >
             <option value="">Aucune</option>
             {candidates.map((a) => (
               <option key={a.labelId} value={a.labelId}>
-                {formatDay(a.date, { weekday: 'short', day: 'numeric' })} · {a.name} · {a.meters ? formatDistance(a.meters, units) : ''}
+                {formatDay(a.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {a.name} · {a.meters ? formatDistance(a.meters, units) : ''}
               </option>
             ))}
           </select>
