@@ -2,6 +2,7 @@ import { callStructured } from './claude'
 import { WEEKDAYS, addDays, today, weekday } from './dates'
 import { COACH_SYSTEM, describeGoal, describeProfile, describeZones } from './prompts'
 import { AdjustmentSchema, type Adjustment, type Goal, type Plan, type Profile, type Session, type Zone } from './schema'
+import { goalPace } from './repace'
 import { validateSessions } from './validate'
 import type { RaceRecord } from './vdot'
 
@@ -80,7 +81,7 @@ Si tout va bien, renvoie une liste de changements vide et dis-le dans summary.`,
         if (c.session && c.session.date !== c.date) errors.push(`${c.date} : la date de session doit être identique.`)
       }
       const sessions = a.changes.flatMap((c) => (c.session ? [c.session] : []))
-      errors.push(...validateSessions(sessions, allowedSet, 'Ajustement'))
+      errors.push(...validateSessions(sessions, allowedSet, 'Ajustement', { zones, goalPace: goalPace(goal) }))
       return errors
     },
   })

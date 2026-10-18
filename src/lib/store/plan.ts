@@ -1,8 +1,9 @@
+import { useEffect } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { today } from '@/lib/coach/dates'
 import { withIds } from '@/lib/coach/generate'
-import { repacePlan } from '@/lib/coach/repace'
+import { fixPaces, repacePlan } from '@/lib/coach/repace'
 import type { Feedback } from '@/lib/coach/feedback'
 import type { Adjustment, Goal, Plan, Profile, Session, Zone } from '@/lib/coach/schema'
 import type { RaceRecord } from '@/lib/coach/vdot'
@@ -52,6 +53,8 @@ interface PlanState {
   setZones: (zones: Zone[]) => void
   /** Nouvelle allure seuil : zones remplacées et allures des séances à venir recalculées. Renvoie les dates des séances modifiées. */
   retuneZones: (zones: Zone[]) => string[]
+  /** Séances à venir : allures cibles incohérentes avec leur zone ramenées à l'allure de la zone. */
+  repairPaces: () => void
   setPlan: (plan: Plan) => void
   setCoros: (patch: Partial<CorosSync>) => void
   markSynced: (hashes: Record<string, string>) => void
@@ -103,6 +106,12 @@ export const usePlan = create<PlanState>()(
         const { plan, changed } = s.plan ? repacePlan(s.plan, s.zones, zones, s.goal, today()) : { plan: null, changed: [] }
         set({ zones, plan })
         return changed
+      },
+      repairPaces: () => {
+        const s = get()
+        if (!s.plan) return
+        const { plan, changed } = fixPaces(s.plan, s.zones, s.goal, today())
+        if (changed.length) set({ plan })
       },
       setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
       setCoros: (patch) => set((s) => ({ coros: { ...s.coros, ...patch } })),
@@ -168,4 +177,11 @@ export const usePlan = create<PlanState>()(
 
 export function allSessions(plan: Plan | null) {
   return plan?.weeks.flatMap((w) => w.sessions) ?? []
+}
+
+/** À monter une fois : corrige les allures des séances à venir dès que le plan ou les zones changent (y compris à la synchro). */
+export function usePaceRepair() {
+  const plan = usePlan((s) => s.plan)
+  const zones = usePlan((s) => s.zones)
+  useEffect(() => usePlan.getState().repairPaces(), [plan, zones])
 }

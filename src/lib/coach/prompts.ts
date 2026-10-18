@@ -19,7 +19,7 @@ Principes :
 Format des blocs :
 - target "time" en secondes ou "distance" en mètres, entiers.
 - zone 1 à 6 : 1 récupération, 2 endurance, 3 tempo / allure marathon, 4 seuil, 5 VMA, 6 sprint.
-- paceFast / paceSlow (secondes/km) pour les blocs de qualité (zones 3 à 6), tirés du tableau des zones ou de l'allure objectif ; null pour l'endurance, la récupération, l'échauffement et le retour au calme (pilotage à la fréquence cardiaque).
+- paceFast / paceSlow (secondes/km) pour les blocs de qualité (zones 3 à 6), tirés du tableau des zones ou de l'allure objectif, et toujours cohérents avec la zone de l'étape (un effort en zone 5 se court à l'allure Z5 du tableau, jamais à l'allure d'endurance) ; null pour l'endurance, la récupération, l'échauffement et le retour au calme (pilotage à la fréquence cardiaque).
 - Un fractionné = un bloc "repeat" (repeats 1 à 20) contenant uniquement des étapes work et recovery.
 - Pas de séance de repos : un jour sans séance est un jour de repos.
 - Volume : l'app additionne les distances ; un bloc en durée est converti avec l'allure médiane de sa zone (tableau des zones). Donne l'endurance et la sortie longue en distance pour que le volume soit exact, et respecte le volume hebdomadaire visé à ±10 %.

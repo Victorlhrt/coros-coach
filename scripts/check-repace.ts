@@ -1,6 +1,6 @@
 // Tests hors ligne du recalcul des allures quand l'allure seuil change.
 import { addDays, today } from '../src/lib/coach/dates'
-import { repacePlan } from '../src/lib/coach/repace'
+import { fixPaces, repacePlan } from '../src/lib/coach/repace'
 import type { Goal, Plan, Session } from '../src/lib/coach/schema'
 import { zonesFromThreshold } from '../src/lib/coach/zones'
 
@@ -42,6 +42,19 @@ expect(JSON.stringify(byId['longue-allure'].blocks) === JSON.stringify(plan.week
 expect(JSON.stringify(byId.course.blocks) === JSON.stringify(plan.weeks[0].sessions[3].blocks), 'course inchangée')
 expect(changed.length === 1 && changed[0] === next, `seule la séance VMA à venir est signalée (${changed.join(', ')})`)
 expect(repacePlan(plan, before, before, goal, today()).changed.length === 0, 'mêmes zones : rien ne bouge')
+
+// Effort Z5 écrit à l'allure d'endurance (6:00–6:42 avec un seuil à 4:04) : ramené à l'allure Z5.
+const zones = zonesFromThreshold(244)
+const wrong = {
+  ...plan,
+  weeks: [{ ...plan.weeks[0], sessions: [session('vma-lente', next, 'interval', [{ kind: 'repeat', repeats: 4, steps: [step(5, 360, 402), { ...step(2, null, null), kind: 'recovery' }] }]), plan.weeks[0].sessions[2]] }],
+} as Plan
+const fixed = fixPaces(wrong, zones, goal, today())
+const z5 = zones[4]
+const fixedStep = (fixed.plan.weeks[0].sessions[0].blocks[0] as Extract<Session['blocks'][number], { kind: 'repeat' }>).steps[0]
+expect(fixedStep.paceFast === z5.paceFast && fixedStep.paceSlow === z5.paceSlow, `effort Z5 trop lent ramené à ${fixedStep.paceFast}-${fixedStep.paceSlow}`)
+expect(fixed.changed.length === 1, 'bloc à allure objectif en Z3 laissé tel quel')
+expect(fixPaces(fixed.plan, zones, goal, today()).changed.length === 0, 'correction stable')
 
 if (fails.length) {
   console.error(fails.map((f) => `✗ ${f}`).join('\n'))

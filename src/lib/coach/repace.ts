@@ -23,11 +23,56 @@ function repaceStep(step: Step, ratio: (zone: number) => number | null, goal: nu
   return { ...step, paceFast: Math.round(step.paceFast * r), paceSlow: Math.round(step.paceSlow * r) }
 }
 
-function repaceSession(session: Session, ratio: (zone: number) => number | null, goal: number | null): Session {
-  const blocks = session.blocks.map((b) =>
-    b.kind === 'repeat' ? { ...b, steps: b.steps.map((s) => repaceStep(s, ratio, goal)) } : repaceStep(b, ratio, goal),
-  )
+function mapSteps(session: Session, fn: (step: Step) => Step): Session {
+  const blocks = session.blocks.map((b) => (b.kind === 'repeat' ? { ...b, steps: b.steps.map(fn) } : fn(b)))
   return JSON.stringify(blocks) === JSON.stringify(session.blocks) ? session : { ...session, blocks }
+}
+
+/** Tolérance autour d'une zone pour juger une allure cible cohérente. */
+const ZONE_MARGIN = 0.05
+
+/**
+ * Allure cible compatible avec la zone de l'étape (± 5 %), ou allure objectif posée sur une zone voisine.
+ * Évite par exemple un effort « Z5 VMA » écrit à l'allure d'endurance.
+ */
+export function paceFitsZone(step: Pick<Step, 'zone' | 'paceFast' | 'paceSlow'>, zones: Zone[], goal: number | null) {
+  if (step.paceFast === null || step.paceSlow === null) return true
+  const mid = (step.paceFast + step.paceSlow) / 2
+  const within = (n: number) => {
+    const z = zones.find((x) => x.zone === n)
+    return !z || (mid >= z.paceFast * (1 - ZONE_MARGIN) && mid <= z.paceSlow * (1 + ZONE_MARGIN))
+  }
+  if (within(step.zone)) return true
+  const atGoal = goal !== null && step.paceFast - GOAL_MARGIN <= goal && goal <= step.paceSlow + GOAL_MARGIN
+  return atGoal && (within(step.zone - 1) || within(step.zone + 1))
+}
+
+/**
+ * Séances à venir (à partir de `from`) : une allure cible incohérente avec sa zone est remplacée par l'allure de la zone.
+ * La course et les séances passées ne bougent pas.
+ */
+export function fixPaces(plan: Plan, zones: Zone[], goal: Goal | null, from: string) {
+  const target = goalPace(goal)
+  const fix = (step: Step): Step => {
+    if (paceFitsZone(step, zones, target)) return step
+    const z = zones.find((x) => x.zone === step.zone)
+    return z ? { ...step, paceFast: z.paceFast, paceSlow: z.paceSlow } : step
+  }
+  return mapPlan(plan, from, (s) => mapSteps(s, fix))
+}
+
+function mapPlan(plan: Plan, from: string, fn: (session: Session) => Session) {
+  const changed: string[] = []
+  const weeks = plan.weeks.map((w) => ({
+    ...w,
+    sessions: w.sessions.map((s) => {
+      if (s.date < from || s.type === 'race' || s.type === 'strength') return s
+      const next = fn(s)
+      if (next !== s) changed.push(s.date)
+      return next
+    }),
+  }))
+  return { plan: changed.length ? { ...plan, weeks } : plan, changed }
 }
 
 /**
@@ -45,15 +90,5 @@ export function repacePlan(plan: Plan, before: Zone[], after: Zone[], goal: Goal
     return a && b && Math.abs(b / a - 1) >= 0.005 ? b / a : null
   }
   const target = goalPace(goal)
-  const changed: string[] = []
-  const weeks = plan.weeks.map((w) => ({
-    ...w,
-    sessions: w.sessions.map((s) => {
-      if (s.date < from || s.type === 'race' || s.type === 'strength') return s
-      const next = repaceSession(s, ratio, target)
-      if (next !== s) changed.push(s.date)
-      return next
-    }),
-  }))
-  return { plan: changed.length ? { ...plan, weeks } : plan, changed }
+  return mapPlan(plan, from, (s) => mapSteps(s, (step) => repaceStep(step, ratio, target)))
 }

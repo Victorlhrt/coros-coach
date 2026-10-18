@@ -1,6 +1,11 @@
-import type { Block, SessionInput } from './schema'
+import { formatPace } from './format'
+import { paceFitsZone } from './repace'
+import type { Block, SessionInput, Zone } from './schema'
 
-function checkBlocks(blocks: Block[], where: string, errors: string[]) {
+/** Zones et allure objectif (s/km) : une allure cible doit correspondre à la zone de son étape. */
+type PaceRef = { zones: Zone[]; goalPace: number | null }
+
+function checkBlocks(blocks: Block[], where: string, errors: string[], ref: PaceRef) {
   const checkStep = (s: Extract<Block, { kind: 'warmup' | 'work' | 'recovery' | 'cooldown' }>, at: string) => {
     if (s.target === 'distance' && (s.value < 50 || s.value > 60000)) errors.push(`${at} : distance ${s.value} m hors limites (50 à 60000).`)
     if (s.target === 'time' && (s.value < 10 || s.value > 6 * 3600)) errors.push(`${at} : durée ${s.value} s hors limites (10 à 21600).`)
@@ -9,6 +14,12 @@ function checkBlocks(blocks: Block[], where: string, errors: string[]) {
     if (s.paceFast !== null && s.paceSlow !== null) {
       if (s.paceFast < 150 || s.paceSlow > 1200) errors.push(`${at} : allure hors limites (150 à 1200 s/km).`)
       if (s.paceFast > s.paceSlow) errors.push(`${at} : paceFast doit être ≤ paceSlow (plus petit = plus rapide).`)
+      else if (!paceFitsZone(s, ref.zones, ref.goalPace)) {
+        const z = ref.zones.find((x) => x.zone === s.zone)!
+        errors.push(
+          `${at} : allure ${formatPace(s.paceFast)}–${formatPace(s.paceSlow)} incohérente avec la zone ${s.zone} (${formatPace(z.paceFast)}–${formatPace(z.paceSlow)} /km). Prends l’allure du tableau des zones, ou l’allure objectif avec la zone qui lui correspond.`,
+        )
+      }
     }
   }
   blocks.forEach((b, i) => {
@@ -24,8 +35,8 @@ function checkBlocks(blocks: Block[], where: string, errors: string[]) {
   })
 }
 
-/** Règles d'une séance : structure, limites COROS et jour autorisé. */
-export function validateSessions(sessions: SessionInput[], allowedDates: Set<string>, label: string) {
+/** Règles d'une séance : structure, limites COROS, allures cohérentes avec les zones et jour autorisé. */
+export function validateSessions(sessions: SessionInput[], allowedDates: Set<string>, label: string, ref: PaceRef) {
   const errors: string[] = []
   const runDates = new Map<string, number>()
   for (const s of sessions) {
@@ -38,7 +49,7 @@ export function validateSessions(sessions: SessionInput[], allowedDates: Set<str
       if (!s.strengthMinutes) errors.push(`${where} : strengthMinutes obligatoire pour un renforcement.`)
     } else {
       if (s.blocks.length === 0) errors.push(`${where} : une séance de course doit avoir au moins un bloc.`)
-      checkBlocks(s.blocks, where, errors)
+      checkBlocks(s.blocks, where, errors, ref)
       runDates.set(s.date, (runDates.get(s.date) ?? 0) + 1)
     }
   }

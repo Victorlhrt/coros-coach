@@ -14,6 +14,7 @@ import {
   type Week,
   type Zone,
 } from './schema'
+import { goalPace } from './repace'
 import { validateSessions } from './validate'
 import { sessionTotals } from './metrics'
 import type { RaceRecord } from './vdot'
@@ -200,7 +201,7 @@ Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séanc
             const got = r.weeks.find((x) => x.number === w.number)
             if (!got) errors.push(`Semaine ${w.number} manquante.`)
             else {
-              errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`))
+              errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`, { zones, goalPace: goalPace(goal) }))
               errors.push(...checkWeekTotals(w, got.sessions, zones))
             }
           }
