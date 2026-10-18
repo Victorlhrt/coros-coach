@@ -1,7 +1,5 @@
-import { useMutation } from '@tanstack/react-query'
 import { SlotText } from '@/components/arc/slot-text/slot-text'
-import { TextMorph } from '@/components/arc/text-morph/text-morph'
-import { CalendarDays, Send, Wand2 } from 'lucide-react'
+import { CalendarDays, Wand2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ElevationChart } from '@/components/ElevationChart'
@@ -13,30 +11,17 @@ import { Card } from '@/components/ui/card'
 import { WEEKDAYS_SHORT, addDays, formatDay, today } from '@/lib/coach/dates'
 import { formatDistance } from '@/lib/coach/format'
 import { isRun, weekMeters } from '@/lib/coach/metrics'
-import type { Week } from '@/lib/coach/schema'
 import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
-import { pushDays, syncStatus } from '@/lib/coros/sync'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
-import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function PlanPage() {
-  const { plan, zones, coros, goal } = usePlan()
+  const { plan, zones, goal } = usePlan()
   const units = useSettings((s) => s.units)
   const [now] = useState(today)
   const current = plan?.weeks.find((w) => w.start <= now && w.end >= now)?.number ?? 1
   const [selected, setSelected] = useState(current)
-
-  const push = useMutation({
-    mutationFn: async (week: Week) => {
-      const dates: string[] = []
-      for (let d = week.start; d <= week.end; d = addDays(d, 1)) dates.push(d)
-      return pushDays(plan!, dates, `la semaine ${week.number}`)
-    },
-    onSuccess: (ok) => ok && toast.success('Envoyé sur la montre ✓'),
-    onError: toast.error,
-  })
 
   if (!plan) {
     return (
@@ -58,10 +43,6 @@ export function PlanPage() {
   const volumes = plan.weeks.map((w) => weekMeters(w.sessions.filter(isRun), zones))
   const maxVolume = Math.max(...volumes, 1)
   const days = Array.from({ length: 7 }, (_, i) => addDays(addDays(week.end, -6), i))
-  const pending = week.sessions.filter((s) => {
-    const st = syncStatus(plan, coros.synced, s)
-    return (st === 'not-sent' || st === 'modified') && s.date >= now
-  }).length
 
   return (
     <>
@@ -171,21 +152,13 @@ export function PlanPage() {
           {week.sessions.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Semaine de repos.</p>}
         </div>
 
-        <div className="mt-4 space-y-2">
-          {week.end >= now && (
-            <Button className="w-full" onClick={() => push.mutate(week)} disabled={push.isPending}>
-              <Send className="size-5" />
-              <TextMorph>{!coros.created ? 'Envoyer le plan sur la montre' : pending > 0 ? `Envoyer la semaine (${pending} à jour)` : 'Renvoyer la semaine'}</TextMorph>
+        {week.number === current && (
+          <Link to="/ajuster" className="mt-4 block">
+            <Button variant="secondary" className="w-full">
+              <Wand2 className="size-5" /> Ajuster ma semaine
             </Button>
-          )}
-          {week.number === current && (
-            <Link to="/ajuster" className="block">
-              <Button variant="secondary" className="w-full">
-                <Wand2 className="size-5" /> Ajuster ma semaine
-              </Button>
-            </Link>
-          )}
-        </div>
+          </Link>
+        )}
       </section>
     </>
   )
