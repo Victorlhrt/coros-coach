@@ -1,7 +1,7 @@
 // Tests hors ligne des règles du coach : volume, liaison automatique, records.
 import './node-env'
 import { addDays, today } from '../src/lib/coach/dates'
-import { checkVolumes, checkWeekTotals } from '../src/lib/coach/generate'
+import { checkLongRuns, checkVolumes, checkWeekTotals } from '../src/lib/coach/generate'
 import { autoLinks } from '../src/lib/coach/links'
 import { mergeRecords } from '../src/lib/coach/records'
 import type { Plan, Week } from '../src/lib/coach/schema'
@@ -26,6 +26,10 @@ const run = (date: string, km: number, type: 'easy' | 'long' = 'easy') => ({
 })
 expect(checkWeekTotals(week, [run(today(), 6), run(addDays(today(), 2), 6)], zones).some((e) => e.includes('totalisent')), 'séances sous le volume visé refusées')
 expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 9), run(addDays(today(), 5), 13, 'long')], zones).length === 0, 'semaine au bon volume acceptée')
+// Le cas signalé : sortie longue du dimanche plus courte qu'un footing de semaine → refusé.
+expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run(addDays(today(), 5), 10, 'long')], zones).some((e) => e.includes('plus longue que la sortie longue')), 'footing plus long que la sortie longue refusé')
+expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 6 }]).length === 1, 'sortie longue trop courte dans la structure refusée')
+expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 10 }, { ...wk(2, 20, 'taper'), longRunKm: 4 }]).length === 0, 'sortie longue à ~33 % acceptée, affûtage libre')
 
 // Volume réel : 4 semaines à 8 + 10 + 14 km.
 const acts = [7, 14, 21, 28].flatMap((d) => [

@@ -153,6 +153,7 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
         if (s.planName.length > 60) errors.push('planName : 60 caractères maximum.')
         if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
         errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
+        errors.push(...checkLongRuns(s.weeks))
         return errors
       },
     }))
@@ -261,6 +262,16 @@ export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
   return errors
 }
 
+/** La sortie longue pèse au moins 25 % du volume (30 à 40 % visés), hors affûtage et semaine de course. */
+export function checkLongRuns(weeks: Skeleton['weeks']) {
+  return weeks
+    .filter((w) => w.phase !== 'taper' && w.phase !== 'race' && w.targetKm > 0 && w.longRunKm < w.targetKm * 0.25)
+    .map(
+      (w) =>
+        `Semaine ${w.number} : sortie longue de ${w.longRunKm} km pour ${w.targetKm} km, c'est trop court — elle doit représenter 30 à 40 % du volume (au moins ${Math.ceil(w.targetKm * 0.3)} km) et rester la plus longue sortie de la semaine.`,
+    )
+}
+
 /** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 %). */
 export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[]) {
   // Semaine de course : son volume dépend surtout de la course, la fourchette ne s'applique pas.
@@ -275,6 +286,12 @@ export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zon
   if (week.longRunKm > 0) {
     const longest = Math.max(0, ...sessions.filter((s) => s.type === 'long' || s.type === 'race').map((s) => sessionTotals({ ...s, id: '' }, zones).meters / 1000))
     if (longest < week.longRunKm * 0.8) errors.push(`Semaine ${week.number} : la sortie longue fait ${longest.toFixed(1)} km au lieu de ${week.longRunKm} km.`)
+    // La sortie longue reste la plus longue sortie de la semaine.
+    for (const s of sessions) {
+      if (s.type === 'long' || s.type === 'race') continue
+      const km = sessionTotals({ ...s, id: '' }, zones).meters / 1000
+      if (km > longest + 0.5) errors.push(`Semaine ${week.number} : la séance du ${s.date} (${km.toFixed(1)} km) est plus longue que la sortie longue (${longest.toFixed(1)} km). Raccourcis-la et reporte le volume sur la sortie longue.`)
+    }
   }
   return errors
 }
