@@ -3,7 +3,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Thème : sombre par défaut (classe .dark sur <html>), clair en option. */
+/* Thème : sombre par défaut (classe .dark et data-theme="dark" sur <html>), clair en option.
+   Déclaré après foundation.css d'Arc : à spécificité égale (:root.dark ~ :root[data-theme]), le thème de l'app l'emporte. */
 :root {
   --background: oklch(0.985 0.002 260);
   --foreground: oklch(0.18 0.01 260);
@@ -36,7 +37,7 @@
   --zone-6: oklch(0.6 0.24 0);
 }
 
-.dark {
+:root.dark {
   --background: oklch(0.145 0.006 260);
   --foreground: oklch(0.97 0.003 260);
   --card: oklch(0.2 0.008 260);
@@ -49,24 +50,35 @@
   --destructive: oklch(0.65 0.21 25);
 }
 
-/* Variables lues par les composants Arc UI (src/components/arc), reliées au thème de l'app. */
-:root {
-  --text-muted: var(--muted-foreground);
+/* Jetons Arc (src/components/arc/foundation.css) reliés à la palette de l'app, dans les deux thèmes. */
+:root,
+:root[data-theme='dark'] {
+  --surface: var(--card);
+  --surface-raised: var(--card);
+  --surface-muted: var(--muted);
   --text-secondary: var(--muted-foreground);
+  --text-muted: var(--muted-foreground);
+  --border-subtle: color-mix(in oklch, var(--border) 60%, transparent);
+  --border-strong: color-mix(in oklch, var(--muted-foreground) 45%, var(--border));
   --accent-strong: var(--accent);
+  --accent-subtle: color-mix(in oklch, var(--accent) 15%, transparent);
+  --control-on: var(--accent);
+  --control-fill: var(--accent);
+  --control-glyph: var(--accent-foreground);
+  --control-thumb-on: oklch(1 0 0);
   --success: var(--session-easy);
   --warning: var(--session-tempo);
   --danger: var(--destructive);
+  /* Séries des graphiques : accent puis couleurs des séances. */
+  --series-1: var(--accent);
+  --series-2: var(--session-long);
+  --series-3: var(--session-easy);
+  --series-4: var(--session-tempo);
   --font-display: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --tracking-display: -0.02em;
   --tracking-body: 0;
   --leading-body: 1.5;
-  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-standard: 240ms;
-  --duration-fast: 160ms;
-  --space-2: 0.5rem;
 }
 
 @theme inline {
@@ -119,15 +131,4 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-page-in { animation: none; }
-}
-
-@keyframes grow-x {
-  from { transform: scaleX(0); }
-}
-.animate-grow-x {
-  transform-origin: left;
-  animation: grow-x 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .animate-grow-x { animation: none; }
 }

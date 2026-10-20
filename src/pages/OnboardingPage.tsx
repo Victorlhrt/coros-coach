@@ -112,7 +112,7 @@ export function OnboardingPage() {
     return (
       <div className="flex min-h-[70dvh] flex-col justify-center px-2">
         <Sparkles className="size-10 text-accent" />
-        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Ton plan se construit</h1>
+        <h1 className="mt-4 text-3xl font-medium tracking-tight">Ton plan se construit</h1>
         <TextShimmer as="p" className="mt-2 text-lg font-medium">{`${progress.step}…`}</TextShimmer>
         <div className="mt-6 h-2 overflow-hidden rounded-full bg-muted">
           <div
@@ -131,7 +131,7 @@ export function OnboardingPage() {
         <Link to="/" aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="text-3xl font-extrabold tracking-tight">Mon objectif</h1>
+        <h1 className="text-3xl font-medium tracking-tight">Mon objectif</h1>
       </header>
 
       <Card>
@@ -267,7 +267,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted p-3">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-lg font-bold tabular-nums">{value}</dd>
+      <dd className="text-lg font-medium tabular-nums">{value}</dd>
     </div>
   )
 }

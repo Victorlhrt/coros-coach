@@ -72,7 +72,7 @@ export function AdjustPage() {
         <Link to="/plan" aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="text-3xl font-extrabold tracking-tight">Bilan de la semaine</h1>
+        <h1 className="text-3xl font-medium tracking-tight">Bilan de la semaine</h1>
       </header>
 
       {!result && !analyse.isPending && (
@@ -101,7 +101,7 @@ export function AdjustPage() {
         <>
           <Card>
             <div className="flex items-center justify-between">
-              <p className="font-semibold">Bilan</p>
+              <p className="font-medium">Bilan</p>
               <p className="text-xs text-muted-foreground">
                 {new Date(review!.createdAt).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                 {review!.status === 'applied' && ' · appliqué'}
@@ -121,7 +121,7 @@ export function AdjustPage() {
                   onChange={(e) => setUpdateZones(e.target.checked)}
                 />
                 <div>
-                  <p className="font-semibold">Nouvelle allure seuil : {formatPace(result.newThresholdPace)} /km</p>
+                  <p className="font-medium">Nouvelle allure seuil : {formatPace(result.newThresholdPace)} /km</p>
                   <p className="text-sm text-muted-foreground">
                     {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule tes zones
                     d’allure et les allures cibles des séances à venir (sauf l’allure course).
@@ -196,7 +196,7 @@ function ChangeCard({
       <label className="flex items-start gap-3">
         <input type="checkbox" className="mt-1 size-5 accent-[var(--accent)]" checked={checked} disabled={disabled} onChange={onToggle} />
         <div className="flex-1">
-          <p className="text-xs font-semibold tracking-wide text-accent uppercase">
+          <p className="text-xs font-medium tracking-wide text-accent uppercase">
             {actionLabel} · <span className="capitalize">{formatDay(change.date, { weekday: 'long', day: 'numeric' })}</span>
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{change.reason}</p>
@@ -227,12 +227,12 @@ function Version({
   const totals = session ? sessionTotals({ ...session, id: '' }, zones) : null
   return (
     <div className={cn('rounded-xl p-3', muted ? 'bg-muted/60 line-through decoration-muted-foreground/40' : 'bg-muted')}>
-      <p className="text-[11px] font-semibold text-muted-foreground uppercase no-underline">{label}</p>
+      <p className="text-[11px] font-medium text-muted-foreground uppercase no-underline">{label}</p>
       {session ? (
         <>
           <div className="mt-1 flex items-center gap-2">
             <TypeBadge type={session.type} />
-            <span className="font-semibold">{session.title}</span>
+            <span className="font-medium">{session.title}</span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {formatDuration(totals!.seconds)}
@@ -240,7 +240,7 @@ function Version({
           </p>
         </>
       ) : (
-        <p className="mt-1 font-semibold">Repos</p>
+        <p className="mt-1 font-medium">Repos</p>
       )}
     </div>
   )

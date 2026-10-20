@@ -1,22 +1,8 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { EmptyState as ArcEmptyState } from '@/components/arc/empty-state/empty-state'
 
-export function EmptyState({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: LucideIcon
-  title: string
-  children?: ReactNode
-}) {
-  return (
-    <div className="flex flex-col items-center px-6 py-14 text-center">
-      <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-        <Icon className="size-7" />
-      </div>
-      <h2 className="mt-4 text-lg font-semibold">{title}</h2>
-      {children && <div className="mt-2 text-sm text-muted-foreground">{children}</div>}
-    </div>
-  )
+/** État vide Arc ; le texte passe en description, une action éventuelle sous le texte. */
+export function EmptyState({ icon: Icon, title, children, action }: { icon: LucideIcon; title: string; children?: string; action?: ReactNode }) {
+  return <ArcEmptyState icon={<Icon width={24} height={24} strokeWidth={1.5} />} title={title} description={children ?? ''} action={action} />
 }

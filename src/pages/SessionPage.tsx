@@ -34,7 +34,7 @@ export function SessionPage() {
   if (!plan || !session) {
     return (
       <Card className="mt-6">
-        <EmptyState icon={RepeatIcon} title="Séance introuvable" />
+        <EmptyState icon={RepeatIcon} title="Séance introuvable">Elle a peut-être été retirée du plan.</EmptyState>
       </Card>
     )
   }
@@ -53,20 +53,20 @@ export function SessionPage() {
 
       <div className="px-1">
         <TypeBadge type={session.type} />
-        <h1 className="mt-2 text-3xl leading-tight font-extrabold tracking-tight">{session.title}</h1>
+        <h1 className="mt-2 text-3xl leading-tight font-medium tracking-tight">{session.title}</h1>
         <p className="mt-2 text-muted-foreground">{session.description}</p>
       </div>
 
       <Card>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Durée</p>
-            <SlotText value={formatDuration(seconds)} className="text-4xl font-extrabold tracking-tight" />
+            <p className="text-sm text-muted-foreground">Durée</p>
+            <SlotText value={formatDuration(seconds)} className="text-4xl font-medium tracking-tight" />
           </div>
           {meters > 0 && (
             <div>
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Distance est.</p>
-              <SlotText value={formatDistance(meters, units)} className="text-4xl font-extrabold tracking-tight" />
+              <p className="text-sm text-muted-foreground">Distance est.</p>
+              <SlotText value={formatDistance(meters, units)} className="text-4xl font-medium tracking-tight" />
             </div>
           )}
         </div>
@@ -86,7 +86,7 @@ export function SessionPage() {
             {session.blocks.map((b, i) =>
               b.kind === 'repeat' ? (
                 <li key={i} className="p-4">
-                  <p className="flex items-center gap-2 font-bold">
+                  <p className="flex items-center gap-2 font-medium">
                     <RepeatIcon className="size-4 text-accent" /> {b.repeats} ×
                   </p>
                   <ul className="mt-2 space-y-2 border-l-2 border-accent/40 pl-3">
@@ -110,7 +110,7 @@ export function SessionPage() {
 
       <Card>
         <div className="flex items-center justify-between">
-          <p className="font-semibold">Montre</p>
+          <p className="font-medium">Montre</p>
           <SyncBadge status={status} />
         </div>
         {status === 'app-only' && (
@@ -141,9 +141,9 @@ function StepRow({ step, zones, units }: { step: Step; zones: Zone[]; units: Uni
         <p className="text-xs font-medium text-muted-foreground">
           {STEP_LABEL[step.kind]} · Z{step.zone} {ZONE_NAMES[step.zone]}
         </p>
-        <p className="font-semibold tabular-nums">{target}</p>
+        <p className="font-medium tabular-nums">{target}</p>
       </div>
-      <p className="text-right text-sm font-semibold tabular-nums">{pace}</p>
+      <p className="text-right text-sm font-medium tabular-nums">{pace}</p>
     </div>
   )
 }

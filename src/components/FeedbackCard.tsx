@@ -20,13 +20,13 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
       <Card id="ressenti">
         <div className="flex items-center justify-between">
           <CardTitle>Mon ressenti</CardTitle>
-          <button className="text-sm font-semibold text-accent" onClick={() => setEditing(true)}>
+          <button className="text-sm font-medium text-accent" onClick={() => setEditing(true)}>
             Modifier
           </button>
         </div>
         <div className="mt-2 flex items-center gap-3">
           <Stars value={saved.rating} />
-          <span className="text-sm font-semibold">
+          <span className="text-sm font-medium">
             RPE {saved.rpe}/10 · {RPE_LABELS[saved.rpe]}
           </span>
         </div>
@@ -49,7 +49,7 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
 
       <div className="mt-4 flex items-baseline justify-between">
         <p className="text-sm font-medium text-muted-foreground">Effort perçu</p>
-        <p className="text-sm font-semibold">
+        <p className="text-sm font-medium">
           {draft.rpe}/10 · {RPE_LABELS[draft.rpe]}
         </p>
       </div>

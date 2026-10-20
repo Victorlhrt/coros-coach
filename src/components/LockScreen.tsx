@@ -19,7 +19,7 @@ export function LockScreen() {
       <div className="flex size-16 items-center justify-center rounded-3xl bg-accent/15">
         <Lock className="size-8 text-accent" />
       </div>
-      <h1 className="mt-5 text-3xl font-extrabold tracking-tight">Coach verrouillé</h1>
+      <h1 className="mt-5 text-3xl font-medium tracking-tight">Coach verrouillé</h1>
       <p className="mt-2 text-muted-foreground">Ta clé API et ta connexion COROS sont chiffrées sur cet appareil.</p>
 
       {hasPasskey && (

@@ -1,4 +1,5 @@
 import { ArrowRight, Moon, Sparkles, Star, Wand2 } from 'lucide-react'
+import { Progress } from '@/components/arc/progress/progress'
 import { SlotText } from '@/components/arc/slot-text/slot-text'
 import { TextReveal } from '@/components/arc/text-reveal/text-reveal'
 import { useState } from 'react'
@@ -32,12 +33,17 @@ export function TodayPage() {
       <>
         <PageHeader subtitle={formatDay(now)} title="Aujourd’hui" />
         <Card>
-          <EmptyState icon={Sparkles} title="Pas encore de plan">
+          <EmptyState
+            icon={Sparkles}
+            title="Pas encore de plan"
+            action={
+              <Link to={connected ? '/objectif' : '/reglages'}>
+                <Button>{connected ? 'Créer mon plan' : 'Connecter COROS'}</Button>
+              </Link>
+            }
+          >
             {connected ? 'Fixe ton objectif et Claude construit ton plan à partir de tes données COROS.' : 'Connecte d’abord ta montre COROS dans Réglages.'}
           </EmptyState>
-          <Link to={connected ? '/objectif' : '/reglages'} className="block">
-            <Button className="w-full">{connected ? 'Créer mon plan' : 'Connecter COROS'}</Button>
-          </Link>
         </Card>
       </>
     )
@@ -65,7 +71,7 @@ export function TodayPage() {
             <Card className="flex items-center gap-3 bg-accent text-accent-foreground">
               <Wand2 className="size-6 shrink-0" />
               <div className="flex-1">
-                <p className="font-bold">Ton bilan de la semaine est prêt</p>
+                <p className="font-medium">Ton bilan de la semaine est prêt</p>
                 <p className="text-sm opacity-85">
                   {review.adjustment.changes.length > 0
                     ? `${review.adjustment.changes.length} ajustement${review.adjustment.changes.length > 1 ? 's' : ''} proposé${review.adjustment.changes.length > 1 ? 's' : ''}`
@@ -82,7 +88,7 @@ export function TodayPage() {
             <Card className="flex items-center gap-3">
               <Star className="size-6 shrink-0 text-accent" />
               <div className="flex-1">
-                <p className="font-semibold">Comment s’est passée ta séance ?</p>
+                <p className="font-medium">Comment s’est passée ta séance ?</p>
                 <p className="text-sm text-muted-foreground">
                   {toRate.title} · <span className="capitalize">{formatDay(toRate.date, { weekday: 'long' })}</span>
                 </p>
@@ -102,7 +108,7 @@ export function TodayPage() {
               </div>
               <div>
                 <TypeBadge type="rest" />
-                <p className="mt-1 text-2xl font-extrabold tracking-tight">Jour de repos</p>
+                <p className="mt-1 text-2xl font-medium tracking-tight">Jour de repos</p>
               </div>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">La récupération fait partie de l’entraînement.</p>
@@ -117,17 +123,11 @@ export function TodayPage() {
               </p>
               <p className="text-sm text-muted-foreground">{week.focus}</p>
             </div>
-            <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight">
+            <p className="mt-2 text-3xl font-medium tabular-nums tracking-tight">
               {activities.isLoading ? <Skeleton className="h-9 w-32" /> : <SlotText value={formatDistance(done, units)} />}
-              <span className="text-lg font-semibold text-muted-foreground"> / {formatDistance(planned, units, 0)}</span>
+              <span className="text-lg font-medium text-muted-foreground"> / {formatDistance(planned, units, 0)}</span>
             </p>
-            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted">
-              <div
-                key={done}
-                className="animate-grow-x h-full rounded-full bg-accent"
-                style={{ width: `${planned ? Math.min(100, (done / planned) * 100) : 0}%` }}
-              />
-            </div>
+            <Progress className="mt-3" value={done} max={planned || 1} label="Volume réalisé cette semaine" showValue />
             <Link to="/ajuster" className="mt-4 block">
               <Button variant="secondary" className="w-full">
                 <Wand2 className="size-5" /> Ajuster ma semaine
@@ -138,7 +138,7 @@ export function TodayPage() {
 
         {next && (
           <div>
-            <p className="mb-2 px-1 text-sm font-semibold text-muted-foreground">Prochaine séance</p>
+            <p className="mb-2 px-1 text-sm font-medium text-muted-foreground">Prochaine séance</p>
             <SessionCard session={next} />
           </div>
         )}
@@ -154,7 +154,7 @@ function TodayCard({ session }: { session: Session }) {
   return (
     <Card className="overflow-hidden">
       <TypeBadge type={session.type} />
-      <TextReveal as="h2" text={session.title} className="mt-2 text-3xl leading-tight font-extrabold tracking-tight" />
+      <TextReveal as="h2" text={session.title} className="mt-2 text-3xl leading-tight font-medium tracking-tight" />
       <p className="mt-2 text-muted-foreground">{session.description}</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <BigStat label="Durée" value={formatDuration(seconds)} />
@@ -173,8 +173,8 @@ function TodayCard({ session }: { session: Session }) {
 function BigStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <SlotText value={value} className="text-4xl font-extrabold tracking-tight" />
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <SlotText value={value} className="text-4xl font-medium tracking-tight" />
     </div>
   )
 }

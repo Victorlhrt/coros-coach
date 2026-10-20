@@ -37,7 +37,7 @@ export function CourseCard({ goal, update }: { goal: Goal; update: (patch: Parti
       {course ? (
         <div className="mt-4">
           <div className="flex items-start justify-between gap-2">
-            <p className="font-semibold">{course.name}</p>
+            <p className="font-medium">{course.name}</p>
             <button aria-label="Retirer le GPX" className="text-muted-foreground" onClick={() => update({ course: null })}>
               <X className="size-5" />
             </button>
@@ -113,7 +113,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted p-2">
       <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="font-bold tabular-nums">{value}</p>
+      <p className="font-medium tabular-nums">{value}</p>
     </div>
   )
 }

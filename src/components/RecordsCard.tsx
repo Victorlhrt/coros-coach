@@ -66,11 +66,11 @@ export function RecordsCard() {
         <div className="mt-4 grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-muted p-3">
             <p className="text-xs text-muted-foreground">VDOT</p>
-            <p className="text-2xl font-extrabold tabular-nums">{vdot}</p>
+            <p className="text-2xl font-medium tabular-nums">{vdot}</p>
           </div>
           <div className="rounded-xl bg-muted p-3">
             <p className="text-xs text-muted-foreground">Allure seuil estimée</p>
-            <p className="text-2xl font-extrabold tabular-nums">{formatPace(thresholdPace(vdot))}</p>
+            <p className="text-2xl font-medium tabular-nums">{formatPace(thresholdPace(vdot))}</p>
           </div>
         </div>
       )}

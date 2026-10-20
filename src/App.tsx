@@ -105,6 +105,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
+    document.documentElement.dataset.theme = theme
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0f1013' : '#fafafa')
   }, [theme])
 
@@ -120,7 +121,7 @@ export default function App() {
     <HashRouter>
       {oauth.status === 'error' && (
         <div className="fixed inset-x-4 top-[calc(1rem+env(safe-area-inset-top))] z-40 mx-auto max-w-md rounded-2xl bg-destructive p-4 text-sm text-white shadow-lg">
-          <p className="font-semibold">Connexion COROS impossible</p>
+          <p className="font-medium">Connexion COROS impossible</p>
           <p className="mt-1 opacity-90">{oauth.message}</p>
           <Button size="sm" variant="secondary" className="mt-3" onClick={oauth.dismiss}>
             Fermer

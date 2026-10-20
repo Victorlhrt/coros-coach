@@ -16,6 +16,18 @@ export function formatDistance(meters: number, units: Units = 'metric', digits =
   return `${v.toFixed(v >= 100 ? 0 : digits).replace('.', ',')} ${units === 'imperial' ? 'mi' : 'km'}`
 }
 
+/** Distance dans l'unité choisie, arrondie au dixième (axes et graphiques). */
+export function distanceValue(meters: number, units: Units = 'metric') {
+  return Math.round((units === 'imperial' ? meters / MI : meters / 1000) * 10) / 10
+}
+
+export function distanceUnit(units: Units = 'metric') {
+  return units === 'imperial' ? 'mi' : 'km'
+}
+
+/** Nombre au format français, une décimale au plus. */
+export const formatNumber = (value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })
+
 export function formatDuration(seconds: number) {
   const s = Math.round(seconds)
   const h = Math.floor(s / 3600)

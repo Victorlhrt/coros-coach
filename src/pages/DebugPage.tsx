@@ -35,7 +35,7 @@ export function DebugPage() {
         <Link to="/reglages" aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="flex-1 text-2xl font-extrabold tracking-tight">Debug MCP</h1>
+        <h1 className="flex-1 text-2xl font-medium tracking-tight">Debug MCP</h1>
         <Button size="icon" variant="secondary" aria-label="Recharger" onClick={() => tools.refetch()}>
           <RefreshCw className={tools.isFetching ? 'size-5 animate-spin' : 'size-5'} />
         </Button>
@@ -62,7 +62,7 @@ export function DebugPage() {
 
       {log.length > 0 && (
         <Card>
-          <h2 className="font-semibold">Journal des écritures</h2>
+          <h2 className="font-medium">Journal des écritures</h2>
           <ul className="mt-3 space-y-2 text-xs">
             {log.map((e) => (
               <li key={e.id} className="rounded-lg bg-muted p-2">
@@ -89,7 +89,7 @@ function ToolCard({ tool }: { tool: Tool }) {
       <details>
         <summary className="flex cursor-pointer list-none items-start gap-2">
           <div className="flex-1">
-            <div className="font-mono text-sm font-semibold">{tool.name}</div>
+            <div className="font-mono text-sm font-medium">{tool.name}</div>
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{tool.description}</p>
           </div>
           {write && <Lock className="mt-0.5 size-4 shrink-0 text-session-tempo" aria-label="Écriture" />}

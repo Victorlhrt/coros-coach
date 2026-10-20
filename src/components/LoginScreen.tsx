@@ -25,7 +25,7 @@ export function LoginScreen() {
       <div className="flex size-16 items-center justify-center rounded-3xl bg-accent/15">
         <ScanFace className="size-8 text-accent" />
       </div>
-      <h1 className="mt-5 text-3xl font-extrabold tracking-tight">Coach COROS</h1>
+      <h1 className="mt-5 text-3xl font-medium tracking-tight">Coach COROS</h1>
 
       {!setup ? (
         <>

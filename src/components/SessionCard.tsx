@@ -24,7 +24,7 @@ export function SessionCard({ session }: { session: Session }) {
       <span className="h-11 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-muted-foreground capitalize">{formatDay(session.date, { weekday: 'long', day: 'numeric' })}</p>
-        <p className="truncate font-semibold">{session.title}</p>
+        <p className="truncate font-medium">{session.title}</p>
         <p className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
           <span>{formatDuration(seconds)}</span>
           {meters > 0 && <span>· {formatDistance(meters, units)}</span>}

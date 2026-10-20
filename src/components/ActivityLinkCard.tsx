@@ -46,7 +46,7 @@ export function ActivityLinkCard({ session }: { session: Session }) {
             <Metric label={`Allure ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
           </div>
 
-          <p className="mt-4 text-sm font-semibold">Splits</p>
+          <p className="mt-4 text-sm font-medium">Splits</p>
           {laps.isLoading && <Skeleton className="mt-2 h-24" />}
           {laps.error && <p className="mt-1 text-sm text-destructive">{laps.error.message}</p>}
           {laps.data && laps.data.laps.length > 0 && (
@@ -66,7 +66,7 @@ export function ActivityLinkCard({ session }: { session: Session }) {
                     <td className="py-1.5">{l.index}</td>
                     <td className="text-right">{l.meters ? formatDistance(l.meters, units, 2) : '—'}</td>
                     <td className="text-right">{l.seconds ? formatClock(l.seconds) : '—'}</td>
-                    <td className="text-right font-semibold">{l.paceSecPerKm ? formatPace(l.paceSecPerKm, units) : '—'}</td>
+                    <td className="text-right font-medium">{l.paceSecPerKm ? formatPace(l.paceSecPerKm, units) : '—'}</td>
                     <td className="text-right">{l.avgHr ? Math.round(l.avgHr) : '—'}</td>
                   </tr>
                 ))}
@@ -118,7 +118,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="text-lg font-bold tabular-nums">{value}</p>
+      <p className="text-lg font-medium tabular-nums">{value}</p>
     </div>
   )
 }

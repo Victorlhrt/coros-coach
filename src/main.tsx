@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { initVault, setupAutoLock } from './lib/lock/vault'
 import { useSettings } from './lib/store/settings'
+import './components/arc/foundation.css'
 import './index.css'
 
 // Avant le premier rendu : ouvre le coffre (ou le verrouille) et migre les anciennes données en clair.

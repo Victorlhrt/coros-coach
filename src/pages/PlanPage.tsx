@@ -1,3 +1,4 @@
+import { BarChart } from '@/components/arc/bar-chart/bar-chart'
 import { SlotText } from '@/components/arc/slot-text/slot-text'
 import { CalendarDays, Wand2 } from 'lucide-react'
 import { useState } from 'react'
@@ -9,7 +10,7 @@ import { SessionCard } from '@/components/SessionCard'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { WEEKDAYS_SHORT, addDays, formatDay, today } from '@/lib/coach/dates'
-import { formatDistance } from '@/lib/coach/format'
+import { distanceUnit, distanceValue, formatDistance, formatNumber } from '@/lib/coach/format'
 import { isRun, weekMeters } from '@/lib/coach/metrics'
 import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
 import { usePlan } from '@/lib/store/plan'
@@ -28,12 +29,17 @@ export function PlanPage() {
       <>
         <PageHeader title="Plan" />
         <Card>
-          <EmptyState icon={CalendarDays} title="Aucun plan">
+          <EmptyState
+            icon={CalendarDays}
+            title="Aucun plan"
+            action={
+              <Link to="/objectif">
+                <Button>Créer mon plan</Button>
+              </Link>
+            }
+          >
             Fixe ton objectif pour générer ton plan semaine par semaine.
           </EmptyState>
-          <Link to="/objectif" className="block">
-            <Button className="w-full">Créer mon plan</Button>
-          </Link>
         </Card>
       </>
     )
@@ -41,7 +47,6 @@ export function PlanPage() {
 
   const week = plan.weeks.find((w) => w.number === selected) ?? plan.weeks[0]
   const volumes = plan.weeks.map((w) => weekMeters(w.sessions.filter(isRun), zones))
-  const maxVolume = Math.max(...volumes, 1)
   const days = Array.from({ length: 7 }, (_, i) => addDays(addDays(week.end, -6), i))
 
   return (
@@ -50,7 +55,7 @@ export function PlanPage() {
         subtitle={`${plan.weeks.length} semaines · course le ${formatDay(plan.raceDate, { day: 'numeric', month: 'long' })}`}
         title={plan.name}
         action={
-          <Link to="/objectif" className="shrink-0 text-sm font-semibold text-accent">
+          <Link to="/objectif" className="shrink-0 text-sm font-medium text-accent">
             Objectif
           </Link>
         }
@@ -60,7 +65,7 @@ export function PlanPage() {
         <Card className="mb-4 p-4">
           <details>
             <summary className="flex cursor-pointer list-none items-center justify-between">
-              <span className="font-semibold">Parcours et stratégie</span>
+              <span className="font-medium">Parcours et stratégie</span>
               {goal?.course && (
                 <span className="text-sm text-muted-foreground tabular-nums">
                   {goal.course.distanceKm} km · {goal.course.gain} m D+
@@ -74,33 +79,32 @@ export function PlanPage() {
       )}
 
       <Card className="p-4">
-        <p className="text-sm font-medium text-muted-foreground">Progression du volume</p>
-        <div className="mt-3 flex h-24 items-end gap-1">
-          {plan.weeks.map((w, i) => (
-            <button
-              key={w.number}
-              onClick={() => setSelected(w.number)}
-              aria-label={`Semaine ${w.number}`}
-              className="flex h-full flex-1 flex-col justify-end"
-            >
-              <span
-                className={cn(
-                  'w-full rounded-t-md transition-all duration-300',
-                  w.number === selected ? 'bg-accent' : w.number === current ? 'bg-foreground/40' : 'bg-muted-foreground/25',
-                )}
-                style={{ height: `${Math.max(6, (volumes[i] / maxVolume) * 100)}%` }}
-              />
-            </button>
-          ))}
-        </div>
+        <BarChart
+          data={plan.weeks.map((w, i) => ({ key: String(w.number), label: `Semaine ${w.number}`, axisLabel: `S${w.number}`, value: distanceValue(volumes[i], units) }))}
+          label="Volume prévu"
+          period={`${plan.weeks.length} semaines`}
+          unit={distanceUnit(units)}
+          averageLabel="Moyenne par semaine"
+          valueLabel="Volume prévu"
+          categoryLabel="Semaine"
+          showAverage={false}
+          height={112}
+          formatValue={formatNumber}
+        />
         <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
           {plan.weeks.map((w) => (
             <button
               key={w.number}
               onClick={() => setSelected(w.number)}
+              aria-pressed={w.number === selected}
+              aria-label={`Semaine ${w.number}`}
               className={cn(
-                'h-8 min-w-8 shrink-0 rounded-full px-2 text-xs font-semibold',
-                w.number === selected ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground',
+                'h-8 min-w-8 shrink-0 rounded-full border px-2 text-xs font-medium transition-colors',
+                w.number === selected
+                  ? 'border-[color-mix(in_oklab,var(--accent)_42%,var(--border))] bg-[color-mix(in_oklab,var(--accent)_11%,var(--surface))] text-foreground'
+                  : w.number === current
+                    ? 'border-[var(--border-strong)] text-foreground'
+                    : 'border-[var(--border)] text-[var(--text-secondary)]',
               )}
             >
               S{w.number}
@@ -112,10 +116,10 @@ export function PlanPage() {
       <section key={week.number} className="animate-page-in mt-5">
         <div className="flex items-end justify-between px-1">
           <div>
-            <p className="text-sm font-semibold text-accent">{PHASE_LABEL[week.phase]}</p>
-            <h2 className="text-2xl font-extrabold tracking-tight">Semaine {week.number}</h2>
+            <p className="text-sm font-medium text-accent">{PHASE_LABEL[week.phase]}</p>
+            <h2 className="text-2xl font-medium tracking-tight">Semaine {week.number}</h2>
           </div>
-          <SlotText value={formatDistance(volumes[week.number - 1], units, 0)} className="text-2xl font-extrabold" />
+          <SlotText value={formatDistance(volumes[week.number - 1], units, 0)} className="text-2xl font-medium" />
         </div>
         <p className="mt-1 px-1 text-sm text-muted-foreground">{week.focus}</p>
 
@@ -131,8 +135,8 @@ export function PlanPage() {
                   (d < week.start || d > week.end) && 'opacity-40',
                 )}
               >
-                <span className="text-[11px] font-semibold text-muted-foreground">{WEEKDAYS_SHORT[i]}</span>
-                <span className="text-sm font-bold tabular-nums">{Number(d.slice(8))}</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{WEEKDAYS_SHORT[i]}</span>
+                <span className="text-sm font-medium tabular-nums">{Number(d.slice(8))}</span>
                 <div className="flex h-2 gap-0.5">
                   {sessions.length === 0 ? (
                     <span className="size-2 rounded-full bg-muted" />
