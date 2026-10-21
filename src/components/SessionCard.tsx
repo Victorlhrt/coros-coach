@@ -19,7 +19,7 @@ export function SessionCard({ session }: { session: Session }) {
   return (
     <Link
       to={`/seance/${session.id}`}
-      className="flex items-center gap-3 rounded-2xl bg-card p-4 transition-transform active:scale-[0.98]"
+      className="flex items-center gap-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 shadow-[var(--shadow-resting)] transition-transform active:scale-[0.98]"
     >
       <span className="h-11 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div className="min-w-0 flex-1">

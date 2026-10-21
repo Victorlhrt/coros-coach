@@ -59,14 +59,14 @@ export function SessionPage() {
 
       <Card>
         <div className="grid grid-cols-2 gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">Durée</p>
-            <SlotText value={formatDuration(seconds)} className="text-4xl font-medium tracking-tight" />
+            <SlotText value={formatDuration(seconds)} className="text-3xl font-medium tracking-tight tabular-nums" />
           </div>
           {meters > 0 && (
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Distance est.</p>
-              <SlotText value={formatDistance(meters, units)} className="text-4xl font-medium tracking-tight" />
+              <SlotText value={formatDistance(meters, units)} className="text-3xl font-medium tracking-tight tabular-nums" />
             </div>
           )}
         </div>

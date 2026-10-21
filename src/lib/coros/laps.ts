@@ -30,10 +30,18 @@ function findLaps(node: unknown): Obj[] {
   return []
 }
 
-/** Normalise la réponse de queryActivityLapData (format non documenté, lecture tolérante). */
-export function normalizeLaps(raw: unknown): Lap[] {
-  return findLaps(raw).map((o, i) => {
-    const meters = parseMeters(o)
+/**
+ * Normalise la réponse de queryActivityLapData (format non documenté, lecture tolérante).
+ * COROS donne la distance des tours en centimètres : avec `totalMeters` (distance de l'activité),
+ * l'échelle est recalée à la puissance de 10 qui fait coïncider la somme des tours avec le total.
+ */
+export function normalizeLaps(raw: unknown, totalMeters?: number | null): Lap[] {
+  const objs = findLaps(raw)
+  const rawMeters = objs.map(parseMeters)
+  const sum = rawMeters.reduce<number>((a, m) => a + (m ?? 0), 0)
+  const scale = totalMeters && sum > 0 ? 10 ** Math.round(Math.log10(totalMeters / sum)) : 1
+  return objs.map((o, i) => {
+    const meters = rawMeters[i] === null ? null : rawMeters[i]! * scale
     const seconds = parseSeconds(o)
     return {
       index: i + 1,
@@ -50,12 +58,12 @@ export function fetchLaps(labelId: string, sportType: number) {
 }
 
 /** Splits d'une activité : ils ne changent plus, on les garde en cache. */
-export function useLaps(labelId: string | null | undefined, sportType = 100) {
+export function useLaps(labelId: string | null | undefined, sportType = 100, totalMeters?: number | null) {
   return useQuery({
-    queryKey: ['coros', 'laps', labelId],
+    queryKey: ['coros', 'laps', labelId, totalMeters],
     queryFn: async () => {
       const raw = await fetchLaps(labelId!, sportType)
-      return { raw, laps: normalizeLaps(raw) }
+      return { raw, laps: normalizeLaps(raw, totalMeters) }
     },
     enabled: !!labelId,
     staleTime: Infinity,

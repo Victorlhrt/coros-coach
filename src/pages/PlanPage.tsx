@@ -131,7 +131,7 @@ export function PlanPage() {
                 key={d}
                 className={cn(
                   'flex flex-col items-center gap-1.5 rounded-xl py-2',
-                  d === now ? 'bg-accent/15 ring-1 ring-accent' : 'bg-card',
+                  d === now ? 'bg-accent/15 ring-1 ring-accent' : 'border border-[var(--border-subtle)] bg-[var(--surface)]',
                   (d < week.start || d > week.end) && 'opacity-40',
                 )}
               >

@@ -28,7 +28,7 @@ function describeActivity(a: Activity) {
 async function describeLaps(a: Activity) {
   try {
     const raw = await fetchLaps(a.labelId, a.sportType)
-    const laps = normalizeLaps(raw)
+    const laps = normalizeLaps(raw, a.meters)
     if (laps.length === 0) return `  splits (brut) : ${JSON.stringify(raw).slice(0, 3000)}`
     return laps
       .map(

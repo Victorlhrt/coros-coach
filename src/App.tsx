@@ -14,7 +14,7 @@ import { useVault } from './lib/lock/vault'
 import { checkAuth, useAuth } from './lib/server/auth'
 import { startStateSync } from './lib/server/state-sync'
 import { toast } from './lib/toast'
-import { usePaceRepair } from './lib/store/plan'
+import { usePlanRepair } from './lib/store/plan'
 import { useSettings } from './lib/store/settings'
 import { AdjustPage } from './pages/AdjustPage'
 import { DebugPage } from './pages/DebugPage'
@@ -61,7 +61,7 @@ function useOAuthCallback() {
 function Shell() {
   const location = useLocation()
   useAutoLink()
-  usePaceRepair()
+  usePlanRepair()
   useWeeklyReview()
   return (
     <>

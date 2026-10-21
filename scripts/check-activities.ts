@@ -1,5 +1,6 @@
 // Vérifie hors ligne la lecture de la réponse texte de querySportRecords (format réel du serveur COROS).
 import { normalizeActivities } from '../src/lib/coros/activities'
+import { normalizeLaps } from '../src/lib/coros/laps'
 
 const sample = `Sport Records — 2026-08-30 to 2026-10-11 (2 records)
 ========================
@@ -35,6 +36,12 @@ expect(a?.seconds === 5625, `durée h:mm:ss (${a?.seconds})`)
 expect(a?.paceSecPerKm === 267, `allure (${a?.paceSecPerKm})`)
 expect(b?.seconds === 2317, `durée mm:ss (${b?.seconds})`)
 expect(normalizeActivities('Sport Records — aucun résultat').length === 0, 'texte sans fiche')
+
+// Splits COROS : distance des tours en centimètres, recalée sur la distance de l'activité.
+const laps = normalizeLaps({ data: { lapList: [{ distance: 100000, time: 422, avgHr: 118 }, { distance: 100000, time: 360, avgHr: 138 }] } }, 2000)
+expect(laps[0]?.meters === 1000, `tour en mètres (${laps[0]?.meters})`)
+expect(laps[0]?.paceSecPerKm === 422, `allure du tour (${laps[0]?.paceSecPerKm})`)
+expect(normalizeLaps({ laps: [{ distance: 1000, time: 300 }] }, 1000)[0]?.meters === 1000, 'tours déjà en mètres inchangés')
 
 if (errors.length) {
   console.error(errors.join('\n'))

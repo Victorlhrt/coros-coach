@@ -262,10 +262,10 @@ export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
   return errors
 }
 
-/** La sortie longue pèse au moins 25 % du volume (30 à 40 % visés), hors affûtage et semaine de course. */
+/** La sortie longue pèse au moins 30 % du volume (30 à 40 % visés), hors affûtage et semaine de course. */
 export function checkLongRuns(weeks: Skeleton['weeks']) {
   return weeks
-    .filter((w) => w.phase !== 'taper' && w.phase !== 'race' && w.targetKm > 0 && w.longRunKm < w.targetKm * 0.25)
+    .filter((w) => w.phase !== 'taper' && w.phase !== 'race' && w.targetKm > 0 && w.longRunKm < Math.floor(w.targetKm * 0.3))
     .map(
       (w) =>
         `Semaine ${w.number} : sortie longue de ${w.longRunKm} km pour ${w.targetKm} km, c'est trop court — elle doit représenter 30 à 40 % du volume (au moins ${Math.ceil(w.targetKm * 0.3)} km) et rester la plus longue sortie de la semaine.`,

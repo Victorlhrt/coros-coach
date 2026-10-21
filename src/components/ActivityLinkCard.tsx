@@ -18,7 +18,7 @@ export function ActivityLinkCard({ session }: { session: Session }) {
   const activities = data?.activities ?? []
   const activity = linkedActivity(session, links, activities)
   const link = links[session.id]
-  const laps = useLaps(activity?.labelId, activity?.sportType)
+  const laps = useLaps(activity?.labelId, activity?.sportType, activity?.meters)
 
   // Toutes les activités chargées (6 semaines), les plus proches de la date prévue d'abord : une séance faite en avance ou en retard reste liable.
   const candidates = [...activities].sort((a, b) => Math.abs(diffDays(session.date, a.date)) - Math.abs(diffDays(session.date, b.date)))

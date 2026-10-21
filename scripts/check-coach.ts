@@ -3,6 +3,8 @@ import './node-env'
 import { addDays, today } from '../src/lib/coach/dates'
 import { checkLongRuns, checkVolumes, checkWeekTotals } from '../src/lib/coach/generate'
 import { autoLinks } from '../src/lib/coach/links'
+import { fixLongRuns } from '../src/lib/coach/longrun'
+import { sessionTotals } from '../src/lib/coach/metrics'
 import { mergeRecords } from '../src/lib/coach/records'
 import type { Plan, Week } from '../src/lib/coach/schema'
 import { computeVolume } from '../src/lib/coach/volume'
@@ -30,6 +32,25 @@ expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 9), run(
 expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run(addDays(today(), 5), 10, 'long')], zones).some((e) => e.includes('plus longue que la sortie longue')), 'footing plus long que la sortie longue refusé')
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 6 }]).length === 1, 'sortie longue trop courte dans la structure refusée')
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 10 }, { ...wk(2, 20, 'taper'), longRunKm: 4 }]).length === 0, 'sortie longue à ~33 % acceptée, affûtage libre')
+expect(checkLongRuns([{ ...wk(1, 28), longRunKm: 7 }]).length === 1, 'sortie longue de 7 km pour 28 km refusée (25 %)')
+
+// Le cas signalé sur un plan existant : mar. 10 km (fait), jeu. 11 km, dim. sortie longue 7 km → volume reporté sur la sortie longue.
+{
+  const d = (n: number) => addDays(today(), n)
+  const sessions = [
+    { ...run(d(-1), 10), id: 'tue' },
+    { ...run(d(1), 11), id: 'thu' },
+    { ...run(d(4), 7, 'long'), id: 'sun' },
+  ]
+  const plan: Plan = { id: 'p', createdAt: '', name: '', overview: '', startDate: d(-2), raceDate: d(60), weeks: [{ ...week, start: d(-2), end: d(4), targetKm: 28, longRunKm: 7, sessions }] }
+  const { plan: fixed, changed } = fixLongRuns(plan, zones, today(), new Set(['tue']))
+  const kmOf = (id: string) => sessionTotals(fixed.weeks[0].sessions.find((s) => s.id === id)!, zones).meters / 1000
+  expect(changed.length === 2, 'sortie longue et footing à venir corrigés')
+  expect(kmOf('sun') >= 10.5 && kmOf('sun') > kmOf('thu') && kmOf('sun') > kmOf('tue'), `sortie longue redevenue la plus longue (${kmOf('sun')} km)`)
+  expect(kmOf('tue') === 10, 'séance passée inchangée')
+  expect(Math.abs(kmOf('sun') + kmOf('thu') - 18) < 0.2, 'volume de la semaine conservé')
+  expect(fixLongRuns(fixed, zones, today(), new Set(['tue'])).changed.length === 0, 'semaine cohérente laissée telle quelle')
+}
 
 // Volume réel : 4 semaines à 8 + 10 + 14 km.
 const acts = [7, 14, 21, 28].flatMap((d) => [

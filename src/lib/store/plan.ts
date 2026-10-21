@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { today } from '@/lib/coach/dates'
 import { withIds } from '@/lib/coach/generate'
+import { fixLongRuns } from '@/lib/coach/longrun'
 import { fixPaces, repacePlan } from '@/lib/coach/repace'
 import type { Feedback } from '@/lib/coach/feedback'
 import type { Adjustment, Goal, Plan, Profile, Session, Zone } from '@/lib/coach/schema'
@@ -55,6 +56,8 @@ interface PlanState {
   retuneZones: (zones: Zone[]) => string[]
   /** Séances à venir : allures cibles incohérentes avec leur zone ramenées à l'allure de la zone. */
   repairPaces: () => void
+  /** Semaines à venir : la sortie longue redevient la plus longue sortie de la semaine. */
+  repairLongRuns: () => void
   setPlan: (plan: Plan) => void
   setCoros: (patch: Partial<CorosSync>) => void
   markSynced: (hashes: Record<string, string>) => void
@@ -111,6 +114,13 @@ export const usePlan = create<PlanState>()(
         const s = get()
         if (!s.plan) return
         const { plan, changed } = fixPaces(s.plan, s.zones, s.goal, today())
+        if (changed.length) set({ plan })
+      },
+      repairLongRuns: () => {
+        const s = get()
+        if (!s.plan) return
+        const done = new Set(Object.entries(s.links).flatMap(([id, l]) => (l.labelId ? [id] : [])))
+        const { plan, changed } = fixLongRuns(s.plan, s.zones, today(), done)
         if (changed.length) set({ plan })
       },
       setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
@@ -179,9 +189,15 @@ export function allSessions(plan: Plan | null) {
   return plan?.weeks.flatMap((w) => w.sessions) ?? []
 }
 
-/** À monter une fois : corrige les allures des séances à venir dès que le plan ou les zones changent (y compris à la synchro). */
-export function usePaceRepair() {
+/**
+ * À monter une fois : corrige les séances à venir dès que le plan ou les zones changent (y compris à la synchro) :
+ * allures cohérentes avec leur zone, sortie longue plus longue que les footings.
+ */
+export function usePlanRepair() {
   const plan = usePlan((s) => s.plan)
   const zones = usePlan((s) => s.zones)
-  useEffect(() => usePlan.getState().repairPaces(), [plan, zones])
+  useEffect(() => {
+    usePlan.getState().repairPaces()
+    usePlan.getState().repairLongRuns()
+  }, [plan, zones])
 }
