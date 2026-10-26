@@ -101,7 +101,7 @@ export function render({ subject, preheader, blocks, footer }: { subject: string
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
     <tr><td style="padding:0 8px 24px;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="padding-right:8px;"><img src="${config.origin}/logo-email.png" width="22" height="24" alt="" style="display:block;border:0;"></td>
+        <td style="padding-right:8px;"><img src="${config.origin}/logo-email.png" width="24" height="23" alt="" style="display:block;border:0;"></td>
         <td style="font-family:${FONT};font-size:18px;line-height:24px;font-weight:600;font-style:italic;letter-spacing:-0.03em;color:${C.primary};">Raice<span style="color:${C.muted};">.run</span></td>
       </tr></table>
     </td></tr>

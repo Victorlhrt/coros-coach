@@ -24,7 +24,7 @@ export function LoginScreen() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="flex size-16 items-center justify-center rounded-3xl border bg-black">
-        <LogoIcon glass className="size-10" />
+        <LogoIcon className="size-9" />
       </div>
       <h1 className="mt-5 text-3xl font-medium tracking-tight">
         <span className="italic">Raice.run</span> <span className="text-muted-foreground">· Coach</span>
