@@ -6,6 +6,8 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { config } from '../config.js'
 import { audit, db, getSetting, type UserRole, type UserStatus } from './db.js'
+import { sendEmailLater } from './email.js'
+import * as emails from './emails/templates.js'
 import { createPlanFromSession } from './onboarding.js'
 
 /**
@@ -134,6 +136,9 @@ platformAuthRoutes.post('/signup', async (c) => {
   if (status === 'active') {
     await db`update users set last_login_at = now() where id = ${user.id}`
     await startSession(c, user.id)
+    sendEmailLater(body.email, 'welcome', emails.welcome({ name: body.name, app: config.origin }))
+  } else {
+    sendEmailLater(body.email, 'waitlist', emails.waitlist({ name: body.name }))
   }
   return c.json({ status })
 })
@@ -168,4 +173,47 @@ platformAuthRoutes.post('/logout', async (c) => {
   if (token) await db`delete from user_sessions where token_hash = ${hashToken(token)}`
   deleteCookie(c, SESSION_COOKIE, cookieOpts)
   return c.json({ ok: true })
+})
+
+// ---------- Mot de passe oublié ----------
+
+const RESET_MINUTES = 60
+
+/** Répond toujours pareil, que l'adresse existe ou non : on ne révèle pas qui a un compte. */
+platformAuthRoutes.post('/forgot', async (c) => {
+  const ip = clientIp(c)
+  if (throttled(ip)) return c.json({ error: 'Trop d’essais, réessaie dans 15 minutes.' }, 429)
+  recordFailure(ip)
+  const parsed = z.object({ email: z.string().trim().toLowerCase().email() }).safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Adresse e-mail invalide.' }, 400)
+  const [user] = await db<{ id: string; name: string; status: UserStatus }[]>`select id, name, status from users where email = ${parsed.data.email}`
+  if (user && user.status !== 'suspended') {
+    const token = randomBytes(32).toString('base64url')
+    await db`
+      insert into password_resets (token_hash, user_id, expires_at)
+      values (${hashToken(token)}, ${user.id}, now() + ${`${RESET_MINUTES} minutes`}::interval)`
+    const url = `${config.origin}/reinitialiser?token=${token}`
+    sendEmailLater(parsed.data.email, 'password-reset', emails.passwordReset({ name: user.name, url, minutes: RESET_MINUTES }))
+  }
+  return c.json({ ok: true })
+})
+
+platformAuthRoutes.post('/reset', async (c) => {
+  const parsed = z.object({ token: z.string().min(20), password: z.string().min(8).max(200) }).safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Mot de passe trop court (8 caractères minimum).' }, 400)
+  const [reset] = await db<{ user_id: string }[]>`
+    update password_resets set used_at = now()
+    where token_hash = ${hashToken(parsed.data.token)} and used_at is null and expires_at > now()
+    returning user_id`
+  if (!reset) return c.json({ error: 'Ce lien a expiré ou a déjà servi. Refais une demande.' }, 400)
+  const [user] = await db<{ email: string; status: UserStatus }[]>`
+    update users set password_hash = ${await hashPassword(parsed.data.password)} where id = ${reset.user_id} returning email, status`
+  // Toutes les autres sessions tombent : le mot de passe a changé.
+  await db`delete from user_sessions where user_id = ${reset.user_id}`
+  await audit(reset.user_id, 'user.password_reset', user.email)
+  if (user.status === 'active') {
+    await db`update users set last_login_at = now() where id = ${reset.user_id}`
+    await startSession(c, reset.user_id)
+  }
+  return c.json({ ok: true, status: user.status })
 })

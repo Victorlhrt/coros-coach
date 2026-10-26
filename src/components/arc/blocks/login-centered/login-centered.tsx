@@ -32,6 +32,8 @@ export interface LoginCenteredProps {
   onPasswordSignIn?: (email: string, password: string) => Promise<void>;
   /** Replaces the built-in sign-up mode, such as a link to a dedicated sign-up page. */
   onSignUp?: () => void;
+  /** "Forgot password?" link under the password form. */
+  onForgotPassword?: () => void;
   /** Name shown in the top bar and the heading. */
   brand?: string;
   /** Mark shown before the brand name. */
@@ -164,7 +166,7 @@ function useDrift(reduce: boolean) {
   return { style: { "--dx": dx, "--dy": dy } as MotionStyle, onPointerMove, onPointerLeave };
 }
 
-export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEmail = "maya@northwind.studio", termsHref = "#terms", privacyHref = "#privacy", onSignIn, onPasswordSignIn, onSignUp, brand = "Arc", brandMark, className }: LoginCenteredProps) {
+export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEmail = "maya@northwind.studio", termsHref = "#terms", privacyHref = "#privacy", onSignIn, onPasswordSignIn, onSignUp, onForgotPassword, brand = "Arc", brandMark, className }: LoginCenteredProps) {
   const reduce = !!useReducedMotion();
   const passwordMode = !!onPasswordSignIn;
   const [step, setStep] = useState<Step>(passwordMode ? "email" : "passkey");
@@ -425,6 +427,7 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
                     {signInError && <p className={styles.signInError} role="alert">{signInError}</p>}
                     <Button type="submit" className={styles.wide} loading={busy === "email"}>{signingUp ? "Créer mon compte" : passwordMode ? "Se connecter" : "Envoyer le code"}</Button>
                   </form>
+                  {passwordMode && onForgotPassword && <button type="button" className={styles.textButton} onClick={onForgotPassword}>Mot de passe oublié ?</button>}
                   {!signingUp && !passwordMode && <button type="button" className={styles.textButton} onClick={switchToPasskey}><FingerprintPattern size={14} strokeWidth={1.75} aria-hidden="true" />Utiliser un passkey</button>}
                 </motion.div>}
 

@@ -15,6 +15,7 @@ const ACTIONS: Record<string, string> = {
   'onboarding.update': 'Parcours modifié',
   'plan.update': 'Plan modifié',
   'settings.signup_mode': 'Mode d’inscription',
+  'user.password_reset': 'Mot de passe réinitialisé',
 }
 
 const columns: DataColumn<Entry>[] = [

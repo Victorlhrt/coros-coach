@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app-shell'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { useMe } from '../session'
 import { AuditPage } from './AuditPage'
+import { EmailsPage } from './EmailsPage'
 import { OnboardingDetailPage } from './OnboardingDetailPage'
 import { OnboardingsPage } from './OnboardingsPage'
 import { OverviewPage } from './OverviewPage'
@@ -37,6 +38,7 @@ export default function AdminApp() {
         <Route path="plans/:id" element={<PlanDetailPage />} />
         <Route path="administration" element={<SettingsPage />} />
         <Route path="journal" element={<AuditPage />} />
+        <Route path="emails" element={<EmailsPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AppShell>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ClipboardListIcon, ExternalLinkIcon, LayoutGridIcon, RouteIcon, ScrollTextIcon, ShieldIcon, UsersIcon, WatchIcon } from "lucide-react";
+import { ClipboardListIcon, ExternalLinkIcon, LayoutGridIcon, MailIcon, RouteIcon, ScrollTextIcon, ShieldIcon, UsersIcon, WatchIcon } from "lucide-react";
 
 export type SidebarNavItem = {
 	title: string;
@@ -30,6 +30,7 @@ export const navGroups: SidebarNavGroup[] = [
 		label: "Administration",
 		items: [
 			{ title: "Accès et réglages", path: "/admin/administration", icon: <ShieldIcon /> },
+			{ title: "E-mails", path: "/admin/emails", icon: <MailIcon /> },
 			{ title: "Journal", path: "/admin/journal", icon: <ScrollTextIcon /> },
 		],
 	},

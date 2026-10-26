@@ -86,6 +86,25 @@ export async function migratePlatform() {
       value jsonb not null,
       updated_at timestamptz not null default now()
     )`
+  await db`
+    create table if not exists password_resets (
+      token_hash text primary key,
+      user_id uuid not null references users(id) on delete cascade,
+      expires_at timestamptz not null,
+      used_at timestamptz,
+      created_at timestamptz not null default now()
+    )`
+  await db`
+    create table if not exists email_log (
+      id bigserial primary key,
+      recipient text not null,
+      template text not null,
+      subject text not null,
+      status text not null check (status in ('sent', 'failed', 'skipped')),
+      provider_id text,
+      error text,
+      created_at timestamptz not null default now()
+    )`
   await db`create index if not exists users_created_idx on users (created_at)`
   await db`create index if not exists onboarding_sessions_variant_idx on onboarding_sessions (variant_id, created_at)`
   await db`create index if not exists plans_user_idx on plans (user_id, created_at)`
@@ -100,6 +119,7 @@ export async function migratePlatform() {
   }
   await db`insert into app_settings (key, value) values ('signup_mode', ${db.json('open')}) on conflict (key) do nothing`
   await db`delete from user_sessions where expires_at < now()`
+  await db`delete from password_resets where expires_at < now() - interval '1 day'`
 }
 
 export async function getSetting<T>(key: string, fallback: T): Promise<T> {

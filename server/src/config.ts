@@ -20,6 +20,10 @@ export const config = {
   /** Base de la plateforme (comptes, onboardings, plans). Par défaut la même que le coach, pratique en local. */
   platformDatabaseUrl: process.env.PLATFORM_DATABASE_URL ?? required('DATABASE_URL'),
   /** E-mails promus administrateurs à l'inscription ou à la connexion (séparés par des virgules). */
+  /** Envoi d'e-mails par Resend (sans clé, les e-mails sont seulement journalisés). */
+  resendApiKey: process.env.RESEND_API_KEY ?? '',
+  emailFrom: process.env.EMAIL_FROM ?? 'Raice.run <bonjour@raice.run>',
+  emailReplyTo: process.env.EMAIL_REPLY_TO ?? '',
   adminEmails: (process.env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())

@@ -27,6 +27,7 @@ export function LoginPage() {
       brandMark={<LogoIcon width={20} height={20} />}
       onPasswordSignIn={signIn}
       onSignUp={() => navigate('/onboarding')}
+      onForgotPassword={() => navigate('/mot-de-passe-oublie')}
       termsHref="#conditions"
       privacyHref="#confidentialite"
     />

@@ -1,7 +1,10 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireAdmin, type SessionUser } from './auth.js'
+import { config } from '../config.js'
 import { audit, db, getSetting } from './db.js'
+import { sendEmail, sendEmailLater } from './email.js'
+import { CATALOG, accountApproved, planReady, type TemplateId } from './emails/templates.js'
 
 type Env = { Variables: { user: SessionUser } }
 
@@ -87,14 +90,18 @@ adminRoutes.patch('/users/:id', async (c) => {
   if (id === me.id && (patch.role === 'runner' || (patch.status && patch.status !== 'active'))) {
     return c.json({ error: 'Tu ne peux pas retirer tes propres droits.' }, 400)
   }
+  const [before] = await db<{ status: string }[]>`select status from users where id = ${id}`
   const [row] = await db`
     update users set
       status = coalesce(${patch.status ?? null}, status),
       role = coalesce(${patch.role ?? null}, role),
       notes = case when ${patch.notes !== undefined} then ${patch.notes ?? null} else notes end
     where id = ${id}
-    returning id, email, status, role`
+    returning id, email, name, status, role`
   if (!row) return c.json({ error: 'Compte introuvable' }, 404)
+  if (before?.status === 'waitlist' && row.status === 'active') {
+    sendEmailLater(row.email as string, 'account-approved', accountApproved({ name: row.name as string, app: config.origin }))
+  }
   if (patch.status === 'suspended') await db`delete from user_sessions where user_id = ${id}`
   await audit(me.id, 'user.update', row.email as string, patch)
   return c.json(row)
@@ -243,8 +250,15 @@ adminRoutes.patch('/plans/:id', async (c) => {
     .object({ status: z.enum(['requested', 'generating', 'active', 'completed', 'archived', 'failed']) })
     .safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: 'Statut invalide' }, 400)
-  const [row] = await db`update plans set status = ${parsed.data.status}, updated_at = now() where id = ${c.req.param('id')} returning id`
+  const [prev] = await db<{ status: string }[]>`select status from plans where id = ${c.req.param('id')}`
+  const [row] = await db<{ title: string; goal_distance: string; goal_date: string | null; weeks: number | null; email: string; name: string }[]>`
+    update plans p set status = ${parsed.data.status}, updated_at = now()
+    from users u where p.id = ${c.req.param('id')} and u.id = p.user_id
+    returning p.title, p.goal_distance, to_char(p.goal_date, 'YYYY-MM-DD') goal_date, p.weeks, u.email, u.name`
   if (!row) return c.json({ error: 'Plan introuvable' }, 404)
+  if (parsed.data.status === 'active' && prev?.status !== 'active') {
+    sendEmailLater(row.email, 'plan-ready', planReady({ name: row.name, app: config.origin, title: row.title, distance: row.goal_distance, goalDate: row.goal_date, weeks: row.weeks }))
+  }
   await audit(c.get('user').id, 'plan.update', c.req.param('id'), parsed.data)
   return c.json({ ok: true })
 })
@@ -272,4 +286,35 @@ adminRoutes.get('/audit', async (c) => {
     from audit_log a left join users u on u.id = a.actor_id
     order by a.created_at desc limit 200`
   return c.json(rows)
+})
+
+// ---------- E-mails ----------
+
+adminRoutes.get('/emails', async (c) => {
+  const log = await db`
+    select id::text, recipient, template, subject, status, error, created_at
+    from email_log order by created_at desc limit 100`
+  return c.json({
+    configured: !!config.resendApiKey,
+    from: config.emailFrom,
+    templates: Object.entries(CATALOG).map(([id, t]) => ({ id, label: t.label, when: t.when, subject: t.sample(config.origin).subject })),
+    log,
+  })
+})
+
+adminRoutes.get('/emails/:id/preview', (c) => {
+  const t = CATALOG[c.req.param('id') as TemplateId]
+  if (!t) return c.json({ error: 'Modèle introuvable' }, 404)
+  return c.html(t.sample(config.origin).html)
+})
+
+/** Envoie l'exemple d'un modèle à l'administrateur connecté. */
+adminRoutes.post('/emails/:id/test', async (c) => {
+  const id = c.req.param('id') as TemplateId
+  const t = CATALOG[id]
+  if (!t) return c.json({ error: 'Modèle introuvable' }, 404)
+  if (!config.resendApiKey) return c.json({ error: 'RESEND_API_KEY n’est pas configurée sur le serveur.' }, 400)
+  const me = c.get('user')
+  const res = await sendEmail(me.email, `test:${id}`, t.sample(config.origin))
+  return res.ok ? c.json({ ok: true, to: me.email }) : c.json({ error: res.error }, 502)
 })
