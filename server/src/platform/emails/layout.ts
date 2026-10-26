@@ -4,6 +4,8 @@
  * dans Gmail, Apple Mail et Outlook.
  */
 
+import { config } from '../../config.js'
+
 export type Email = { subject: string; html: string; text: string }
 
 const FONT = "Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif"
@@ -97,7 +99,12 @@ export function render({ subject, preheader, blocks, footer }: { subject: string
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.background}" style="background:${C.background};">
 <tr><td align="center" style="padding:40px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-    <tr><td style="padding:0 8px 24px;font-family:${FONT};font-size:18px;line-height:24px;font-weight:600;font-style:italic;letter-spacing:-0.03em;color:${C.primary};">Raice<span style="color:${C.muted};">.run</span></td></tr>
+    <tr><td style="padding:0 8px 24px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="padding-right:8px;"><img src="${config.origin}/logo-email.png" width="22" height="24" alt="" style="display:block;border:0;"></td>
+        <td style="font-family:${FONT};font-size:18px;line-height:24px;font-weight:600;font-style:italic;letter-spacing:-0.03em;color:${C.primary};">Raice<span style="color:${C.muted};">.run</span></td>
+      </tr></table>
+    </td></tr>
     <tr><td style="background:${C.surface};border:1px solid ${C.border};border-radius:34px;padding:40px 36px 28px;" bgcolor="${C.surface}">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 ${blocks.map(block).join('\n')}

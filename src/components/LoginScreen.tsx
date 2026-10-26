@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { KeyRound, ScanFace } from 'lucide-react'
 import { useState } from 'react'
 import { login, registerPasskey, useAuth } from '@/lib/server/auth'
+import { LogoIcon } from './logo'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 
@@ -22,10 +23,12 @@ export function LoginScreen() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <div className="flex size-16 items-center justify-center rounded-3xl bg-accent/15">
-        <ScanFace className="size-8 text-accent" />
+      <div className="flex size-16 items-center justify-center rounded-3xl border bg-black">
+        <LogoIcon glass className="size-10" />
       </div>
-      <h1 className="mt-5 text-3xl font-medium tracking-tight">Coach COROS</h1>
+      <h1 className="mt-5 text-3xl font-medium tracking-tight">
+        <span className="italic">Raice.run</span> <span className="text-muted-foreground">· Coach</span>
+      </h1>
 
       {!setup ? (
         <>
