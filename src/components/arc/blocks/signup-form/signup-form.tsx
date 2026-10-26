@@ -33,6 +33,8 @@ export interface SignupFormProps {
   done?: { title: string; text: string; action?: string; onAction?: () => void };
   /** Brand named in the accessible label. */
   brand?: string;
+  /** Values already known, such as from an onboarding flow. */
+  defaultValues?: { name?: string; email?: string };
 }
 
 type Field = "name" | "email" | "password";
@@ -115,7 +117,7 @@ function useStepHeight(step: Step, reduce: boolean) {
   return { track, height };
 }
 
-export function SignupForm({ onSubmit, serverError, onProvider, providers = [], onSignIn, done, brand = "Arc" }: SignupFormProps) {
+export function SignupForm({ onSubmit, serverError, onProvider, providers = [], onSignIn, done, brand = "Arc", defaultValues }: SignupFormProps) {
   const reduce = !!useReducedMotion();
   const feedbackId = useId();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -125,8 +127,8 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
   const timers = useRef<number[]>([]);
   const [step, setStep] = useState<Step>("form");
   const [direction, setDirection] = useState(1);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(defaultValues?.name ?? "");
+  const [email, setEmail] = useState(defaultValues?.email ?? "");
   const [password, setPassword] = useState("");
   const [productUpdates, setProductUpdates] = useState(false);
   const [touched, setTouched] = useState<Record<Field, boolean>>({ name: false, email: false, password: false });

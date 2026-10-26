@@ -27,9 +27,11 @@ export type UserRole = 'runner' | 'admin'
 export type UserStatus = 'waitlist' | 'active' | 'suspended'
 export type Me = { id: string; email: string; name: string; role: UserRole; status: UserStatus }
 
+export type CompleteKind = 'reason' | 'wearables' | 'identity' | 'goal' | 'estimate' | 'health' | 'gear' | 'generate'
+
 export type OnboardingStep = {
   id: string
-  kind: 'choice' | 'multi' | 'number' | 'date' | 'text' | 'days' | 'coros'
+  kind: 'choice' | 'multi' | 'number' | 'date' | 'text' | 'days' | 'coros' | CompleteKind
   title: string
   help?: string
   field: string

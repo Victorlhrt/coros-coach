@@ -3,9 +3,12 @@
  * et range la réponse sous `field` : les champs connus (distance, race_date, level, weekly_km, days)
  * servent à créer la demande de plan à la fin du parcours.
  */
+/** Étapes riches du parcours « Complet », rendues par un composant dédié côté front. */
+export type CompleteKind = 'reason' | 'wearables' | 'identity' | 'goal' | 'estimate' | 'health' | 'gear' | 'generate'
+
 export type OnboardingStep = {
   id: string
-  kind: 'choice' | 'multi' | 'number' | 'date' | 'text' | 'days' | 'coros'
+  kind: 'choice' | 'multi' | 'number' | 'date' | 'text' | 'days' | 'coros' | CompleteKind
   title: string
   help?: string
   field: string
@@ -110,5 +113,22 @@ export const DEFAULT_VARIANTS: VariantSeed[] = [
     status: 'draft',
     weight: 0,
     steps: [coros, distance, raceDate, days],
+  },
+  {
+    id: 'complet',
+    name: 'Complet (test)',
+    description: 'Motivation, montre, profil UTMB, objectif et course, estimation de temps, santé, chaussures, puis génération du plan.',
+    status: 'draft',
+    weight: 0,
+    steps: [
+      { id: 'reason', kind: 'reason', title: 'Qu’est-ce qui t’amène sur Raice.run ?', field: 'reason' },
+      { id: 'wearables', kind: 'wearables', title: 'Avec quoi cours-tu ?', field: 'wearables' },
+      { id: 'identity', kind: 'identity', title: 'Faisons connaissance', field: 'identity' },
+      { id: 'goal', kind: 'goal', title: 'Quel est ton objectif ?', field: 'goal' },
+      { id: 'estimate', kind: 'estimate', title: 'Ton temps estimé', field: 'estimate' },
+      { id: 'health', kind: 'health', title: 'Comment va ton corps ?', field: 'health' },
+      { id: 'gear', kind: 'gear', title: 'Tes chaussures', field: 'gear' },
+      { id: 'generate', kind: 'generate', title: 'On construit ton plan', field: 'generated', optional: true },
+    ],
   },
 ]

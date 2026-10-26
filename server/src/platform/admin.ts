@@ -138,7 +138,7 @@ adminRoutes.get('/export/users.csv', async (c) => {
 
 const StepSchema = z.object({
   id: z.string().min(1).max(60),
-  kind: z.enum(['choice', 'multi', 'number', 'date', 'text', 'days', 'coros']),
+  kind: z.enum(['choice', 'multi', 'number', 'date', 'text', 'days', 'coros', 'reason', 'wearables', 'identity', 'goal', 'estimate', 'health', 'gear', 'generate']),
   title: z.string().min(1).max(200),
   help: z.string().max(400).optional(),
   field: z.string().min(1).max(60),

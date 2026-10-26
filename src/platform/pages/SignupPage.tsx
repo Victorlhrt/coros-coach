@@ -5,7 +5,7 @@ import { SignupForm, type SignupDetails } from '@/components/arc/blocks/signup-f
 import { Logo } from '@/components/logo'
 import { api } from '../api'
 import { BRAND, siteHref } from '../brand'
-import { ONBOARDING_KEY } from './OnboardingRunPage'
+import { ONBOARDING_KEY, SIGNUP_PREFILL_KEY } from './OnboardingRunPage'
 
 /** Bloc Arc signup-form, branché sur /api/platform/auth/signup. */
 export function SignupPage() {
@@ -13,6 +13,13 @@ export function SignupPage() {
   const [params] = useSearchParams()
   const qc = useQueryClient()
   const [result, setResult] = useState<'active' | 'waitlist' | null>(null)
+  const [prefill] = useState<{ name?: string; email?: string } | undefined>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(SIGNUP_PREFILL_KEY) ?? 'null') ?? undefined
+    } catch {
+      return undefined
+    }
+  })
 
   async function submit(details: SignupDetails) {
     let onboardingSessionId: string | undefined
@@ -40,6 +47,7 @@ export function SignupPage() {
       <SignupForm
         brand={BRAND.name}
         onSubmit={submit}
+        defaultValues={prefill}
         onSignIn={() => navigate('/connexion')}
         done={
           result === 'waitlist'

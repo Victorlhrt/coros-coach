@@ -10,11 +10,14 @@ import { RadioCards } from '@/components/arc/radio-cards/radio-cards'
 import { Logo } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { api, type OnboardingStep, type Variant } from '../api'
+import { CompleteOnboarding, type CompleteAnswers } from '../onboarding/CompleteOnboarding'
 import { useMe } from '../session'
 import { siteHref } from '../brand'
 
 /** Identifiant du parcours en cours, relu par l'inscription pour rattacher les réponses au compte. */
 export const ONBOARDING_KEY = 'platform.onboardingSession'
+/** Nom et e-mail saisis pendant le parcours, repris par l'inscription. */
+export const SIGNUP_PREFILL_KEY = 'platform.signupPrefill'
 
 const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((label, i) => ({ value: String(i), label }))
 
@@ -76,6 +79,34 @@ export function OnboardingRunPage() {
     )
   }
   if (!variant.data) return <Frame />
+
+  if (variant.data.id === 'complet') {
+    const v = variant.data
+    return (
+      <Frame banner={preview ? `Aperçu du parcours « ${v.name} » : non compté dans les statistiques` : undefined}>
+        <CompleteOnboarding
+          variant={v}
+          preview={preview}
+          ready={!!sessionId}
+          onSave={async (answers, stepReached) => {
+            await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached } })
+          }}
+          onComplete={async (answers: CompleteAnswers) => {
+            await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached: 8 } })
+            const res = await api<{ needsAccount: boolean }>(`/onboarding/sessions/${sessionId}/complete`, { method: 'POST' })
+            if (preview) return
+            try {
+              const id = answers.identity
+              if (id) sessionStorage.setItem(SIGNUP_PREFILL_KEY, JSON.stringify({ name: `${id.firstName} ${id.lastName}`.trim(), email: id.email }))
+            } catch {
+              /* sans stockage, l'inscription démarre vide */
+            }
+            window.setTimeout(() => navigate(res.needsAccount ? '/inscription' : '/compte'), 1200)
+          }}
+        />
+      </Frame>
+    )
+  }
 
   const steps = variant.data.steps
   const step = steps[index]
