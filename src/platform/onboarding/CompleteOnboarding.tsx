@@ -31,7 +31,7 @@ import { distanceCategory, formatDuration, formatPace, parseDuration, predict, t
 
 type Race = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb' | 'saisie' }
 type UtmbRunner = { uri: string; name: string; ageGroup: string; nationality: string; index: number | null; picture: string | null }
-type UtmbProfile = { uri: string; name: string; indexes: { piCategory: string; index: number }[]; results: { date: string; race: string; km: number; elevation: number; time: string }[] }
+type UtmbProfile = { uri: string; name: string; indexes: { piCategory: string; index: number }[]; results: { date: string; race: string; km: number; elevation: number; time: string | null }[] }
 type Shoe = { id: string; brand: string; model: string; use: string }
 
 export type CompleteAnswers = {
@@ -297,8 +297,12 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
                 value: r.uri,
                 label: r.name,
                 description: `${r.nationality} · ${r.ageGroup}`,
-                icon: <Avatar name={r.name} src={r.picture ?? undefined} size="sm" />,
-                meta: r.index ? <Badge size="sm">Index {r.index}</Badge> : undefined,
+                meta: (
+                  <span className="flex items-center gap-2">
+                    {r.index ? <Badge size="sm">Index {r.index}</Badge> : null}
+                    <Avatar name={r.name} src={r.picture ?? undefined} size="sm" />
+                  </span>
+                ),
               })),
               { value: 'none', label: 'Ce n’est pas moi', description: 'Ou je ne fais pas de trail.' },
             ]}

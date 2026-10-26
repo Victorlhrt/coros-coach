@@ -63,7 +63,7 @@ lookupRoutes.get('/utmb/runners', async (c) => {
   }
 })
 
-type UtmbResult = { dateIso: string; race: string; distance: string; elevationGain: number; time: string; rank?: number }
+type UtmbResult = { dateIso: string; race: string; distance: string; elevationGain: number; time: string | null; rank?: number }
 
 /** Profil public UTMB : résultats (date, course, distance, D+, temps) et indices de performance. */
 lookupRoutes.get('/utmb/runner/:uri', async (c) => {

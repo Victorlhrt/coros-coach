@@ -28,7 +28,9 @@ export function predict(perfs: Performance[], km: number, elevation = 0): { seco
   return { seconds: preds[Math.floor(preds.length / 2)], basedOn: usable }
 }
 
-export function parseDuration(text: string): number | null {
+/** Durée « h:mm:ss », « mm:ss » ou « 1h45 » en secondes ; `null` si illisible ou absente (abandon). */
+export function parseDuration(text: string | null | undefined): number | null {
+  if (!text) return null
   const parts = text.trim().split(/[:h'’"]/).filter(Boolean).map(Number)
   if (!parts.length || parts.some((n) => !Number.isFinite(n))) return null
   const [h, m, s] = parts.length === 3 ? parts : parts.length === 2 ? [0, ...parts] : [0, parts[0], 0]
