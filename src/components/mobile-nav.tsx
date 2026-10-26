@@ -14,7 +14,7 @@ export function MobileNav() {
 			<Button
 				aria-controls="mobile-menu"
 				aria-expanded={open}
-				aria-label="Ouvrir le menu"
+				aria-label="Open menu"
 				className="md:hidden"
 				onClick={() => setOpen(!open)}
 				size="icon"
@@ -52,10 +52,10 @@ export function MobileNav() {
 						</div>
 						<div className="mt-12 flex flex-col gap-2">
 							<Button asChild className="w-full" variant="outline">
-								<a href={appHref("/connexion")}>Se connecter</a>
+								<a href={appHref("/connexion")}>Sign in</a>
 							</Button>
 							<Button asChild className="w-full">
-								<a href={appHref("/onboarding")}>Créer mon plan</a>
+								<a href={appHref("/onboarding")}>Build my plan</a>
 							</Button>
 						</div>
 					</div>

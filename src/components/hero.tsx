@@ -6,6 +6,35 @@ import { ArrowRightIcon, LogInIcon } from "lucide-react";
 import { appHref } from "@/platform/brand";
 import { PlanPreview } from "@/platform/pages/PlanPreview";
 
+/** Logos posés autour du titre, en chips. `invert` pour les marques noires sur fond sombre. */
+const PARTNERS = [
+	{ name: "Claude", src: "/partners/claude.png", invert: false, className: "lg:-left-44 lg:top-0 lg:-rotate-6" },
+	{ name: "OpenAI", src: "/partners/openai.png", invert: true, className: "lg:-right-44 lg:-top-2 lg:rotate-6" },
+	{ name: "COROS", src: "/partners/coros.png", invert: false, className: "lg:-left-36 lg:bottom-4 lg:rotate-3" },
+	{ name: "Garmin", src: "/partners/garmin.png", invert: true, className: "lg:-right-36 lg:bottom-6 lg:-rotate-3" },
+];
+
+function PartnerChip({ name, src, invert, className }: (typeof PARTNERS)[number]) {
+	return (
+		<span
+			className={cn(
+				"flex items-center gap-2 rounded-full border bg-card/80 py-1.5 pr-3.5 pl-1.5 shadow-sm backdrop-blur-sm",
+				"lg:absolute",
+				className
+			)}
+		>
+			<span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-background">
+				<img
+					alt=""
+					className={cn("size-full object-contain", invert && "p-1 invert", name === "COROS" && "scale-110")}
+					src={src}
+				/>
+			</span>
+			<span className="font-medium text-sm">{name}</span>
+		</span>
+	);
+}
+
 export function HeroSection() {
 	return (
 		<section>
@@ -35,10 +64,10 @@ export function HeroSection() {
 					href={appHref("/onboarding")}
 				>
 					<div className="rounded-xs border bg-card px-1.5 py-0.5 shadow-sm">
-						<p className="font-mono text-xs">BÊTA</p>
+						<p className="font-mono text-xs">BETA</p>
 					</div>
 
-					<span className="text-xs">plans gratuits pendant la bêta</span>
+					<span className="text-xs">free training plans during the beta</span>
 					<span className="block h-5 border-l" />
 
 					<div className="pr-1">
@@ -46,34 +75,47 @@ export function HeroSection() {
 					</div>
 				</a>
 
-				<h1
-					className={cn(
-						"font-heading max-w-2xl text-balance text-center text-3xl text-foreground md:text-5xl lg:text-6xl",
-						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out"
-					)}
-				>
-					Un plan de course écrit pour toi, pas pour la moyenne
-				</h1>
+				<div className="relative flex flex-col items-center gap-5">
+					<h1
+						className={cn(
+							"font-heading max-w-3xl text-balance text-center font-semibold text-4xl text-foreground tracking-tight md:text-6xl lg:text-7xl",
+							"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out"
+						)}
+					>
+						Forget generic running plans, it’s time for <span className="italic">Agentic running</span>
+					</h1>
+					<div
+						className={cn(
+							"flex flex-wrap justify-center gap-2 lg:contents",
+							"fade-in animate-in fill-mode-backwards delay-300 duration-700"
+						)}
+						aria-label="Works with"
+					>
+						{PARTNERS.map((p) => (
+							<PartnerChip key={p.name} {...p} />
+						))}
+					</div>
+				</div>
 
 				<p
 					className={cn(
-						"text-center text-muted-foreground text-sm tracking-wider sm:text-lg",
+						"max-w-xl text-center text-muted-foreground text-sm tracking-wide sm:text-lg",
 						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-200 duration-500 ease-out"
 					)}
 				>
-					L’IA lit ton historique COROS, construit ton plan <br className="hidden sm:block" /> et
-					l’ajuste chaque semaine selon tes sensations.
+					AI agents read your watch, build your plan around your real paces, push every session to your wrist and
+					rewrite the next week from how you actually felt.
 				</p>
 
 				<div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
 					<Button asChild variant="outline">
 						<a href={appHref("/connexion")}>
-							<LogInIcon data-icon="inline-start" /> Se connecter
+							<LogInIcon data-icon="inline-start" /> Sign in
 						</a>
 					</Button>
 					<Button asChild>
 						<a href={appHref("/onboarding")}>
-							Créer mon plan <ArrowRightIcon data-icon="inline-end" />
+							Build my plan <ArrowRightIcon data-icon="inline-end" />
 						</a>
 					</Button>
 				</div>

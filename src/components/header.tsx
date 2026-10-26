@@ -9,15 +9,15 @@ import { appHref } from "@/platform/brand";
 
 export const navLinks = [
 	{
-		label: "Comment ça marche",
-		href: "#fonctionnement",
+		label: "How it works",
+		href: "#how-it-works",
 	},
 	{
-		label: "Montre",
-		href: "#montre",
+		label: "Watch sync",
+		href: "#watch",
 	},
 	{
-		label: "Coach IA",
+		label: "AI coach",
 		href: "#coach",
 	},
 ];
@@ -58,10 +58,10 @@ export function Header() {
 						))}
 					</div>
 					<Button asChild size="sm" variant="outline">
-						<a href={appHref("/connexion")}>Se connecter</a>
+						<a href={appHref("/connexion")}>Sign in</a>
 					</Button>
 					<Button asChild size="sm">
-						<a href={appHref("/onboarding")}>Créer mon plan</a>
+						<a href={appHref("/onboarding")}>Build my plan</a>
 					</Button>
 				</div>
 				<MobileNav />
