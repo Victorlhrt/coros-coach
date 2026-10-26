@@ -1,7 +1,7 @@
 /**
  * Données de démonstration pour le back office, en local uniquement :
  *   PLATFORM_DATABASE_URL=postgres://localhost/coach_platform npx tsx scripts/seed-platform.ts
- * Les comptes créés ont des e-mails en @demo.paice.run ; `--purge` les supprime (plans et parcours compris).
+ * Les comptes créés ont des e-mails en @demo.raice.run ; `--purge` les supprime (plans et parcours compris).
  */
 import postgres from 'postgres'
 
@@ -10,7 +10,7 @@ if (!url) throw new Error('PLATFORM_DATABASE_URL manquante')
 if (process.env.NODE_ENV === 'production' || /railway|rlwy/.test(url)) throw new Error('Refusé : ce script ne tourne que sur une base locale.')
 
 const db = postgres(url, { onnotice: () => {} })
-const DOMAIN = 'demo.paice.run'
+const DOMAIN = 'demo.raice.run'
 
 await db`delete from onboarding_sessions where user_id in (select id from users where email like ${`%@${DOMAIN}`})`
 await db`delete from users where email like ${`%@${DOMAIN}`}`

@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { SignupForm, type SignupDetails } from '@/components/arc/blocks/signup-form/signup-form'
 import { Logo } from '@/components/logo'
 import { api } from '../api'
-import { BRAND } from '../brand'
+import { BRAND, siteHref } from '../brand'
 import { ONBOARDING_KEY } from './OnboardingRunPage'
 
 /** Bloc Arc signup-form, branché sur /api/platform/auth/signup. */
@@ -34,9 +34,9 @@ export function SignupPage() {
 
   return (
     <div className="flex min-h-dvh flex-col items-center gap-8 px-4 py-8">
-      <Link to="/" aria-label={`Accueil ${BRAND.name}`}>
+      <a href={siteHref()} aria-label={`Accueil ${BRAND.name}`}>
         <Logo />
-      </Link>
+      </a>
       <SignupForm
         brand={BRAND.name}
         onSubmit={submit}

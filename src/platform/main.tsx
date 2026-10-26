@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { BRAND } from './brand'
 import { PlatformApp } from './PlatformApp'
 
-/** Paice.run est en thème sombre uniquement (noir et gris, accent neutre). */
+/** Raice.run est en thème sombre uniquement (noir et gris, accent neutre). */
 function applyDarkTheme() {
   document.documentElement.classList.add('dark')
   document.documentElement.dataset.theme = 'dark'

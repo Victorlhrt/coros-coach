@@ -176,7 +176,7 @@
   .animate-page-in { animation: none; }
 }
 
-/* Paice.run (site, connexion, onboarding, back office) : noir et gris, accent neutre, à la Cursor.
+/* Raice.run (site, connexion, onboarding, back office) : noir et gris, accent neutre, à la Cursor.
    Le coach personnel sous /app/ garde sa palette. Les jetons Arc et shadcn dérivés de --accent suivent. */
 :root[data-surface='platform'] {
   --background: #0a0a0a;

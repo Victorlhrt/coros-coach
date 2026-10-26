@@ -8,6 +8,7 @@ import { Button } from '@/components/shadcn/button'
 import { api } from '../api'
 import { DISTANCE_LABELS, PLAN_STATUS, formatDate } from '../format'
 import { useLogout, useMe } from '../session'
+import { siteHref } from '../brand'
 
 type Plan = { id: string; title: string; goal_distance: string; goal_date: string | null; weeks: number | null; status: string }
 
@@ -24,9 +25,9 @@ export function AccountPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-8 px-4 py-6">
       <header className="flex items-center justify-between">
-        <Link to="/">
+        <a href={siteHref()}>
           <Logo />
-        </Link>
+        </a>
         <div className="flex items-center gap-2">
           {me.data.role === 'admin' && (
             <Button asChild size="sm" variant="outline">

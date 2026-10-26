@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { BRAND } from "@/platform/brand";
 
 /**
- * Marque Paice.run (provisoire, en attendant le design system) : un cube isométrique en niveaux de gris,
+ * Marque Raice.run (provisoire, en attendant le design system) : un cube isométrique en niveaux de gris,
  * dont la facette claire dessine un P. Les teintes sont fixes : la marque reste la même dans les deux thèmes.
  */
 export const LogoIcon = (props: React.ComponentProps<"svg">) => (

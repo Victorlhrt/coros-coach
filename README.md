@@ -1,6 +1,6 @@
-# Paice.run (plateforme) + Coach COROS (personnel)
+# Raice.run (plateforme) + Coach COROS (personnel)
 
-## Plateforme Paice.run
+## Plateforme Raice.run
 
 Même build, même serveur, deux applications :
 

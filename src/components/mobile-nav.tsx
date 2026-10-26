@@ -4,7 +4,7 @@ import { Button } from "@/components/shadcn/button";
 import { Portal, PortalBackdrop } from "@/components/portal";
 import { navLinks } from "@/components/header";
 import { XIcon, MenuIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { appHref } from "@/platform/brand";
 
 export function MobileNav() {
 	const [open, setOpen] = React.useState(false);
@@ -52,10 +52,10 @@ export function MobileNav() {
 						</div>
 						<div className="mt-12 flex flex-col gap-2">
 							<Button asChild className="w-full" variant="outline">
-								<Link to="/connexion">Se connecter</Link>
+								<a href={appHref("/connexion")}>Se connecter</a>
 							</Button>
 							<Button asChild className="w-full">
-								<Link to="/onboarding">Créer mon plan</Link>
+								<a href={appHref("/onboarding")}>Créer mon plan</a>
 							</Button>
 						</div>
 					</div>

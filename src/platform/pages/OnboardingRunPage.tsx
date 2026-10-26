@@ -11,6 +11,7 @@ import { Logo } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { api, type OnboardingStep, type Variant } from '../api'
 import { useMe } from '../session'
+import { siteHref } from '../brand'
 
 /** Identifiant du parcours en cours, relu par l'inscription pour rattacher les réponses au compte. */
 export const ONBOARDING_KEY = 'platform.onboardingSession'
@@ -228,9 +229,9 @@ function Frame({ children, banner }: { children?: React.ReactNode; banner?: stri
     <div className="flex min-h-dvh flex-col">
       {banner && <p className="bg-primary/10 px-4 py-2 text-center text-primary text-xs">{banner}</p>}
       <header className="mx-auto flex w-full max-w-xl items-center justify-between px-4 py-5">
-        <Link to="/">
+        <a href={siteHref()}>
           <Logo />
-        </Link>
+        </a>
         <Link to="/connexion" className="text-muted-foreground text-sm hover:text-foreground">
           Se connecter
         </Link>

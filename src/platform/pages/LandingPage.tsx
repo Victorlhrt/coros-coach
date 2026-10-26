@@ -1,12 +1,11 @@
 import { ArrowRightIcon, BrainCircuitIcon, RefreshCwIcon, WatchIcon } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { DecorIcon } from '@/components/decor-icon'
 import { FullWidthDivider } from '@/components/full-width-divider'
 import { Header } from '@/components/header'
 import { HeroSection } from '@/components/hero'
 import { Logo } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
-import { BRAND } from '../brand'
+import { BRAND, appHref } from '../brand'
 
 const FEATURES = [
   {
@@ -66,9 +65,9 @@ export function LandingPage() {
         <section className="flex flex-col items-center gap-4 px-4 py-16 text-center">
           <h2 className="font-heading max-w-xl text-balance text-2xl md:text-3xl">Deux minutes de questions, un plan jusqu’au jour J.</h2>
           <Button asChild size="lg">
-            <Link to="/onboarding">
+            <a href={appHref('/onboarding')}>
               Créer mon plan <ArrowRightIcon data-icon="inline-end" />
-            </Link>
+            </a>
           </Button>
         </section>
       </main>

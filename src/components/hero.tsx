@@ -3,7 +3,7 @@ import { Button } from "@/components/shadcn/button";
 import { DecorIcon } from "@/components/decor-icon";
 import { FullWidthDivider } from "@/components/full-width-divider";
 import { ArrowRightIcon, LogInIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { appHref } from "@/platform/brand";
 import { PlanPreview } from "@/platform/pages/PlanPreview";
 
 export function HeroSection() {
@@ -27,12 +27,12 @@ export function HeroSection() {
 					<div className="absolute inset-y-0 left-8 w-px bg-linear-to-b from-transparent via-border/50 to-border/50 md:left-12" />
 					<div className="absolute inset-y-0 right-8 w-px bg-linear-to-b from-transparent via-border/50 to-border/50 md:right-12" />
 				</div>
-				<Link
+				<a
 					className={cn(
 						"group mx-auto flex w-fit items-center gap-3 rounded-sm border bg-card p-1 shadow",
 						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards transition-all delay-500 duration-500 ease-out"
 					)}
-					to="/onboarding"
+					href={appHref("/onboarding")}
 				>
 					<div className="rounded-xs border bg-card px-1.5 py-0.5 shadow-sm">
 						<p className="font-mono text-xs">BÊTA</p>
@@ -44,7 +44,7 @@ export function HeroSection() {
 					<div className="pr-1">
 						<ArrowRightIcon className="size-3 -translate-x-0.5 duration-150 ease-out group-hover:translate-x-0.5" />
 					</div>
-				</Link>
+				</a>
 
 				<h1
 					className={cn(
@@ -67,14 +67,14 @@ export function HeroSection() {
 
 				<div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
 					<Button asChild variant="outline">
-						<Link to="/connexion">
+						<a href={appHref("/connexion")}>
 							<LogInIcon data-icon="inline-start" /> Se connecter
-						</Link>
+						</a>
 					</Button>
 					<Button asChild>
-						<Link to="/onboarding">
+						<a href={appHref("/onboarding")}>
 							Créer mon plan <ArrowRightIcon data-icon="inline-end" />
-						</Link>
+						</a>
 					</Button>
 				</div>
 			</div>

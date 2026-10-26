@@ -5,6 +5,7 @@ import { useScroll } from "@/hooks/use-scroll";
 import { Button } from "@/components/shadcn/button";
 import { MobileNav } from "@/components/mobile-nav";
 import { Link } from "react-router-dom";
+import { appHref } from "@/platform/brand";
 
 export const navLinks = [
 	{
@@ -57,10 +58,10 @@ export function Header() {
 						))}
 					</div>
 					<Button asChild size="sm" variant="outline">
-						<Link to="/connexion">Se connecter</Link>
+						<a href={appHref("/connexion")}>Se connecter</a>
 					</Button>
 					<Button asChild size="sm">
-						<Link to="/onboarding">Créer mon plan</Link>
+						<a href={appHref("/onboarding")}>Créer mon plan</a>
 					</Button>
 				</div>
 				<MobileNav />
