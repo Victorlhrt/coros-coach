@@ -17,6 +17,13 @@ export const config = {
   production,
   port: Number(process.env.PORT ?? 8787),
   databaseUrl: required('DATABASE_URL'),
+  /** Base de la plateforme (comptes, onboardings, plans). Par défaut la même que le coach, pratique en local. */
+  platformDatabaseUrl: process.env.PLATFORM_DATABASE_URL ?? required('DATABASE_URL'),
+  /** E-mails promus administrateurs à l'inscription ou à la connexion (séparés par des virgules). */
+  adminEmails: (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
   anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
   /** Code demandé pour enregistrer un passkey sans être connecté (premier appareil, appareil sans passkey synchronisé). */
   setupCode: process.env.SETUP_CODE ?? '',

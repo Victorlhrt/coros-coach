@@ -10,6 +10,7 @@ import { Button } from './components/ui/button'
 import { useAutoLink } from './lib/coach/links'
 import { useWeeklyReview } from './lib/coach/review'
 import { finishCorosLogin } from './lib/coros/client'
+import { COACH_BASE } from './lib/coros/config'
 import { useVault } from './lib/lock/vault'
 import { checkAuth, useAuth } from './lib/server/auth'
 import { startStateSync } from './lib/server/state-sync'
@@ -26,7 +27,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TodayPage } from './pages/TodayPage'
 
 /**
- * COROS revient sur `/?code=…&state=…` (avant le #). On lit les paramètres au chargement
+ * COROS revient sur `/app/?code=…&state=…` (avant le #). On lit les paramètres au chargement
  * et on nettoie l'URL, mais l'échange attend que le coffre soit ouvert (les tokens y sont écrits).
  */
 const callback = (() => {
@@ -34,7 +35,7 @@ const callback = (() => {
   const code = params.get('code')
   const error = params.get('error_description') ?? params.get('error')
   if (!code && !error) return null
-  window.history.replaceState(null, '', `${import.meta.env.BASE_URL}#/reglages`)
+  window.history.replaceState(null, '', `${COACH_BASE}#/reglages`)
   return { code, state: params.get('state'), error }
 })()
 let exchanged = false

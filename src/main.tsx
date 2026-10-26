@@ -1,26 +1,18 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
-import { initVault, setupAutoLock } from './lib/lock/vault'
-import { useSettings } from './lib/store/settings'
 import './components/arc/foundation.css'
 import './index.css'
 
-// Avant le premier rendu : ouvre le coffre (ou le verrouille) et migre les anciennes données en clair.
-initVault()
-setupAutoLock(() => useSettings.getState().autoLockMinutes)
+/**
+ * Deux applications dans un même build : le coach personnel sous /app/ (HashRouter)
+ * et la plateforme (site public, connexion, onboarding, back office) partout ailleurs.
+ * Chacune est chargée à la demande pour ne pas alourdir l'autre.
+ */
+const root = document.getElementById('root')!
+const path = window.location.pathname
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: true },
-  },
-})
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>,
-)
+if (path === '/app' || path.startsWith('/app/')) {
+  if (path === '/app') window.history.replaceState(null, '', `/app/${window.location.search}${window.location.hash}`)
+  void import('./coach-main').then((m) => m.mountCoach(root))
+} else {
+  document.documentElement.dataset.surface = 'platform'
+  void import('./platform/main').then((m) => m.mountPlatform(root))
+}

@@ -3,9 +3,12 @@
 export const MCP_URL = 'https://mcpeu.coros.com/mcp'
 export const SCOPES = 'openid mcp.tools offline_access'
 
-/** URL de retour OAuth : la racine de l'app (avant le #), identique en dev et en prod. */
+/** Le coach est servi sous /app/ (la racine est le site public). */
+export const COACH_BASE = '/app/'
+
+/** URL de retour OAuth : la racine du coach (avant le #), identique en dev et en prod. */
 export function redirectUrl() {
-  return `${window.location.origin}${import.meta.env.BASE_URL}`
+  return `${window.location.origin}${COACH_BASE}`
 }
 
 /** Outils qui modifient le compte COROS : ils passent obligatoirement par `corosWrite`. */

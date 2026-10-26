@@ -1,4 +1,25 @@
-# Coach COROS
+# Paice.run (plateforme) + Coach COROS (personnel)
+
+## Plateforme Paice.run
+
+Même build, même serveur, deux applications :
+
+| URL | Contenu |
+|---|---|
+| `/` | landing (bloc Efferd `hero-2`) |
+| `/onboarding` | parcours d'onboarding tiré au sort parmi les parcours en ligne (test A/B) ; `?variant=<id>&preview=1` pour tester sans fausser les stats |
+| `/inscription`, `/connexion` | blocs Arc `signup-form` et `login-centered` (e-mail + mot de passe) |
+| `/compte` | espace coureur minimal (demandes de plan) |
+| `/admin` | back office (bloc Efferd `app-shell-2`, graphiques Arc) : vue d'ensemble, inscriptions, onboardings, plans, accès et réglages, journal |
+| `/app/` | le coach personnel ci-dessous (passkey, COROS) |
+
+- Serveur : `server/src/platform/` (comptes scrypt + cookie `psid`, onboarding, API admin journalisée).
+- Base dédiée : service Postgres `Postgres-6v2F` du projet Railway RunningAPP, via `PLATFORM_DATABASE_URL`
+  (sinon `DATABASE_URL`). Tables créées au démarrage.
+- Administrateurs : les e-mails de `ADMIN_EMAILS` (séparés par des virgules) deviennent admin à l'inscription ou à la connexion.
+- Composants shadcn de la plateforme dans `src/components/shadcn` (le `button` historique du coach reste dans `src/components/ui`).
+- Données de démo en local : `PLATFORM_DATABASE_URL=postgres://localhost/coach_platform npm run seed:platform` (`-- --purge` pour les retirer).
+
 
 Coach course à pied perso : plans générés par Claude, poussés sur la montre via le MCP officiel COROS.
 Web app mobile-first (Chrome sur iPhone), hébergée sur GitHub Pages, **sans backend**.
@@ -21,6 +42,8 @@ Web app mobile-first (Chrome sur iPhone), hébergée sur GitHub Pages, **sans ba
 | `ANTHROPIC_API_KEY` | clé API Anthropic |
 | `SETUP_CODE` | code demandé pour créer un passkey sans être connecté (1er appareil) |
 | `NODE_ENV` | `production` |
+| `PLATFORM_DATABASE_URL` | `${{Postgres-6v2F.DATABASE_URL}}` (base de la plateforme) |
+| `ADMIN_EMAILS` | e-mails administrateurs du back office |
 | `PUBLIC_ORIGIN` | facultatif : origine publique si domaine personnalisé (sinon `RAILWAY_PUBLIC_DOMAIN`) |
 
 Le rpID WebAuthn est le nom d'hôte de l'origine publique : changer de domaine invalide les passkeys existants.
@@ -45,7 +68,7 @@ Rien à configurer : tout se fait dans le navigateur.
 | Client | enregistré dynamiquement (`/connect/register`), client public, `token_endpoint_auth_method: none` |
 | Flux | Authorization Code + PKCE S256, `resource=https://mcpeu.coros.com/mcp` |
 | Scopes | `openid mcp.tools offline_access` (le dernier donne le `refresh_token`) |
-| URL de retour | `${origin}/` — l'app lit `?code=&state=` au chargement |
+| URL de retour | `${origin}/app/` — l'app lit `?code=&state=` au chargement |
 
 On utilise `mcpeu` et non `mcp.coros.com` : ce dernier répond mais annonce la ressource `mcpeu`,
 ce que le SDK MCP refuse. CORS est ouvert sur MCP, token et DCR : **aucun proxy n'est nécessaire**.
