@@ -96,8 +96,8 @@ const WEARABLES = [
   { id: 'coros', name: 'COROS', logo: '/partners/coros.png', invert: false, available: true },
   { id: 'garmin', name: 'Garmin', logo: '/partners/garmin.png', invert: true, available: true },
   { id: 'apple', name: 'Apple Watch', logo: '/partners/apple.png', invert: true, available: false },
-  { id: 'suunto', name: 'Suunto', logo: '/partners/suunto.png', invert: true, wordmark: true, available: false },
-  { id: 'polar', name: 'Polar', logo: '/partners/polar.png', invert: true, wordmark: true, available: false },
+  { id: 'suunto', name: 'Suunto', logo: '/partners/suunto-mark.svg', available: false },
+  { id: 'polar', name: 'Polar', logo: '/partners/polar-mark.svg', available: false },
 ]
 
 const PAINS = ['Genou', 'Tendon d’Achille', 'Mollet', 'Périostite', 'Ischios', 'Hanche', 'Dos', 'Voûte plantaire', 'Cheville'].map((p) => ({ value: p, label: p }))
@@ -253,7 +253,7 @@ function WearablesStep({ value, onChange }: { value: string[]; onChange: (v: str
           >
             <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-background">
               {w.logo ? (
-                <img src={w.logo} alt="" className={`size-full object-contain ${w.invert ? 'p-2 invert hue-rotate-180' : ''} ${'wordmark' in w && w.wordmark ? 'p-1' : ''}`} />
+                <img src={w.logo} alt="" className={`size-full object-contain ${w.invert ? 'p-2 invert' : w.logo.endsWith('.svg') ? 'p-1.5' : ''}`} />
               ) : (
                 <WatchIcon className="size-5 text-muted-foreground" />
               )}

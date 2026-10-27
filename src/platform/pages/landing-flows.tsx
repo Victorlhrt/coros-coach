@@ -81,16 +81,13 @@ const status = (step: number, index: number): Status => (step > index ? 'done' :
 
 // ---------- Montre ----------
 
-/**
- * Montres et leurs logos. `wordmark` : logo en toutes lettres (affiché seul) ; `invert` : marque noire,
- * inversée sur fond sombre (hue-rotate garde le rouge des logos Polar et Suunto).
- */
-const WATCHES: { name: string; logo: string; wordmark?: boolean; invert?: boolean; state: 'live' | 'next' | 'soon' }[] = [
-  { name: 'COROS', logo: '/partners/coros.png', state: 'live' },
-  { name: 'Garmin', logo: '/partners/garmin.png', invert: true, state: 'next' },
-  { name: 'Apple Watch', logo: '/partners/apple.png', invert: true, state: 'soon' },
-  { name: 'Polar', logo: '/partners/polar.png', wordmark: true, invert: true, state: 'soon' },
-  { name: 'Suunto', logo: '/partners/suunto.png', wordmark: true, invert: true, state: 'soon' },
+/** Montres, représentées par leur seul symbole (comme un favicon). `invert` : symbole noir, inversé sur fond sombre. */
+const WATCHES: { name: string; logo: string; invert?: boolean; live?: boolean }[] = [
+  { name: 'COROS', logo: '/partners/coros.png', live: true },
+  { name: 'Garmin', logo: '/partners/garmin.png', invert: true },
+  { name: 'Apple Watch', logo: '/partners/apple.png', invert: true },
+  { name: 'Polar', logo: '/partners/polar-mark.svg' },
+  { name: 'Suunto', logo: '/partners/suunto-mark.svg' },
 ]
 
 function WatchChip({ watch, active }: { watch: (typeof WATCHES)[number]; active: boolean }) {
@@ -98,17 +95,11 @@ function WatchChip({ watch, active }: { watch: (typeof WATCHES)[number]; active:
     <span
       title={watch.name}
       className={cn(
-        'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-all duration-300',
-        active ? 'border-foreground/50 bg-foreground/10 text-foreground' : 'bg-card text-muted-foreground'
+        'flex size-9 items-center justify-center overflow-hidden rounded-[10px] border transition-all duration-300',
+        active ? 'border-foreground/60 bg-foreground/10' : 'bg-card'
       )}
     >
-      <img
-        alt={watch.wordmark ? watch.name : ''}
-        className={cn('object-contain', watch.wordmark ? 'h-3.5 w-auto' : 'size-3.5 rounded-[3px]', watch.invert && 'invert hue-rotate-180')}
-        src={watch.logo}
-      />
-      {!watch.wordmark && watch.name}
-      {watch.state !== 'live' && <span className="opacity-60">· {watch.state === 'next' ? 'next' : 'soon'}</span>}
+      <img alt={watch.name} className={cn('size-full object-contain', watch.invert ? 'p-2 invert' : watch.live ? '' : 'p-1.5')} src={watch.logo} />
     </span>
   )
 }
@@ -123,7 +114,7 @@ export function WatchFlow() {
       <Node icon={RefreshCwIcon} title="1. Sync your data" status={status(step, 0)}>
         <div className="flex flex-wrap gap-1.5">
           {WATCHES.map((w) => (
-            <WatchChip key={w.name} watch={w} active={w.state === 'live' && step >= 1} />
+            <WatchChip key={w.name} watch={w} active={!!w.live && step >= 1} />
           ))}
         </div>
       </Node>

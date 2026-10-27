@@ -44,38 +44,30 @@ function RotatingLogo() {
 	);
 }
 
-/** Deux poses d'un coureur (repère 24), alternées quand il court. */
-const RUNNER_POSES = [
-	"M14 4.5a2 2 0 1 0 0-.01M13 7.5l-2 6M12.6 9 9 10.5 8 8.5M12.6 9l2.6 2.4 2-1M11 13.5l3 3-1 4M11 13.5l-3 2.5-3-1",
-	"M14 4.5a2 2 0 1 0 0-.01M13 7.5l-2 6M12.6 9l-2.6 2.6 1 2M12.6 9l3-.6 1.4-2M11 13.5l1.4 4 3 1.5M11 13.5l-2 4v4",
+/**
+ * Bouton principal du hero : « Build my plan » suivi de trois traits de vitesse. Au survol, les traits
+ * s'étirent en vague ; au clic, ils filent hors du bouton, le bouton se remplit, puis l'onboarding s'ouvre.
+ */
+const SPEED_LINES = [
+	{ width: 16, delay: 0 },
+	{ width: 11, delay: 0.06 },
+	{ width: 7, delay: 0.12 },
 ];
 
-/**
- * Bouton principal du hero : « Build my plan » avec un petit coureur. Il trottine au survol ; au clic,
- * il sprinte hors du bouton en laissant des traînées, le bouton se remplit, puis l'onboarding s'ouvre.
- */
 function RunCta({ href }: { href: string }) {
 	const reduce = useReducedMotion();
 	const [hover, setHover] = useState(false);
 	const [launch, setLaunch] = useState(false);
-	const [pose, setPose] = useState(0);
-	const running = hover || launch;
-
-	useEffect(() => {
-		if (!running || reduce) return;
-		const t = window.setInterval(() => setPose((p) => 1 - p), launch ? 70 : 140);
-		return () => window.clearInterval(t);
-	}, [running, launch, reduce]);
 
 	return (
 		<a
-			className="group relative inline-flex h-12 items-center gap-3 overflow-hidden rounded-full bg-primary pr-4 pl-6 font-medium text-base text-primary-foreground shadow-lg outline-none ring-ring/50 focus-visible:ring-[3px]"
+			className="group relative inline-flex h-12 items-center gap-4 overflow-hidden rounded-full bg-primary pr-5 pl-6 font-medium text-base text-primary-foreground shadow-lg outline-none ring-ring/50 focus-visible:ring-[3px]"
 			href={href}
 			onClick={(e) => {
 				if (reduce || launch) return;
 				e.preventDefault();
 				setLaunch(true);
-				window.setTimeout(() => window.location.assign(href), 750);
+				window.setTimeout(() => window.location.assign(href), 650);
 			}}
 			onMouseEnter={() => setHover(true)}
 			onMouseLeave={() => setHover(false)}
@@ -86,37 +78,31 @@ function RunCta({ href }: { href: string }) {
 				animate={{ scaleX: launch ? 1 : 0 }}
 				className="absolute inset-0 origin-left bg-black/10"
 				initial={false}
-				transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+				transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
 			/>
-			<motion.span animate={{ x: launch ? -6 : 0, opacity: launch ? 0.6 : 1 }} className="relative" transition={{ duration: 0.3 }}>
+			<motion.span animate={{ x: launch ? -4 : 0, opacity: launch ? 0.6 : 1 }} className="relative" transition={{ duration: 0.3 }}>
 				{launch ? "Let’s go" : "Build my plan"}
 			</motion.span>
-			<span className="relative flex size-8 items-center justify-center">
-				{/* Traînées de vitesse derrière le coureur */}
-				{[0, 1, 2].map((i) => (
+			<span aria-hidden="true" className="relative flex w-4 flex-col items-end gap-[3px]">
+				{SPEED_LINES.map((l) => (
 					<motion.span
-						key={i}
-						aria-hidden="true"
-						animate={running ? { scaleX: [0, 1, 0], opacity: [0, 0.8, 0] } : { scaleX: 0, opacity: 0 }}
-						className="absolute right-[22px] h-[2px] w-2.5 origin-right rounded-full bg-primary-foreground"
-						style={{ top: 10 + i * 5 }}
-						transition={{ duration: launch ? 0.35 : 0.6, repeat: running ? Infinity : 0, delay: i * 0.08 }}
+						key={l.width}
+						animate={
+							launch
+								? { x: 60, opacity: 0, scaleX: 1.8 }
+								: hover && !reduce
+									? { x: [0, 3, 0], scaleX: [1, 1.35, 1], opacity: 1 }
+									: { x: 0, scaleX: 1, opacity: 1 }
+						}
+						className="block h-[2.5px] origin-right rounded-full bg-primary-foreground"
+						style={{ width: l.width }}
+						transition={
+							launch
+								? { duration: 0.45, delay: l.delay, ease: [0.55, 0, 1, 0.45] }
+								: { duration: 0.7, delay: l.delay, repeat: hover ? Infinity : 0, ease: "easeInOut" }
+						}
 					/>
 				))}
-				<motion.svg
-					animate={launch ? { x: 70, opacity: 0 } : { x: 0, opacity: 1, y: hover ? [0, -1.5, 0] : 0 }}
-					aria-hidden="true"
-					className="size-6"
-					fill="none"
-					stroke="currentColor"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					strokeWidth="2.2"
-					transition={launch ? { duration: 0.55, ease: [0.55, 0, 1, 0.45] } : { y: { duration: 0.28, repeat: hover ? Infinity : 0 } }}
-					viewBox="0 0 24 24"
-				>
-					<path d={RUNNER_POSES[running ? pose : 0]} />
-				</motion.svg>
 			</span>
 		</a>
 	);
