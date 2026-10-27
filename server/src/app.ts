@@ -13,6 +13,7 @@ import { platformAuthRoutes } from './platform/auth.js'
 import { migratePlatform } from './platform/db.js'
 import { lookupRoutes } from './platform/lookup.js'
 import { inviteRoutes } from './platform/invites.js'
+import { connectRoutes } from './platform/connect.js'
 import { onboardingRoutes } from './platform/onboarding.js'
 import { stateRoutes } from './state.js'
 
@@ -44,6 +45,7 @@ app.route('/api/platform/auth', platformAuthRoutes)
 app.route('/api/platform/onboarding', onboardingRoutes)
 app.route('/api/platform/lookup', lookupRoutes)
 app.route('/api/platform/invites', inviteRoutes)
+app.route('/api/platform/connect', connectRoutes)
 app.route('/api/platform/admin', adminRoutes)
 app.route('/api/platform/account', accountRoutes)
 

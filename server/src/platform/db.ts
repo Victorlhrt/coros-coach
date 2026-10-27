@@ -129,6 +129,27 @@ export async function migratePlatform() {
       created_at timestamptz not null default now()
     )`
   await db`alter table onboarding_sessions add column if not exists invite_code text`
+  // Connexions aux montres (OAuth côté serveur), rattachées au parcours puis au compte.
+  await db`
+    create table if not exists wearable_connections (
+      id uuid primary key default gen_random_uuid(),
+      provider text not null,
+      onboarding_session_id uuid references onboarding_sessions(id) on delete set null,
+      user_id uuid references users(id) on delete cascade,
+      tokens jsonb not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`
+  await db`create unique index if not exists wearable_connections_session_idx on wearable_connections (provider, onboarding_session_id)`
+  await db`
+    create table if not exists oauth_pending (
+      state text primary key,
+      provider text not null,
+      onboarding_session_id uuid not null,
+      verifier text,
+      created_at timestamptz not null default now()
+    )`
+  await db`delete from oauth_pending where created_at < now() - interval '1 hour'`
   await db`insert into invite_codes (code, label, max_uses) values ('victor43', 'Code de Victor (illimité)', null) on conflict (code) do nothing`
   await db`create index if not exists users_created_idx on users (created_at)`
   await db`create index if not exists onboarding_sessions_variant_idx on onboarding_sessions (variant_id, created_at)`

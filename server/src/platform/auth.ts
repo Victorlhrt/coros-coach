@@ -129,7 +129,10 @@ platformAuthRoutes.post('/signup', async (c) => {
     returning id`
   if (body.onboardingSessionId) {
     const linked = await db`update onboarding_sessions set user_id = ${user.id} where id = ${body.onboardingSessionId} and user_id is null and not is_preview returning id`
-    if (linked.length) await createPlanFromSession(body.onboardingSessionId, user.id)
+    if (linked.length) {
+      await createPlanFromSession(body.onboardingSessionId, user.id)
+      await db`update wearable_connections set user_id = ${user.id} where onboarding_session_id = ${body.onboardingSessionId} and user_id is null`
+    }
   }
   await audit(user.id, 'user.signup', body.email, { status, source: body.source ?? 'direct' })
 

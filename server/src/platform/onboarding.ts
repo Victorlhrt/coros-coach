@@ -87,6 +87,9 @@ onboardingRoutes.post('/sessions/:id/complete', async (c) => {
   if (!row) return c.json({ error: 'Parcours introuvable' }, 404)
   // Un usage du code est compté une fois, à la fin du parcours.
   if (row.first && row.invite_code && !row.is_preview) await db`update invite_codes set uses = uses + 1 where code = ${row.invite_code}`
-  if (row.user_id && !row.is_preview) await createPlanFromSession(id, row.user_id)
+  if (row.user_id && !row.is_preview) {
+    await createPlanFromSession(id, row.user_id)
+    await db`update wearable_connections set user_id = ${row.user_id} where onboarding_session_id = ${id} and user_id is null`
+  }
   return c.json({ ok: true, needsAccount: !row.user_id })
 })

@@ -3,6 +3,7 @@ import {
   ActivityIcon,
   ArrowLeftIcon,
   ExternalLinkIcon,
+  FootprintsIcon,
   CompassIcon,
   FlagIcon,
   LayoutListIcon,
@@ -25,7 +26,6 @@ import { Checkbox } from '@/components/arc/checkbox/checkbox'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Combobox } from '@/components/arc/combobox/combobox'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
-import { Dialog, DialogContent } from '@/components/arc/dialog/dialog'
 import { FileDropzone } from '@/components/arc/file-dropzone/file-dropzone'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Input } from '@/components/arc/input/input'
@@ -88,6 +88,9 @@ type StepProps = {
 export type CompleteAnswers = {
   reason?: string
   wearables?: string[]
+  has_watch?: 'yes' | 'no'
+  data_source?: 'strava' | 'none'
+  connected?: string[]
   identity?: { firstName: string; lastName: string; email: string }
   utmb?: { uri: string; name: string; index?: number | null } | null
   goal?: {
@@ -127,7 +130,11 @@ export type CompleteAnswers = {
 
 const STEPS = [
   { id: 'reason', label: 'Motivation' },
-  { id: 'wearables', label: 'Montre' },
+  { id: 'watch', label: 'Montre' },
+  { id: 'wearables', label: 'Modèle' },
+  { id: 'connect', label: 'Connexion' },
+  { id: 'nowatch', label: 'Données' },
+  { id: 'strava', label: 'Strava' },
   { id: 'identity', label: 'Profil' },
   { id: 'about', label: 'À propos' },
   { id: 'experience', label: 'Expérience' },
@@ -282,12 +289,14 @@ const MANUAL_DISTANCES = [
 ]
 
 export function CompleteOnboarding({
+  sessionId,
   preview,
   ready,
   onSave,
   onComplete,
 }: {
   variant: Variant
+  sessionId: string | null
   preview: boolean
   ready: boolean
   onSave: (answers: CompleteAnswers, stepReached: number) => Promise<void>
@@ -302,12 +311,21 @@ export function CompleteOnboarding({
   const [error, setError] = useState('')
   const patch = (p: Partial<CompleteAnswers>) => setA((cur) => ({ ...cur, ...p }))
   // « M'entraîner » n'a pas de course à choisir : l'étape Course disparaît du fil.
-  const flow = STEPS.filter((s) => s.id !== 'target' || a.goal?.type !== 'train')
+  const flow = STEPS.filter((s) => {
+    if (s.id === 'target') return a.goal?.type !== 'train'
+    if (s.id === 'wearables') return a.has_watch === 'yes'
+    if (s.id === 'connect') return a.has_watch === 'yes' && (a.wearables ?? []).some((w) => w === 'coros' || w === 'garmin')
+    if (s.id === 'nowatch') return a.has_watch === 'no'
+    if (s.id === 'strava') return a.has_watch === 'no' && a.data_source === 'strava'
+    return true
+  })
   const step = flow[Math.min(index, flow.length - 1)]
 
   const valid: Record<string, boolean> = {
     reason: !!a.reason,
-    wearables: (a.wearables?.length ?? 0) > 0 || !!a.strava,
+    wearables: (a.wearables?.length ?? 0) > 0,
+    connect: true,
+    strava: true,
     identity: !!a.identity?.firstName.trim() && !!a.identity.lastName.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a.identity.email.trim()),
     about: true,
     experience: !!a.experience,
@@ -422,37 +440,54 @@ export function CompleteOnboarding({
             onBack={index > 0 ? () => setIndex(index - 1) : undefined}
           />
         ) : (
-          <form
-            className="flex animate-[fade-in_300ms_ease-out] flex-col gap-6 rounded-[26px] border bg-card p-5"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (valid[step.id] && ready) void next()
-            }}
-          >
-            {step.id === 'wearables' && <WearablesStep answers={a} patch={patch} />}
-            {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
-            {step.id === 'about' && <AboutStep answers={a} patch={patch} />}
-            {step.id === 'days' && <DaysStep answers={a} patch={patch} />}
-            {step.id === 'target' && <TargetStep answers={a} patch={patch} />}
-            {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
-            {step.id === 'volume' && <VolumeStep answers={a} patch={patch} />}
-            {step.id === 'pains' && <PainsStep answers={a} patch={patch} />}
-            {step.id === 'events' && <EventsStep answers={a} patch={patch} />}
-            {step.id === 'gear' && <GearStep answers={a} patch={patch} />}
-            {error && (
-              <p role="alert" className="text-destructive text-sm">
-                {error}
-              </p>
+          <>
+            {NOTHING[step.id] && (
+              <div className="flex animate-[fade-in_300ms_ease-out] justify-end">
+                <button
+                  type="button"
+                  disabled={!ready || busy}
+                  onClick={() => void next(NOTHING[step.id].answer(a))}
+                  className="rounded-full border bg-card px-4 py-2.5 text-sm transition-colors hover:border-foreground/50 hover:bg-foreground hover:text-background disabled:opacity-50"
+                >
+                  {NOTHING[step.id].label}
+                </button>
+              </div>
             )}
-            <div className="flex items-center justify-between gap-3 border-t pt-4">
-              <Button type="button" variant="ghost" size="sm" disabled={index === 0 || busy} onClick={() => setIndex(index - 1)}>
-                <ArrowLeftIcon className="size-4" /> Modifier
-              </Button>
-              <Button type="submit" loading={busy} disabled={!ready || !valid[step.id]}>
-                {step.id === 'gear' ? 'Créer mon plan' : 'Envoyer'} <SendIcon className="size-4" />
-              </Button>
-            </div>
-          </form>
+            <form
+              className="flex animate-[fade-in_300ms_ease-out] flex-col gap-6 rounded-[26px] border bg-card p-5"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (valid[step.id] && ready) void next()
+              }}
+            >
+              {step.id === 'wearables' && <WearablesStep answers={a} patch={patch} />}
+              {step.id === 'connect' && <ConnectStep answers={a} patch={patch} sessionId={sessionId} />}
+              {step.id === 'strava' && <StravaImport answers={a} patch={patch} />}
+              {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
+              {step.id === 'about' && <AboutStep answers={a} patch={patch} />}
+              {step.id === 'days' && <DaysStep answers={a} patch={patch} />}
+              {step.id === 'target' && <TargetStep answers={a} patch={patch} />}
+              {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
+              {step.id === 'volume' && <VolumeStep answers={a} patch={patch} />}
+              {step.id === 'pains' && <PainsStep answers={a} patch={patch} />}
+              {step.id === 'events' && <EventsStep answers={a} patch={patch} />}
+              {step.id === 'gear' && <GearStep answers={a} patch={patch} />}
+              {error && (
+                <p role="alert" className="text-destructive text-sm">
+                  {error}
+                </p>
+              )}
+              <div className="flex items-center justify-between gap-3 border-t pt-4">
+                <Button type="button" variant="ghost" size="sm" disabled={index === 0 || busy} onClick={() => setIndex(index - 1)}>
+                  <ArrowLeftIcon className="size-4" /> Modifier
+                </Button>
+                <Button type="submit" loading={busy} disabled={!ready || !valid[step.id]}>
+                  {step.id === 'gear' ? 'Créer mon plan' : (step.id === 'connect' && !a.connected?.length) || (step.id === 'strava' && !a.strava) ? 'Plus tard' : 'Envoyer'}{' '}
+                  <SendIcon className="size-4" />
+                </Button>
+              </div>
+            </form>
+          </>
         ))}
       <div ref={endRef} />
     </div>
@@ -523,18 +558,32 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
   switch (step) {
     case 'reason':
       return ['Salut ! Moi c’est Pacer, ton coach running.', 'Avant de construire ton plan, dis-moi : qu’est-ce qui t’amène ici ?']
+    case 'watch':
+      return [REASON_PRAISE[a.reason ?? ''] ?? 'Bien reçu.', 'Tu cours avec une montre ou un objet connecté ?']
     case 'wearables':
-      return [REASON_PRAISE[a.reason ?? ''] ?? 'Bien reçu.', 'Tu cours avec quelle montre ? Je récupère ton historique pendant qu’on discute.']
+      return ['Parfait.', 'Laquelle ? Tu peux en choisir plusieurs.']
+    case 'connect': {
+      const w = a.wearables ?? []
+      return w.includes('coros')
+        ? ['COROS, excellent choix.', 'Connecte ton compte : je récupère ton historique pendant qu’on discute.']
+        : ['Garmin, noté.', 'La connexion Garmin arrive très vite : on attend la validation de Garmin. Je te préviens dès qu’elle est prête.']
+    }
+    case 'nowatch':
+      return ['Pas de souci.', 'Tu enregistres tes sorties sur Strava, ou tu cours sans rien ?']
+    case 'strava':
+      return ['Strava fera très bien l’affaire.', 'Importe ton historique : il me sert à calibrer ton plan et tes allures.']
     case 'identity': {
       const w = a.wearables ?? []
       const st = a.strava
       const praise = st
         ? `J’ai lu tes ${st.runs} sorties Strava${st.recent.runs ? `, dont ${st.recent.runs} ces 12 dernières semaines` : ''}. Joli historique.`
-        : w.includes('none')
-          ? 'Pas de montre ? Aucun souci, on fera aux sensations.'
-          : w.some((x) => x === 'coros' || x === 'garmin')
-            ? 'Top, je pourrai lire tes séances directement depuis ta montre.'
-            : 'Noté, je te préviens dès que ta montre est compatible.'
+        : a.connected?.includes('coros')
+          ? 'COROS connecté : je lis tes séances pendant qu’on fait connaissance.'
+          : a.has_watch === 'no'
+            ? 'Aucun souci, on fera aux sensations. Ça marche très bien.'
+            : w.some((x) => x === 'coros' || x === 'garmin')
+              ? 'Pas de souci, tu pourras connecter ta montre plus tard depuis ton espace.'
+              : 'Noté, je te préviens dès que ta montre est compatible.'
       return [praise, 'On fait connaissance ? Ton prénom, ton nom et ton e-mail. Je regarde au passage si tu as des résultats publics.']
     }
     case 'about':
@@ -586,7 +635,7 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
       ]
     }
     case 'pains':
-      return [volumePraise(h?.weeklyKm ?? 0, ctx.weeklyPct), 'Des douleurs ces dernières semaines ? Touche les zones qui t’ont gêné. Rien du tout ? Envoie directement.']
+      return [volumePraise(h?.weeklyKm ?? 0, ctx.weeklyPct), 'Des douleurs ces dernières semaines ? Touche les zones qui t’ont gêné.']
     case 'events':
       return [
         h?.pains.length ? 'Merci de me le dire, j’en tiendrai compte dans les charges.' : 'Aucune douleur, parfait.',
@@ -617,13 +666,16 @@ function summarize(step: string, a: CompleteAnswers): string {
   switch (step) {
     case 'reason':
       return REASONS.find((r) => r.value === a.reason)?.label ?? '—'
-    case 'wearables': {
-      const strava = a.strava ? `historique Strava (${a.strava.runs} sorties)` : ''
-      if (!a.wearables?.length) return strava || '—'
-      return [a.wearables.includes('none') ? 'Je cours sans montre' : a.wearables.map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', '), strava]
-        .filter(Boolean)
-        .join(' + ')
-    }
+    case 'watch':
+      return a.has_watch === 'yes' ? 'Oui, une montre' : 'Non'
+    case 'wearables':
+      return (a.wearables ?? []).map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', ') || '—'
+    case 'connect':
+      return a.connected?.length ? `${a.connected.map((c) => WEARABLES.find((x) => x.id === c)?.name ?? c).join(', ')} connecté` : 'Je connecterai plus tard'
+    case 'nowatch':
+      return a.data_source === 'strava' ? 'J’utilise Strava' : 'Je cours sans rien'
+    case 'strava':
+      return a.strava ? `Historique Strava importé (${a.strava.runs} sorties)` : 'J’importerai plus tard'
     case 'identity': {
       const id = a.identity
       return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · c’est moi sur UTMB' : ''}` : '—'
@@ -716,8 +768,7 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
 function WearablesStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
   const value = answers.wearables ?? []
   const onChange = (wearables: string[]) => patch({ wearables })
-  const none = value.includes('none')
-  const toggle = (id: string, on: boolean) => onChange(on ? [...value.filter((v) => v !== 'none'), id] : value.filter((v) => v !== id))
+  const toggle = (id: string, on: boolean) => onChange(on ? [...value, id] : value.filter((v) => v !== id))
   return (
     <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -738,13 +789,6 @@ function WearablesStep({ answers, patch }: { answers: CompleteAnswers; patch: (p
           </label>
         ))}
       </div>
-      <StravaImport answers={answers} patch={patch} />
-      <Checkbox label="Je cours sans montre" checked={none} onCheckedChange={(c) => onChange(c === true ? ['none'] : [])} />
-      {value.some((v) => v === 'coros' || v === 'garmin') && (
-        <p className="rounded-[20px] border bg-card p-4 text-muted-foreground text-sm">
-          La connexion à ta montre se fait juste après la création du compte. En attendant, on part de tes résultats publics et de ce que tu nous dis.
-        </p>
-      )}
     </>
   )
 }
@@ -754,132 +798,147 @@ function WearablesStep({ answers, patch }: { answers: CompleteAnswers; patch: (p
  * directement, ou d'importer l'export du compte Strava (lu dans le navigateur), et une liste d'attente.
  */
 function StravaImport({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
-  const [open, setOpen] = useState(false)
-  const [view, setView] = useState<'choices' | 'import'>('choices')
-  const [need, setNeed] = useState(answers.strava_need ?? '')
   const st = answers.strava
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setView(st ? 'import' : 'choices')
-          setOpen(true)
+    <div className="flex flex-col gap-4">
+      <p className="text-muted-foreground text-sm">
+        Strava limite le nombre de coureurs qu’une application peut connecter : on passe par l’export de ton compte. Il est lu dans ton navigateur, seul un résumé (volume, sorties
+        longues, meilleurs chronos) est envoyé.
+      </p>
+      <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm">
+        <li>
+          <a href="https://www.strava.com/athlete/download_my_account" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+            Demande ton archive sur Strava <ExternalLinkIcon className="size-3.5" />
+          </a>
+        </li>
+        <li>Strava t’envoie un lien de téléchargement par e-mail quand elle est prête.</li>
+        <li>Dépose le ZIP ici, pas besoin de le décompresser.</li>
+      </ol>
+      <FileDropzone
+        accept=".zip,application/zip"
+        multiple={false}
+        maxFiles={1}
+        label="Dépose ton export Strava (ZIP)"
+        description="ou choisis le fichier sur ton appareil"
+        dropLabel="Lâche le ZIP ici"
+        note="Lu dans ton navigateur, rien n’est envoyé"
+        onUpload={async (item, { onProgress }) => {
+          if (!item.file) throw new Error('Fichier introuvable')
+          const summary = await readStravaExport(item.file, onProgress)
+          if (!summary.runs) throw new Error('Aucune course à pied dans cet export.')
+          onProgress(100)
+          patch({ strava: summary })
         }}
-        className={`flex items-center gap-3 rounded-[20px] border p-4 text-left transition-colors hover:border-foreground/50 ${st ? 'border-primary' : ''}`}
-      >
-        <img src="/partners/strava.png" alt="" className="size-10 shrink-0 rounded-[12px]" />
-        <span className="flex flex-1 flex-col">
-          <span className="text-sm">{st ? 'Historique Strava importé' : 'J’utilise Strava'}</span>
-          <span className="text-muted-foreground text-xs">
-            {st ? `${st.runs} sorties · ${st.recent.weeklyKm} km/sem. ces 12 dernières semaines` : 'Importe ton historique en quelques clics'}
-          </span>
-        </span>
-        {st && <CheckIcon className="size-4" />}
-      </button>
+      />
+      {st && (
+        <div className="grid grid-cols-3 gap-2 rounded-[20px] border bg-background p-4 text-center">
+          <div>
+            <p className="font-semibold text-xl tabular-nums">{st.runs}</p>
+            <p className="text-muted-foreground text-xs">sorties</p>
+          </div>
+          <div>
+            <p className="font-semibold text-xl tabular-nums">{st.recent.weeklyKm} km</p>
+            <p className="text-muted-foreground text-xs">par semaine (12 sem.)</p>
+          </div>
+          <div>
+            <p className="font-semibold text-xl tabular-nums">{st.recent.longestKm} km</p>
+            <p className="text-muted-foreground text-xs">plus longue sortie</p>
+          </div>
+        </div>
+      )}
+      <p className="text-muted-foreground text-xs">Archive pas encore reçue ? Réponds « Plus tard », tu pourras l’importer depuis ton espace.</p>
+    </div>
+  )
+}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent title="Connecter Strava" description="Strava limite le nombre de coureurs qu’une application peut connecter. Voici comment faire :">
-          {view === 'choices' ? (
-            <div className="flex flex-col gap-5">
-              <div className="flex gap-3">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs">1</span>
-                <div className="flex flex-col gap-1">
-                  <p className="font-medium text-sm">Connecte ta montre directement</p>
-                  <p className="text-muted-foreground text-sm">
-                    Raice.run marche mieux avec la source qui enregistre tes séances (COROS, Garmin) : des données plus propres, avec le sommeil et la récupération.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3 border-t pt-5">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs">2</span>
-                <div className="flex flex-1 flex-col gap-3">
-                  <div className="flex flex-col gap-1">
-                    <p className="font-medium text-sm">Importe ton historique Strava</p>
-                    <p className="text-muted-foreground text-sm">Tes sorties passées servent à calibrer ton plan et tes allures.</p>
-                  </div>
-                  <Button type="button" variant="secondary" onClick={() => setView('import')}>
-                    Importer mon historique Strava
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 border-t pt-5">
-                <p className="text-sm">
-                  <strong className="font-medium">Besoin de Strava quand même ?</strong> Dis-nous pourquoi, ça nous aide à prioriser.
-                </p>
-                <Textarea label="Tu utilises Strava pour quoi ?" rows={2} value={need} onChange={(e) => setNeed(e.target.value)} />
-                <Button type="button" variant="secondary" disabled={!need.trim() || need.trim() === answers.strava_need} onClick={() => patch({ strava_need: need.trim() })}>
-                  {answers.strava_need && need.trim() === answers.strava_need ? 'Merci, c’est noté' : 'Rejoindre la liste d’attente'}
+/** Connexion des montres : COROS par OAuth dans une nouvelle fenêtre, Garmin en attente du programme partenaire. */
+function ConnectStep({ answers, patch, sessionId }: StepProps & { sessionId: string | null }) {
+  const w = answers.wearables ?? []
+  const connected = answers.connected ?? []
+  const [opening, setOpening] = useState(false)
+  const [waiting, setWaiting] = useState(false)
+  const [error, setError] = useState('')
+
+  // Pendant que la fenêtre COROS est ouverte, on demande au serveur si la connexion a abouti.
+  useEffect(() => {
+    if (!waiting || !sessionId) return
+    const t = window.setInterval(async () => {
+      const res = await api<{ providers: string[] }>(`/connect/status?session=${sessionId}`).catch(() => null)
+      if (res?.providers.includes('coros')) {
+        patch({ connected: [...new Set([...connected, 'coros'])] })
+        setWaiting(false)
+      }
+    }, 2000)
+    const stop = window.setTimeout(() => setWaiting(false), 10 * 60_000)
+    return () => {
+      window.clearInterval(t)
+      window.clearTimeout(stop)
+    }
+  }, [waiting, sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function connectCoros() {
+    if (!sessionId) return
+    setError('')
+    setOpening(true)
+    // Fenêtre ouverte tout de suite (sinon bloquée par le navigateur), adresse COROS chargée ensuite.
+    const win = window.open('', 'coros-connect', 'width=520,height=720')
+    try {
+      const { url } = await api<{ url: string }>('/connect/coros/start', { body: { sessionId } })
+      if (win) win.location.href = url
+      else window.open(url, '_blank')
+      setWaiting(true)
+    } catch (e) {
+      win?.close()
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setOpening(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {w
+        .filter((id) => id === 'coros' || id === 'garmin')
+        .map((id) => {
+          const meta = WEARABLES.find((x) => x.id === id)!
+          const done = connected.includes(id)
+          return (
+            <div key={id} className="flex items-center gap-3 rounded-[20px] border bg-background p-4">
+              <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-card">
+                <img src={meta.logo} alt="" className={`size-full object-contain ${meta.invert ? 'p-2 invert' : ''}`} />
+              </span>
+              <span className="flex flex-1 flex-col">
+                <span className="text-sm">{meta.name}</span>
+                <span className="text-muted-foreground text-xs">
+                  {done
+                    ? 'Connecté : historique en cours de lecture'
+                    : id === 'garmin'
+                      ? 'Connexion bientôt disponible'
+                      : waiting
+                        ? 'Termine la connexion dans la fenêtre COROS…'
+                        : 'Autorise Raice.run à lire tes séances'}
+                </span>
+              </span>
+              {done ? (
+                <Badge tone="success">
+                  <CheckIcon className="size-3.5" /> Connecté
+                </Badge>
+              ) : id === 'coros' ? (
+                <Button type="button" variant={waiting ? 'secondary' : undefined} loading={opening || waiting} disabled={!sessionId} onClick={() => void connectCoros()}>
+                  {waiting ? 'En attente' : 'Connecter'}
                 </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {!st && (
-                <button type="button" onClick={() => setView('choices')} className="flex w-fit items-center gap-1 text-muted-foreground text-sm hover:text-foreground">
-                  <ArrowLeftIcon className="size-4" /> Retour
-                </button>
-              )}
-              <p className="text-sm">
-                <strong className="font-medium">Importe ton historique Strava.</strong> L’archive est lue directement dans ton navigateur : seul un résumé (volume, sorties longues,
-                meilleurs chronos) est envoyé à Raice.run.
-              </p>
-              <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm">
-                <li>
-                  <a
-                    href="https://www.strava.com/athlete/download_my_account"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 underline underline-offset-2"
-                  >
-                    Demande ton archive sur Strava <ExternalLinkIcon className="size-3.5" />
-                  </a>
-                </li>
-                <li>Strava t’envoie un lien de téléchargement par e-mail quand elle est prête.</li>
-                <li>Dépose le ZIP ici, pas besoin de le décompresser.</li>
-              </ol>
-              <FileDropzone
-                accept=".zip,application/zip"
-                multiple={false}
-                maxFiles={1}
-                label="Dépose ton export Strava (ZIP)"
-                description="ou choisis le fichier sur ton appareil"
-                dropLabel="Lâche le ZIP ici"
-                note="Lu dans ton navigateur, rien n’est envoyé"
-                onUpload={async (item, { onProgress }) => {
-                  if (!item.file) throw new Error('Fichier introuvable')
-                  const summary = await readStravaExport(item.file, onProgress)
-                  if (!summary.runs) throw new Error('Aucune course à pied dans cet export.')
-                  onProgress(100)
-                  patch({ strava: summary })
-                }}
-              />
-              {st && (
-                <div className="grid grid-cols-3 gap-2 rounded-[20px] border bg-card p-4 text-center">
-                  <div>
-                    <p className="font-semibold text-xl tabular-nums">{st.runs}</p>
-                    <p className="text-muted-foreground text-xs">sorties</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-xl tabular-nums">{st.recent.weeklyKm} km</p>
-                    <p className="text-muted-foreground text-xs">par semaine (12 sem.)</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-xl tabular-nums">{st.recent.longestKm} km</p>
-                    <p className="text-muted-foreground text-xs">plus longue sortie</p>
-                  </div>
-                </div>
-              )}
-              {st && (
-                <Button type="button" onClick={() => setOpen(false)}>
-                  C’est bon
-                </Button>
+              ) : (
+                <Badge>Bientôt</Badge>
               )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+          )
+        })}
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -899,12 +958,16 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
   const set = (p: Partial<typeof id>) => patch({ identity: { ...id, ...p } })
   const fullName = useDebounced(`${id.firstName} ${id.lastName}`.trim())
   const qc = useQueryClient()
+  const typedName = `${id.firstName} ${id.lastName}`.trim()
+  const canSearch = id.firstName.trim().length >= 2 && id.lastName.trim().length >= 2
   const runners = useQuery({
     queryKey: ['utmb', 'runners', fullName],
-    queryFn: () => api<UtmbRunner[]>(`/lookup/utmb/runners?q=${encodeURIComponent(fullName)}`),
-    enabled: id.firstName.trim().length >= 2 && id.lastName.trim().length >= 2,
+    // Un temps de recherche minimal : le résultat ne surgit pas pendant qu'on tape encore.
+    queryFn: () => Promise.all([api<UtmbRunner[]>(`/lookup/utmb/runners?q=${encodeURIComponent(fullName)}`), new Promise((r) => window.setTimeout(r, 1400))]).then(([r]) => r),
+    enabled: canSearch,
     staleTime: Infinity,
   })
+  const searching = canSearch && (runners.isFetching || typedName !== fullName)
 
   function pick(uri: string) {
     if (uri === 'none') return patch({ utmb: null })
@@ -926,8 +989,20 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
       </div>
       <Input label="E-mail" type="email" autoComplete="email" placeholder="nom@exemple.fr" value={id.email} onChange={(e) => set({ email: e.target.value })} />
 
-      {runners.data && runners.data.length > 0 && (
-        <UtmbPicker runners={runners.data.slice(0, 6)} value={answers.utmb?.uri ?? (answers.utmb === null ? 'none' : null)} onPick={pick} />
+      {searching ? (
+        <div className="flex flex-col gap-3">
+          <TextShimmer as="p" className="text-sm">
+            Je cherche ton profil UTMB…
+          </TextShimmer>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="aspect-square animate-pulse rounded-[18px] bg-muted" style={{ animationDelay: `${i * 150}ms` }} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        runners.data &&
+        runners.data.length > 0 && <UtmbPicker runners={runners.data.slice(0, 6)} value={answers.utmb?.uri ?? (answers.utmb === null ? 'none' : null)} onPick={pick} />
       )}
       <p className="text-muted-foreground text-xs">Course sur route : l’index running FFA n’est pas encore relié. Tu pourras ajouter un chrono récent à l’étape d’estimation.</p>
     </>
@@ -1173,12 +1248,7 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
     <div className="flex flex-col gap-4">
       {!custom ? (
         <>
-          <div className="flex flex-col gap-2">
-            <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS.road} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
-            <span className="flex w-fit items-center gap-1.5 rounded-full border border-dashed px-3 py-1 text-muted-foreground text-xs">
-              <MountainIcon className="size-3" /> Trail · bientôt
-            </span>
-          </div>
+          <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS.road} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
           <SearchField label="Rechercher une course" placeholder="Ex. Marathon de Paris" value={q} onValueChange={setQ} />
           {list.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -1269,6 +1339,12 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
   )
 }
 
+/** Réponse « rien à signaler », envoyée d'un clic sans remplir le formulaire. */
+const NOTHING: Record<string, { label: string; answer: (a: CompleteAnswers) => Partial<CompleteAnswers> }> = {
+  pains: { label: 'Aucun problème', answer: (a) => ({ health: { ...defaultHealth(a), pains: [], painLevel: 0 } }) },
+  events: { label: 'Rien de particulier', answer: (a) => ({ health: { ...defaultHealth(a), events: [], notes: '' } }) },
+}
+
 /** Questions à choix unique : réponses rapides envoyées dès le clic. */
 const QUICK: Record<
   string,
@@ -1278,6 +1354,20 @@ const QUICK: Record<
   }
 > = {
   reason: { options: REASONS, answer: (reason) => ({ reason }) },
+  watch: {
+    options: [
+      { value: 'yes', label: 'Oui, une montre', icon: <WatchIcon /> },
+      { value: 'no', label: 'Non', icon: <ActivityIcon /> },
+    ],
+    answer: (v) => ({ has_watch: v as 'yes' | 'no', ...(v === 'no' ? { wearables: [] } : { data_source: undefined }) }),
+  },
+  nowatch: {
+    options: [
+      { value: 'strava', label: 'J’utilise Strava', icon: <img src="/partners/strava.png" alt="" className="size-4 rounded-[4px]" /> },
+      { value: 'none', label: 'Je cours sans rien', icon: <FootprintsIcon /> },
+    ],
+    answer: (v) => ({ data_source: v as 'strava' | 'none', ...(v === 'none' ? { strava: null } : {}) }),
+  },
   experience: {
     options: EXPERIENCES,
     answer: (experience) => ({ experience }),
@@ -1436,14 +1526,12 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
 // ---------- 6. Santé ----------
 
+function defaultHealth(a: CompleteAnswers): NonNullable<CompleteAnswers['health']> {
+  return a.health ?? { pains: [], painLevel: 0, events: [], weeklyKm: a.strava?.recent.runs ? a.strava.recent.weeklyKm : 20, notes: '' }
+}
+
 function useHealth({ answers, patch }: StepProps) {
-  const h = answers.health ?? {
-    pains: [],
-    painLevel: 0,
-    events: [],
-    weeklyKm: answers.strava?.recent.runs ? answers.strava.recent.weeklyKm : 20,
-    notes: '',
-  }
+  const h = defaultHealth(answers)
   return [h, (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })] as const
 }
 

@@ -112,6 +112,7 @@ export function OnboardingRunPage() {
       <Frame banner={preview ? `Aperçu du parcours « ${v.name} » : non compté dans les statistiques` : undefined}>
         <CompleteOnboarding
           variant={v}
+          sessionId={sessionId}
           preview={preview}
           ready={!!sessionId}
           onSave={async (answers, stepReached) => {

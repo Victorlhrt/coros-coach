@@ -23,7 +23,8 @@ accountRoutes.get('/overview', async (c) => {
   const plans = await db`
     select id, title, goal_distance, to_char(goal_date, 'YYYY-MM-DD') goal_date, level, weeks, sessions_per_week, status, created_at
     from plans where user_id = ${userId} order by created_at desc`
-  return c.json({ answers: session?.answers ?? null, completedAt: session?.completed_at ?? null, plans })
+  const connections = await db<{ provider: string }[]>`select distinct provider from wearable_connections where user_id = ${userId}`
+  return c.json({ answers: session?.answers ?? null, completedAt: session?.completed_at ?? null, plans, connections: connections.map((r) => r.provider) })
 })
 
 /** Code de parrainage du coureur (5 invitations), créé à la première demande. */
