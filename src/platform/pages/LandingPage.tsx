@@ -13,6 +13,7 @@ import { DecorIcon } from '@/components/decor-icon'
 import { FullWidthDivider } from '@/components/full-width-divider'
 import { Header } from '@/components/header'
 import { HeroSection } from '@/components/hero'
+import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Logo, LogoIcon } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { cn } from '@/lib/utils'
@@ -63,9 +64,9 @@ export function LandingPage() {
           }
         >
           <div className="grid border md:grid-cols-3">
-            <Pillar icon={<WatchIcon />} title="Reads" text="Your watch and your race results, read for you." />
-            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." className="md:border-x" />
-            <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions on your wrist, rewritten from what you ran." />
+            <Pillar icon={<WatchIcon />} title="Reads" text="Your watch and your race results, read for you." visual={<ReadsVisual />} />
+            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." className="md:border-x" visual={<PlansVisual />} />
+            <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions on your wrist, rewritten from what you ran." visual={<ActsVisual />} />
           </div>
         </Section>
 
@@ -235,13 +236,146 @@ function Section({ id, eyebrow, title, children }: { id: string; eyebrow: string
   )
 }
 
-function Pillar({ icon, title, text, className }: { icon: ReactNode; title: string; text: string; className?: string }) {
+function Pillar({ icon, title, text, visual, className }: { icon: ReactNode; title: string; text: string; visual: ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col gap-3 border-b p-6 md:border-b-0 md:p-8', className)}>
+      {/* Aperçu de l'outil, sur la grille de points */}
+      <div className="relative -mx-2 mb-3 flex h-56 items-center justify-center overflow-hidden rounded-xl border bg-background px-4">
+        <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
+        <div className="relative w-full">{visual}</div>
+      </div>
       <span className="flex size-9 items-center justify-center rounded-md border bg-card [&>svg]:size-4.5">{icon}</span>
       <h3 className="font-medium text-lg">{title}</h3>
       <p className="text-muted-foreground text-sm leading-relaxed">{text}</p>
     </div>
+  )
+}
+
+// ---------- Aperçus de l'outil (piliers Reads, Plans, Acts) ----------
+
+/** Reads : ce que l'agent a lu sur la montre, chiffres qui défilent et courbe de volume qui se trace. */
+function ReadsVisual() {
+  const metrics = [
+    { label: 'VO2max', value: 54, unit: '' },
+    { label: 'Threshold', value: 272, unit: '/km', pace: true },
+    { label: 'Weekly', value: 42, unit: ' km' },
+  ]
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex items-center gap-2 text-muted-foreground text-xs">
+        <img alt="" className="size-4 rounded-[4px]" src="/partners/coros.png" />
+        Synced from COROS
+        <motion.span className="ml-auto size-1.5 rounded-full bg-[var(--success)]" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.6, repeat: Infinity }} />
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {metrics.map((m) => (
+          <div key={m.label} className="rounded-md border bg-background px-2 py-1.5">
+            <p className="text-[10px] text-muted-foreground">{m.label}</p>
+            <p className="font-semibold text-sm tabular-nums">
+              <Count to={m.value} pace={m.pace} />
+              <span className="font-normal text-muted-foreground text-xs">{m.unit}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+      <svg viewBox="0 0 200 40" className="h-10 w-full" fill="none" aria-hidden="true">
+        <motion.path
+          d="M0 32 L25 28 L50 30 L75 22 L100 24 L125 16 L150 18 L175 10 L200 12"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          initial={{ pathLength: 0 }}
+          whileInView={{ pathLength: 1 }}
+          viewport={inView}
+          transition={{ duration: 1.4, ease: 'easeInOut' }}
+        />
+      </svg>
+    </div>
+  )
+}
+
+/** Plans : l'agent écrit la semaine, les séances apparaissent une à une. */
+function PlansVisual() {
+  const sessions = [
+    ['Tue', 'Intervals · 6 × 800 m', 'var(--session-interval)'],
+    ['Thu', 'Tempo · 3 × 10 min', 'var(--session-tempo)'],
+    ['Sun', 'Long run · 18 km', 'var(--session-long)'],
+  ]
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex items-center gap-2 text-xs">
+        <img alt="" className="size-4 rounded-[4px]" src="/partners/claude.png" />
+        <TextShimmer className="text-muted-foreground">Writing week 7…</TextShimmer>
+      </div>
+      <motion.div className="flex flex-col gap-1.5" initial="hidden" whileInView="shown" viewport={inView} transition={{ staggerChildren: 0.35, delayChildren: 0.3 }}>
+        {sessions.map(([day, label, color]) => (
+          <motion.div
+            key={day}
+            className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-xs"
+            variants={{ hidden: { opacity: 0, y: 6 }, shown: { opacity: 1, y: 0 } }}
+          >
+            <span className="size-1.5 rounded-full" style={{ background: color }} />
+            <span className="w-7 text-muted-foreground">{day}</span>
+            <span>{label}</span>
+          </motion.div>
+        ))}
+      </motion.div>
+      <motion.p className="text-[11px] text-muted-foreground" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={inView} transition={{ delay: 1.5 }}>
+        Load check · +8 % vs last week ✓
+      </motion.p>
+    </div>
+  )
+}
+
+/** Acts : la séance sur la montre, sa progression, puis la semaine suivante réécrite. */
+function ActsVisual() {
+  return (
+    <div className="flex items-center justify-center gap-4">
+      <div className="relative flex size-36 shrink-0 flex-col items-center justify-center rounded-[36px] border-4 border-[#1f1f1f] bg-black shadow-xl">
+        <svg viewBox="0 0 100 100" className="absolute size-28 -rotate-90" aria-hidden="true">
+          <circle cx="50" cy="50" r="44" stroke="#262626" strokeWidth="6" fill="none" />
+          <motion.circle
+            cx="50"
+            cy="50"
+            r="44"
+            stroke="var(--session-interval)"
+            strokeWidth="6"
+            strokeLinecap="round"
+            fill="none"
+            initial={{ pathLength: 0 }}
+            whileInView={{ pathLength: 0.62 }}
+            viewport={inView}
+            transition={{ duration: 1.6, ease: 'easeOut' }}
+          />
+        </svg>
+        <span className="text-[10px] text-muted-foreground">Rep 4 / 6</span>
+        <span className="font-semibold text-xl tabular-nums">3:55</span>
+        <span className="text-[10px] text-muted-foreground">/km · 800 m</span>
+      </div>
+      <motion.div
+        className="flex max-w-36 flex-col gap-1 rounded-lg border bg-card p-2.5 text-xs"
+        initial={{ opacity: 0, x: 12 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={inView}
+        transition={{ delay: 1.2, duration: 0.4 }}
+      >
+        <span className="flex items-center gap-1.5 font-medium">
+          <RefreshCwIcon className="size-3" /> Week 8 updated
+        </span>
+        <span className="text-muted-foreground">Tired legs logged: Thursday is now easy.</span>
+      </motion.div>
+    </div>
+  )
+}
+
+/** Nombre qui défile jusqu'à sa valeur à l'apparition (allure en m:ss si `pace`). */
+function Count({ to, pace }: { to: number; pace?: boolean }) {
+  const v = useMotionValue(0)
+  const text = useTransform(v, (n) => (pace ? `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, '0')}` : String(Math.round(n))))
+  return (
+    <motion.span onViewportEnter={() => void animate(v, to, { duration: 1.2, ease: [0.22, 1, 0.36, 1] })} viewport={inView}>
+      {text}
+    </motion.span>
   )
 }
 
