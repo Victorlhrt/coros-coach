@@ -16,6 +16,7 @@ import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
+import { ROUTES } from '@/lib/coach/routes'
 
 export function PlanPage() {
   const { plan, zones, goal } = usePlan()
@@ -33,7 +34,7 @@ export function PlanPage() {
             icon={CalendarDays}
             title="Aucun plan"
             action={
-              <Link to="/objectif">
+              <Link to={ROUTES.goal}>
                 <Button>Créer mon plan</Button>
               </Link>
             }
@@ -55,7 +56,7 @@ export function PlanPage() {
         subtitle={`${plan.weeks.length} semaines · course le ${formatDay(plan.raceDate, { day: 'numeric', month: 'long' })}`}
         title={plan.name}
         action={
-          <Link to="/objectif" className="shrink-0 text-sm font-medium text-accent">
+          <Link to={ROUTES.goal} className="shrink-0 text-sm font-medium text-accent">
             Objectif
           </Link>
         }
@@ -157,7 +158,7 @@ export function PlanPage() {
         </div>
 
         {week.number === current && (
-          <Link to="/ajuster" className="mt-4 block">
+          <Link to={ROUTES.adjust} className="mt-4 block">
             <Button variant="secondary" className="w-full">
               <Wand2 className="size-5" /> Ajuster ma semaine
             </Button>

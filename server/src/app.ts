@@ -3,7 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { secureHeaders } from 'hono/secure-headers'
-import { authRoutes, requireAuth } from './auth.js'
+import { authRoutes } from './auth.js'
 import { claudeRoutes } from './claude.js'
 import { config } from './config.js'
 import { migrate } from './db.js'
@@ -15,7 +15,7 @@ import { lookupRoutes } from './platform/lookup.js'
 import { inviteRoutes } from './platform/invites.js'
 import { connectRoutes } from './platform/connect.js'
 import { onboardingRoutes } from './platform/onboarding.js'
-import { stateRoutes } from './state.js'
+import { requireCoachAccess, stateRoutes } from './state.js'
 
 const app = new Hono()
 
@@ -33,10 +33,10 @@ app.use('/api/*', async (c, next) => {
 app.get('/api/health', (c) => c.json({ ok: true }))
 app.route('/api/auth', authRoutes)
 
-app.use('/api/state', requireAuth, bodyLimit({ maxSize: 5 * 1024 * 1024 }))
+app.use('/api/state', requireCoachAccess, bodyLimit({ maxSize: 5 * 1024 * 1024 }))
 app.route('/api/state', stateRoutes)
 
-app.use('/api/claude/*', requireAuth, bodyLimit({ maxSize: 2 * 1024 * 1024 }))
+app.use('/api/claude/*', requireCoachAccess, bodyLimit({ maxSize: 2 * 1024 * 1024 }))
 app.route('/api/claude', claudeRoutes)
 
 // Plateforme multi-utilisateur : comptes, onboardings, back office.

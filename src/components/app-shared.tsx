@@ -40,7 +40,7 @@ export const navGroups: SidebarNavGroup[] = [
 
 export const footerNavLinks: SidebarNavItem[] = [
 	{ title: "Site public", path: "/", icon: <ExternalLinkIcon />, external: true },
-	{ title: "Coach personnel", path: "/app/", icon: <WatchIcon />, external: true },
+	{ title: "Espace coureur", path: "/compte/plan", icon: <WatchIcon />, external: true },
 ];
 
 export const navLinks: SidebarNavItem[] = [

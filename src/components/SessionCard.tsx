@@ -9,6 +9,7 @@ import { syncStatus } from '@/lib/coros/sync'
 import { useSettings } from '@/lib/store/settings'
 import { usePlan } from '@/lib/store/plan'
 import { SyncBadge } from './SyncBadge'
+import { ROUTES } from '@/lib/coach/routes'
 
 export function SessionCard({ session }: { session: Session }) {
   const { plan, zones, coros } = usePlan()
@@ -18,7 +19,7 @@ export function SessionCard({ session }: { session: Session }) {
 
   return (
     <Link
-      to={`/seance/${session.id}`}
+      to={ROUTES.session(session.id)}
       className="flex items-center gap-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4 shadow-[var(--shadow-resting)] transition-transform active:scale-[0.98]"
     >
       <span className="h-11 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />

@@ -19,6 +19,7 @@ import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { ROUTES } from '@/lib/coach/routes'
 
 export function AdjustPage() {
   const navigate = useNavigate()
@@ -54,11 +55,11 @@ export function AdjustPage() {
     },
     onSuccess: (r) => {
       toast.success(r === 'sent' ? 'Semaine ajustée et envoyée sur la montre ✓' : 'Semaine ajustée dans l’app')
-      navigate('/plan')
+      navigate(ROUTES.plan)
     },
     onError: (e) => {
       toast.error(e)
-      navigate('/plan')
+      navigate(ROUTES.plan)
     },
   })
 
@@ -69,7 +70,7 @@ export function AdjustPage() {
   return (
     <div className="space-y-4 pb-4">
       <header className="flex items-center gap-2 pt-4">
-        <Link to="/plan" aria-label="Retour" className="-ml-2 p-2">
+        <Link to={ROUTES.plan} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
         <h1 className="text-3xl font-medium tracking-tight">Bilan de la semaine</h1>

@@ -29,6 +29,8 @@ export const config = {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean),
   anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
+  /** Compte de la plateforme qui reprend l'état du coach personnel (plan, séances, réglages) à sa première ouverture. */
+  coachOwnerEmail: (process.env.COACH_OWNER_EMAIL ?? 'lhermetvictor@gmail.com').trim().toLowerCase(),
   /** Code demandé pour enregistrer un passkey sans être connecté (premier appareil, appareil sans passkey synchronisé). */
   setupCode: process.env.SETUP_CODE ?? '',
   origin,

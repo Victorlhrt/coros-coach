@@ -20,6 +20,7 @@ import { useActivities } from '@/lib/coros/activity-hooks'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
+import { ROUTES } from '@/lib/coach/routes'
 
 export function TodayPage() {
   const { plan, zones, reviews, feedback, links } = usePlan()
@@ -67,7 +68,7 @@ export function TodayPage() {
       <PageHeader subtitle={formatDay(now)} title="Aujourd’hui" />
       <div className="space-y-4">
         {review?.status === 'pending' && (
-          <Link to="/ajuster" className="block">
+          <Link to={ROUTES.adjust} className="block">
             <Card className="flex items-center gap-3 bg-accent text-accent-foreground">
               <Wand2 className="size-6 shrink-0" />
               <div className="flex-1">
@@ -84,7 +85,7 @@ export function TodayPage() {
         )}
 
         {toRate && (
-          <Link to={`/seance/${toRate.id}#ressenti`} className="block">
+          <Link to={`${ROUTES.session(toRate.id)}#ressenti`} className="block">
             <Card className="flex items-center gap-3">
               <Star className="size-6 shrink-0 text-accent" />
               <div className="flex-1">
@@ -128,7 +129,7 @@ export function TodayPage() {
               <span className="text-lg font-medium text-muted-foreground"> / {formatDistance(planned, units, 0)}</span>
             </p>
             <Progress className="mt-3" value={done} max={planned || 1} label="Volume réalisé cette semaine" showValue />
-            <Link to="/ajuster" className="mt-4 block">
+            <Link to={ROUTES.adjust} className="mt-4 block">
               <Button variant="secondary" className="w-full">
                 <Wand2 className="size-5" /> Ajuster ma semaine
               </Button>
@@ -161,7 +162,7 @@ function TodayCard({ session }: { session: Session }) {
         <BigStat label={meters > 0 ? 'Distance estimée' : 'Type'} value={meters > 0 ? formatDistance(meters, units) : 'Renfo'} />
       </div>
       {session.blocks.length > 0 && <WorkoutChart blocks={session.blocks} zones={zones} className="mt-5 h-16" />}
-      <Link to={`/seance/${session.id}`} className="mt-5 block">
+      <Link to={ROUTES.session(session.id)} className="mt-5 block">
         <Button className="w-full">
           Voir le détail <ArrowRight className="size-5" />
         </Button>

@@ -3,7 +3,6 @@ import { Bug, Download, Upload } from 'lucide-react'
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
-import { AccountCard } from '@/components/AccountCard'
 import { RecordsCard } from '@/components/RecordsCard'
 import { SecurityCard } from '@/components/SecurityCard'
 import { ZonesEditor } from '@/components/ZonesEditor'
@@ -15,6 +14,7 @@ import { useVault } from '@/lib/lock/vault'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
+import { ROUTES } from '@/lib/coach/routes'
 
 export function SettingsPage() {
   const connected = useCorosAuth((s) => s.connected)
@@ -67,8 +67,6 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <AccountCard />
-
         {vaultEncrypted && <SecurityCard />}
 
         <RecordsCard />
@@ -100,7 +98,7 @@ export function SettingsPage() {
 
         <PlanData />
 
-        <Link to="/debug" className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+        <Link to={ROUTES.debug} className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
           <Bug className="size-4" /> Debug MCP
         </Link>
       </div>

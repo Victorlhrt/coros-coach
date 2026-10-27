@@ -18,6 +18,7 @@ import { ZONE_NAMES } from '@/lib/coach/zones'
 import { syncStatus } from '@/lib/coros/sync'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
+import { ROUTES } from '@/lib/coach/routes'
 
 export function SessionPage() {
   const { id } = useParams()
@@ -118,7 +119,7 @@ export function SessionPage() {
         )}
       </Card>
 
-      <Link to="/plan" className="block text-center text-sm font-medium text-muted-foreground">
+      <Link to={ROUTES.plan} className="block text-center text-sm font-medium text-muted-foreground">
         Voir la semaine
       </Link>
     </div>

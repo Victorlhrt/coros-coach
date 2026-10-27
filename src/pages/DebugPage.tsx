@@ -12,6 +12,7 @@ import { corosRead } from '@/lib/coros/client'
 import { MCP_URL, isWriteTool } from '@/lib/coros/config'
 import { useCorosTools } from '@/lib/coros/hooks'
 import { useWriteLog } from '@/lib/coros/write-log'
+import { ROUTES } from '@/lib/coach/routes'
 
 /** Écran caché (/#/debug) : outils exposés par le serveur COROS, tels quels. */
 export function DebugPage() {
@@ -32,7 +33,7 @@ export function DebugPage() {
   return (
     <div className="space-y-4">
       <header className="flex items-center gap-2 pt-4">
-        <Link to="/reglages" aria-label="Retour" className="-ml-2 p-2">
+        <Link to={ROUTES.settings} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
         <h1 className="flex-1 text-2xl font-medium tracking-tight">Debug MCP</h1>

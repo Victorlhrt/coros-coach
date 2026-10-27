@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ActivityIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, SettingsIcon, ShieldIcon, UserIcon, WatchIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
@@ -33,6 +33,25 @@ import type { CompleteAnswers } from '../onboarding/CompleteOnboarding'
 import { formatDuration, formatPace } from '../onboarding/estimate'
 import { ShareButtons } from '../invite/ShareButtons'
 import { useLogout, useMe } from '../session'
+import { ConfirmSheet } from '@/components/ConfirmSheet'
+import { LockScreen } from '@/components/LockScreen'
+import { Toaster } from '@/components/Toaster'
+import { useAutoLink } from '@/lib/coach/links'
+import { useWeeklyReview } from '@/lib/coach/review'
+import { useCorosCallback } from '@/lib/coros/callback'
+import { initVault, setupAutoLock, useVault } from '@/lib/lock/vault'
+import { startStateSync } from '@/lib/server/state-sync'
+import { usePlan, usePlanRepair } from '@/lib/store/plan'
+import { useSettings } from '@/lib/store/settings'
+import { toast } from '@/lib/toast'
+import { AdjustPage } from '@/pages/AdjustPage'
+import { DebugPage } from '@/pages/DebugPage'
+import { HistoryPage } from '@/pages/HistoryPage'
+import { OnboardingPage as GoalPage } from '@/pages/OnboardingPage'
+import { PlanPage as CoachPlanPage } from '@/pages/PlanPage'
+import { SessionPage } from '@/pages/SessionPage'
+import { SettingsPage as CoachSettingsPage } from '@/pages/SettingsPage'
+import { TodayPage } from '@/pages/TodayPage'
 
 /**
  * Espace coureur (app.raice.run/compte) : barre latérale avec Plan, Analytics, Coach et Equipment,
@@ -71,31 +90,140 @@ function useOverview() {
   return useQuery({ queryKey: ['account', 'overview'], queryFn: () => api<Overview>('/account/overview') })
 }
 
+// Coffre de l'appareil (tokens COROS) : ouvert ou verrouillé avant le premier rendu du coach.
+let vaultReady = false
+function prepareVault() {
+  if (vaultReady) return
+  vaultReady = true
+  initVault()
+  setupAutoLock(() => useSettings.getState().autoLockMinutes)
+}
+
+/** Les données du coach gardées sur l'appareil appartiennent à un compte : on repart de zéro si un autre se connecte. */
+const OWNER_KEY = 'coach.owner'
+function claimDevice(userId: string) {
+  try {
+    if (localStorage.getItem(OWNER_KEY) === userId) return
+    usePlan.setState(usePlan.getInitialState(), true)
+    localStorage.setItem(OWNER_KEY, userId)
+  } catch {
+    /* sans stockage, rien à protéger */
+  }
+}
+
 export default function RunnerApp() {
+  prepareVault()
   const me = useMe()
   const location = useLocation()
+  const locked = useVault((s) => s.status === 'locked')
+  const coros = useCorosCallback()
+  const [synced, setSynced] = useState(false)
+  const active = me.data?.status === 'active'
+
+  // Le coach (plan, séances, ressentis) est synchronisé avec le compte, sur tous les appareils.
+  useEffect(() => {
+    if (!me.data || !active) return
+    claimDevice(me.data.id)
+    startStateSync()
+      .catch((err) => toast.error(err))
+      .finally(() => setSynced(true))
+  }, [me.data, active])
+
   if (me.isPending) return <div className="min-h-dvh" />
   if (!me.data) return <Navigate to={`/connexion?next=${encodeURIComponent(location.pathname)}`} replace />
+  if (locked) return <LockScreen />
 
   return (
     <SidebarProvider>
       <RunnerSidebar />
       <SidebarInset>
         <RunnerHeader />
+        {coros.status === 'error' && (
+          <div className="mx-4 mt-4 rounded-[18px] border border-destructive/50 p-4 text-sm md:mx-8">
+            <p className="font-medium">Connexion COROS impossible</p>
+            <p className="mt-1 text-muted-foreground">{coros.message}</p>
+            <button type="button" className="mt-2 text-sm underline" onClick={coros.dismiss}>
+              Fermer
+            </button>
+          </div>
+        )}
         <div className="flex w-full flex-1 flex-col p-4 md:p-8">
-          <Routes>
-            <Route index element={<Navigate to="plan" replace />} />
-            <Route path="plan" element={<PlanPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="coach" element={<CoachPage />} />
-            <Route path="equipment" element={<EquipmentPage />} />
-            <Route path="profil" element={<ProfilePage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="plan" replace />} />
-          </Routes>
+          {coros.status === 'pending' || (active && !synced) ? (
+            <p className="text-muted-foreground text-sm">{coros.status === 'pending' ? 'Connexion à COROS…' : 'Chargement de ton plan…'}</p>
+          ) : (
+            <CoachRoutes />
+          )}
         </div>
       </SidebarInset>
+      <ConfirmSheet />
+      <Toaster />
     </SidebarProvider>
+  )
+}
+
+function CoachRoutes() {
+  useAutoLink()
+  usePlanRepair()
+  useWeeklyReview()
+  const hasPlan = usePlan((s) => !!s.plan)
+  return (
+    <Routes>
+      <Route index element={<Navigate to="plan" replace />} />
+      <Route path="plan" element={hasPlan ? <PlanTab /> : <OnboardingPlanPage />} />
+      <Route path="analytics" element={<AnalyticsTab />} />
+      <Route path="coach" element={hasPlan ? <Narrow><AdjustPage /></Narrow> : <CoachPlaceholder />} />
+      <Route path="equipment" element={<EquipmentPage />} />
+      <Route path="profil" element={<ProfilePage />} />
+      <Route path="settings" element={<SettingsTab />} />
+      <Route path="seance/:id" element={<Narrow><SessionPage /></Narrow>} />
+      <Route path="objectif" element={<Narrow><GoalPage /></Narrow>} />
+      <Route path="debug" element={<Narrow><DebugPage /></Narrow>} />
+      <Route path="*" element={<Navigate to="plan" replace />} />
+    </Routes>
+  )
+}
+
+/** Pages du coach pensées pour le mobile : une colonne lisible, même en pleine largeur. */
+function Narrow({ children }: { children: ReactNode }) {
+  return <div className="w-full max-w-2xl">{children}</div>
+}
+
+/** Plan : la séance du jour à gauche, le plan complet à droite (empilés sur mobile). */
+function PlanTab() {
+  return (
+    <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <div>
+        <TodayPage />
+      </div>
+      <div className="min-w-0">
+        <CoachPlanPage />
+      </div>
+    </div>
+  )
+}
+
+function AnalyticsTab() {
+  const { data } = useOverview()
+  return (
+    <div className="flex w-full flex-col gap-8">
+      {data?.answers && <OnboardingAnalytics />}
+      <Narrow>
+        <HistoryPage />
+      </Narrow>
+    </div>
+  )
+}
+
+function SettingsTab() {
+  return (
+    <div className="grid w-full gap-8 xl:grid-cols-2">
+      <div>
+        <CoachSettingsPage />
+      </div>
+      <div>
+        <AccountSettings />
+      </div>
+    </div>
   )
 }
 
@@ -204,7 +332,7 @@ function NoOnboarding() {
 
 // ---------- Plan ----------
 
-function PlanPage() {
+function OnboardingPlanPage() {
   const { data, isPending } = useOverview()
   if (isPending) return null
   const a = data?.answers
@@ -275,11 +403,10 @@ function PlanPage() {
 
 // ---------- Analytics ----------
 
-function AnalyticsPage() {
-  const { data, isPending } = useOverview()
-  if (isPending) return null
+function OnboardingAnalytics() {
+  const { data } = useOverview()
   const a = data?.answers
-  if (!a) return <NoOnboarding />
+  if (!a) return null
   const st = a.strava
   const perfs = [...(st?.performances ?? []), ...(a.performances ?? [])]
   return (
@@ -314,7 +441,7 @@ function AnalyticsPage() {
 
 // ---------- Coach ----------
 
-function CoachPage() {
+function CoachPlaceholder() {
   const { data } = useOverview()
   const me = useMe().data
   const a = data?.answers
@@ -444,12 +571,12 @@ function ProfilePage() {
   )
 }
 
-function SettingsPage() {
+function AccountSettings() {
   const logout = useLogout()
   const navigate = useNavigate()
   return (
     <>
-      <PageTitle title="Settings" />
+      <PageTitle title="Compte" />
       <div className="flex max-w-2xl flex-col gap-4">
         <Panel title="Mot de passe">
           <p className="text-muted-foreground text-sm">Reçois un lien par e-mail pour en choisir un nouveau.</p>

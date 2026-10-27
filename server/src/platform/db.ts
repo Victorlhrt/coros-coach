@@ -129,6 +129,14 @@ export async function migratePlatform() {
       created_at timestamptz not null default now()
     )`
   await db`alter table onboarding_sessions add column if not exists invite_code text`
+  // État du coach (plan, séances, ressentis, réglages) de chaque coureur, un document JSON versionné.
+  await db`
+    create table if not exists coach_state (
+      user_id uuid primary key references users(id) on delete cascade,
+      version int not null default 0,
+      data jsonb,
+      updated_at timestamptz not null default now()
+    )`
   // Connexions aux montres (OAuth côté serveur), rattachées au parcours puis au compte.
   await db`
     create table if not exists wearable_connections (

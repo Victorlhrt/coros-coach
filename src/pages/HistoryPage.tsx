@@ -17,6 +17,7 @@ import { linkedActivity } from '@/lib/coach/links'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
+import { ROUTES } from '@/lib/coach/routes'
 
 type Row = { date: string; activity: Activity | null; planned: Session | null }
 
@@ -168,7 +169,7 @@ function HistoryRow({ row }: { row: Row }) {
     </Card>
   )
   return row.planned ? (
-    <Link to={`/seance/${row.planned.id}`} className="block">
+    <Link to={ROUTES.session(row.planned.id)} className="block">
       {body}
     </Link>
   ) : (

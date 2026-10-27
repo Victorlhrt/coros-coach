@@ -21,6 +21,7 @@ import { mergeRecords } from '@/lib/coach/records'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { fetchProfileData, fetchRecords } from '@/lib/coros/data'
 import { usePlan } from '@/lib/store/plan'
+import { ROUTES } from '@/lib/coach/routes'
 
 const PREDICTION_KEY: Partial<Record<GoalDistance, keyof Profile['predictions']>> = {
   '5k': 'fiveK',
@@ -85,7 +86,7 @@ export function OnboardingPage() {
     onSuccess: (plan) => {
       clearDraft()
       store.setPlan(plan)
-      navigate('/plan')
+      navigate(ROUTES.plan)
     },
     onError: () => markDraftFailed(),
     onSettled: () => setProgress(null),
@@ -128,7 +129,7 @@ export function OnboardingPage() {
   return (
     <div className="space-y-4 pb-6">
       <header className="flex items-center gap-2 pt-4">
-        <Link to="/" aria-label="Retour" className="-ml-2 p-2">
+        <Link to={ROUTES.today} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
         <h1 className="text-3xl font-medium tracking-tight">Mon objectif</h1>
