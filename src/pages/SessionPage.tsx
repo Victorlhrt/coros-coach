@@ -44,15 +44,15 @@ export function SessionPage() {
   const status = syncStatus(plan, coros.synced, session)
 
   return (
-    <div className="space-y-4 pb-4">
-      <header className="flex items-center gap-2 pt-4">
+    <div className="grid items-start gap-4 pb-4 lg:grid-cols-2">
+      <header className="flex items-center gap-2 pt-4 lg:col-span-2">
         <button onClick={() => navigate(-1)} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </button>
         <p className="flex-1 text-sm font-medium text-muted-foreground capitalize">{formatDay(session.date)}</p>
       </header>
 
-      <div className="px-1">
+      <div className="px-1 lg:col-span-2">
         <TypeBadge type={session.type} />
         <h1 className="mt-2 text-3xl leading-tight font-medium tracking-tight">{session.title}</h1>
         <p className="mt-2 text-muted-foreground">{session.description}</p>

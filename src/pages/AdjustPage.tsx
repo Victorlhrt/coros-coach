@@ -79,8 +79,8 @@ export function AdjustPage() {
       {!result && !analyse.isPending && (
         <Card>
           <CardDescription>
-            Claude compare tes séances prévues avec les activités COROS liées et leurs splits, lit ta récupération, ta HRV, ton
-            sommeil et ta FC de repos, puis propose des changements pour le reste de la semaine. Rien n’est modifié sans ton accord.
+            Claude compare tes séances prévues avec les activités COROS liées et leurs splits, lit ta récupération, ta HRV, ton sommeil et ta FC de repos, puis
+            propose des changements pour le reste de la semaine. Rien n’est modifié sans ton accord.
           </CardDescription>
           <Button className="mt-4 w-full" onClick={() => analyse.mutate()}>
             <Wand2 className="size-5" /> Analyser ma semaine
@@ -91,7 +91,9 @@ export function AdjustPage() {
 
       {analyse.isPending && (
         <div className="space-y-3">
-          <TextShimmer as="p" className="px-1 text-sm">Lecture des activités, des splits et de la récupération…</TextShimmer>
+          <TextShimmer as="p" className="px-1 text-sm">
+            Lecture des activités, des splits et de la récupération…
+          </TextShimmer>
           <Skeleton className="h-28" />
           <Skeleton className="h-40" />
           <Skeleton className="h-40" />
@@ -124,8 +126,8 @@ export function AdjustPage() {
                 <div>
                   <p className="font-medium">Nouvelle allure seuil : {formatPace(result.newThresholdPace)} /km</p>
                   <p className="text-sm text-muted-foreground">
-                    {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule tes zones
-                    d’allure et les allures cibles des séances à venir (sauf l’allure course).
+                    {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule tes zones d’allure et les
+                    allures cibles des séances à venir (sauf l’allure course).
                   </p>
                 </div>
               </label>
@@ -135,37 +137,35 @@ export function AdjustPage() {
           {result.changes.length === 0 ? (
             <p className="py-4 text-center text-muted-foreground">Aucun changement nécessaire. Continue comme prévu.</p>
           ) : (
-            result.changes.map((c, i) => (
-              <ChangeCard
-                key={i}
-                change={c}
-                checked={pending && !unchecked.has(i)}
-                disabled={!pending}
-                onToggle={() =>
-                  setUnchecked((s) => {
-                    const n = new Set(s)
-                    if (n.has(i)) n.delete(i)
-                    else n.add(i)
-                    return n
-                  })
-                }
-              />
-            ))
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              {result.changes.map((c, i) => (
+                <ChangeCard
+                  key={i}
+                  change={c}
+                  checked={pending && !unchecked.has(i)}
+                  disabled={!pending}
+                  onToggle={() =>
+                    setUnchecked((s) => {
+                      const n = new Set(s)
+                      if (n.has(i)) n.delete(i)
+                      else n.add(i)
+                      return n
+                    })
+                  }
+                />
+              ))}
+            </div>
           )}
 
           {pending && (
-            <>
-              <Button
-                className="w-full"
-                disabled={(chosen.length === 0 && !result.newThresholdPace) || apply.isPending}
-                onClick={() => apply.mutate(chosen)}
-              >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button className="w-full" disabled={(chosen.length === 0 && !result.newThresholdPace) || apply.isPending} onClick={() => apply.mutate(chosen)}>
                 {chosen.length > 0 ? `Appliquer ${chosen.length} changement${chosen.length > 1 ? 's' : ''}` : 'Mettre à jour mes zones'}
               </Button>
               <Button variant="ghost" className="w-full" onClick={() => week && store.setReviewStatus(week.number, 'dismissed')}>
                 Ignorer ce bilan
               </Button>
-            </>
+            </div>
           )}
           <Button variant="secondary" className="w-full" onClick={() => analyse.mutate()}>
             <Wand2 className="size-5" /> Analyser à nouveau

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ActivityIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, SettingsIcon, ShieldIcon, UserIcon, WatchIcon } from 'lucide-react'
+import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, SettingsIcon, ShieldIcon, UserIcon, WatchIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/arc/avatar/avatar'
@@ -63,6 +63,7 @@ type Plan = { id: string; title: string; goal_distance: string; goal_date: strin
 type Overview = { answers: CompleteAnswers | null; completedAt: string | null; plans: Plan[] }
 
 const NAV = [
+  { title: 'Home', path: '/compte/home', icon: <HomeIcon /> },
   { title: 'Plan', path: '/compte/plan', icon: <CalendarDaysIcon /> },
   { title: 'Analytics', path: '/compte/analytics', icon: <BarChart3Icon /> },
   { title: 'Coach', path: '/compte/coach', icon: <MessageCircleIcon /> },
@@ -168,37 +169,19 @@ function CoachRoutes() {
   const hasPlan = usePlan((s) => !!s.plan)
   return (
     <Routes>
-      <Route index element={<Navigate to="plan" replace />} />
-      <Route path="plan" element={hasPlan ? <PlanTab /> : <OnboardingPlanPage />} />
+      <Route index element={<Navigate to="home" replace />} />
+      <Route path="home" element={hasPlan ? <TodayPage /> : <OnboardingPlanPage />} />
+      <Route path="plan" element={<CoachPlanPage />} />
       <Route path="analytics" element={<AnalyticsTab />} />
-      <Route path="coach" element={hasPlan ? <Narrow><AdjustPage /></Narrow> : <CoachPlaceholder />} />
+      <Route path="coach" element={hasPlan ? <AdjustPage /> : <CoachPlaceholder />} />
       <Route path="equipment" element={<EquipmentPage />} />
       <Route path="profil" element={<ProfilePage />} />
       <Route path="settings" element={<SettingsTab />} />
-      <Route path="seance/:id" element={<Narrow><SessionPage /></Narrow>} />
-      <Route path="objectif" element={<Narrow><GoalPage /></Narrow>} />
-      <Route path="debug" element={<Narrow><DebugPage /></Narrow>} />
-      <Route path="*" element={<Navigate to="plan" replace />} />
+      <Route path="seance/:id" element={<SessionPage />} />
+      <Route path="objectif" element={<GoalPage />} />
+      <Route path="debug" element={<DebugPage />} />
+      <Route path="*" element={<Navigate to="home" replace />} />
     </Routes>
-  )
-}
-
-/** Pages du coach pensées pour le mobile : une colonne lisible, même en pleine largeur. */
-function Narrow({ children }: { children: ReactNode }) {
-  return <div className="w-full max-w-2xl">{children}</div>
-}
-
-/** Plan : la séance du jour à gauche, le plan complet à droite (empilés sur mobile). */
-function PlanTab() {
-  return (
-    <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-      <div>
-        <TodayPage />
-      </div>
-      <div className="min-w-0">
-        <CoachPlanPage />
-      </div>
-    </div>
   )
 }
 
@@ -207,22 +190,16 @@ function AnalyticsTab() {
   return (
     <div className="flex w-full flex-col gap-8">
       {data?.answers && <OnboardingAnalytics />}
-      <Narrow>
-        <HistoryPage />
-      </Narrow>
+      <HistoryPage />
     </div>
   )
 }
 
 function SettingsTab() {
   return (
-    <div className="grid w-full gap-8 xl:grid-cols-2">
-      <div>
-        <CoachSettingsPage />
-      </div>
-      <div>
-        <AccountSettings />
-      </div>
+    <div className="flex w-full flex-col gap-10">
+      <CoachSettingsPage />
+      <AccountSettings />
     </div>
   )
 }
@@ -250,7 +227,7 @@ function RunnerSidebar() {
     >
       <SidebarHeader className="h-14 justify-center border-b px-2">
         <SidebarMenuButton asChild>
-          <Link to="/compte/plan">
+          <Link to="/compte/home">
             <LogoIcon />
             <span className="font-medium">{BRAND.name}</span>
           </Link>
@@ -553,7 +530,8 @@ function ProfilePage() {
           <p className="text-muted-foreground text-sm">Coureur sur {BRAND.name}</p>
         </div>
       </div>
-      <Panel className="max-w-2xl">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <Panel>
         <dl className="divide-y">
           {rows.map(([k, v]) => (
             <div key={k} className="flex justify-between gap-4 py-2.5 text-sm">
@@ -567,6 +545,7 @@ function ProfilePage() {
         </LinkButton>
       </Panel>
       <InvitePanel />
+      </div>
     </>
   )
 }
@@ -577,7 +556,7 @@ function AccountSettings() {
   return (
     <>
       <PageTitle title="Compte" />
-      <div className="flex max-w-2xl flex-col gap-4">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <Panel title="Mot de passe">
           <p className="text-muted-foreground text-sm">Reçois un lien par e-mail pour en choisir un nouveau.</p>
           <LinkButton asChild variant="secondary" className="self-start">
@@ -601,7 +580,7 @@ function InvitePanel() {
   if (!d) return null
   const left = d.max_uses === null ? null : Math.max(0, d.max_uses - d.uses)
   return (
-    <Panel title="Invite tes potes" className="mt-4 max-w-2xl">
+    <Panel title="Invite tes potes">
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-muted-foreground text-xs">Ton code</p>

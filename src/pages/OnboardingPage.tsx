@@ -127,14 +127,15 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="space-y-4 pb-6">
-      <header className="flex items-center gap-2 pt-4">
+    <div className="grid items-start gap-4 pb-6 lg:grid-cols-2">
+      <header className="flex items-center gap-2 pt-4 lg:col-span-2">
         <Link to={ROUTES.today} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
         <h1 className="text-3xl font-medium tracking-tight">Mon objectif</h1>
       </header>
 
+      <div className="flex flex-col gap-4">
       <Card>
         <div className="flex items-center gap-3">
           <Activity className="size-6 text-accent" />
@@ -163,6 +164,8 @@ export function OnboardingPage() {
         {!connected && <p className="mt-2 text-xs text-muted-foreground">Connecte COROS dans Réglages.</p>}
         {readCoros.error && <p className="mt-2 text-sm text-destructive">{claudeErrorMessage(readCoros.error)}</p>}
       </Card>
+        <CourseCard goal={goal} update={update} />
+      </div>
 
       <Card className="space-y-5">
         <Field label="Distance">
@@ -241,16 +244,14 @@ export function OnboardingPage() {
         </label>
       </Card>
 
-      <CourseCard goal={goal} update={update} />
+      {generate.error && <Card className="text-sm text-destructive whitespace-pre-line lg:col-span-2">{claudeErrorMessage(generate.error)}</Card>}
+      {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground lg:col-span-2">Indique ton volume actuel pour générer le plan.</p>}
 
-      {generate.error && <Card className="text-sm text-destructive whitespace-pre-line">{claudeErrorMessage(generate.error)}</Card>}
-      {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground">Indique ton volume actuel pour générer le plan.</p>}
-
-      <Button className="w-full" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate(null)}>
+      <Button className="w-full lg:col-span-2" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate(null)}>
         <Sparkles className="size-5" />
         {store.plan ? 'Régénérer mon plan' : 'Générer mon plan'}
       </Button>
-      {store.plan && <p className="text-center text-xs text-muted-foreground">Le plan actuel sera remplacé.</p>}
+      {store.plan && <p className="text-center text-xs text-muted-foreground lg:col-span-2">Le plan actuel sera remplacé.</p>}
     </div>
   )
 }

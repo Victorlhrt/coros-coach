@@ -77,7 +77,7 @@ export function HistoryPage() {
           )}
         </Card>
       )}
-      <div className="space-y-2">
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {rows.map((r, i) => (
           <HistoryRow key={`${r.date}-${i}`} row={r} />
         ))}
@@ -113,7 +113,7 @@ function VolumeChart({ activities, planned, zones, units }: { activities: Activi
       series={series}
       label="Volume par semaine"
       unit={distanceUnit(units)}
-      height={150}
+      height={220}
       legend={series.length > 1}
       categoryLabel="Semaine"
       emptyLabel="Aucune activité"

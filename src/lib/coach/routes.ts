@@ -1,6 +1,6 @@
 /** Adresses du coach dans l'espace coureur (app.raice.run/compte). */
 export const ROUTES = {
-  today: '/compte/plan',
+  today: '/compte/home',
   plan: '/compte/plan',
   history: '/compte/analytics',
   adjust: '/compte/coach',

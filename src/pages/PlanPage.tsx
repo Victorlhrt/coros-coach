@@ -89,7 +89,7 @@ export function PlanPage() {
           valueLabel="Volume prévu"
           categoryLabel="Semaine"
           showAverage={false}
-          height={112}
+          height={180}
           formatValue={formatNumber}
         />
         <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
@@ -131,13 +131,13 @@ export function PlanPage() {
               <div
                 key={d}
                 className={cn(
-                  'flex flex-col items-center gap-1.5 rounded-xl py-2',
+                  'flex flex-col items-center gap-1.5 rounded-xl py-2 lg:gap-2 lg:py-4',
                   d === now ? 'bg-accent/15 ring-1 ring-accent' : 'border border-[var(--border-subtle)] bg-[var(--surface)]',
                   (d < week.start || d > week.end) && 'opacity-40',
                 )}
               >
                 <span className="text-[11px] font-medium text-muted-foreground">{WEEKDAYS_SHORT[i]}</span>
-                <span className="text-sm font-medium tabular-nums">{Number(d.slice(8))}</span>
+                <span className="text-sm font-medium tabular-nums lg:text-xl">{Number(d.slice(8))}</span>
                 <div className="flex h-2 gap-0.5">
                   {sessions.length === 0 ? (
                     <span className="size-2 rounded-full bg-muted" />
@@ -150,16 +150,16 @@ export function PlanPage() {
           })}
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {week.sessions.map((s) => (
             <SessionCard key={s.id} session={s} />
           ))}
-          {week.sessions.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Semaine de repos.</p>}
+          {week.sessions.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">Semaine de repos.</p>}
         </div>
 
         {week.number === current && (
-          <Link to={ROUTES.adjust} className="mt-4 block">
-            <Button variant="secondary" className="w-full">
+          <Link to={ROUTES.adjust} className="mt-4 block sm:w-fit">
+            <Button variant="secondary" className="w-full sm:px-8">
               <Wand2 className="size-5" /> Ajuster ma semaine
             </Button>
           </Link>

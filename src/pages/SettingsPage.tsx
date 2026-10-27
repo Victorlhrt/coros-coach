@@ -27,7 +27,7 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Réglages" />
-      <div className="space-y-4">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card>
           <div className="flex items-center gap-3">
             <img src="/coros-logo.png" alt="" className="size-11 rounded-2xl" />
@@ -98,7 +98,7 @@ export function SettingsPage() {
 
         <PlanData />
 
-        <Link to={ROUTES.debug} className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+        <Link to={ROUTES.debug} className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground lg:col-span-2">
           <Bug className="size-4" /> Debug MCP
         </Link>
       </div>
