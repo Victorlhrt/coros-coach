@@ -2,21 +2,18 @@ import {
   ArrowRightIcon,
   BotIcon,
   CalendarRangeIcon,
-  FootprintsIcon,
-  GaugeIcon,
-  HeartPulseIcon,
   MountainIcon,
   RefreshCwIcon,
-  SparklesIcon,
   TargetIcon,
   WatchIcon,
 } from 'lucide-react'
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
 import { useEffect, type ReactNode } from 'react'
 import { DecorIcon } from '@/components/decor-icon'
 import { FullWidthDivider } from '@/components/full-width-divider'
 import { Header } from '@/components/header'
 import { HeroSection } from '@/components/hero'
-import { Logo } from '@/components/logo'
+import { Logo, LogoIcon } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { cn } from '@/lib/utils'
 import { BRAND, appHref } from '../brand'
@@ -26,54 +23,10 @@ const DOT_GRID =
   'bg-[radial-gradient(color-mix(in_oklab,var(--foreground)_16%,transparent)_1px,transparent_1px)] [background-size:14px_14px] [mask-image:linear-gradient(to_bottom,black,transparent)]'
 
 const STEPS: { title: string; text: string; icon: ReactNode; visual: ReactNode }[] = [
-  {
-    title: 'Tell us why you run',
-    text: 'A race on the calendar, getting faster, structure, a comeback. Your plan starts from your reason.',
-    icon: <SparklesIcon />,
-    visual: <Chips items={['Prepare a race', 'Get faster', 'Come back']} active={0} />,
-  },
-  {
-    title: 'Connect your watch',
-    text: 'COROS today, Garmin next. Your history loads in the background while you finish the questions.',
-    icon: <WatchIcon />,
-    visual: <Chips items={['COROS', 'Garmin', 'Apple Watch · soon']} active={0} />,
-  },
-  {
-    title: 'We find your results',
-    text: 'Name and email are enough: we look up your public race results to know your real level.',
-    icon: <MountainIcon />,
-    visual: <Row label="Grand Velay · 10 km" value="1:07:27" />,
-  },
-  {
-    title: 'Pick your goal',
-    text: 'Search your race, road or trail, or simply train. Distance, elevation and date set the plan’s spine.',
-    icon: <TargetIcon />,
-    visual: <Row label="Half · 21.1 km" value="Apr 11" />,
-  },
-  {
-    title: 'See your predicted time',
-    text: 'Computed from your recent races, elevation included. Slide it if you want to aim faster or safer.',
-    icon: <GaugeIcon />,
-    visual: <Big value="1:44:50" caption="4:58 /km · realistic" />,
-  },
-  {
-    title: 'Check in with your body',
-    text: 'Recent pain, injury, illness, a busy month: the first weeks are dosed to keep you healthy.',
-    icon: <HeartPulseIcon />,
-    visual: <Chips items={['Knee', 'Achilles', 'None']} active={2} />,
-  },
-  {
-    title: 'Add your shoes',
-    text: 'Pick your model and its mileage. We track wear and tell you when a pair is done.',
-    icon: <FootprintsIcon />,
-    visual: <Row label="Endorphin Speed" value="412 km" />,
-  },
-  {
-    title: 'Your plan is built',
-    text: 'Week by week until race day, every session with its paces and recoveries, ready to sync.',
-    icon: <CalendarRangeIcon />,
-    visual: <Progress />,
-  },
+  { title: 'Connect your watch', text: 'Your history syncs in the background.', icon: <WatchIcon />, visual: <SyncVisual /> },
+  { title: 'We find your results', text: 'Public race results set your real level.', icon: <MountainIcon />, visual: <ResultsVisual /> },
+  { title: 'Pick your race', text: 'Get a predicted time you can tune.', icon: <TargetIcon />, visual: <TimeVisual /> },
+  { title: 'Get your plan', text: 'Week by week, synced to your wrist.', icon: <CalendarRangeIcon />, visual: <WeeksVisual /> },
 ]
 
 const FAQ = [
@@ -110,9 +63,9 @@ export function LandingPage() {
           }
         >
           <div className="grid border md:grid-cols-3">
-            <Pillar icon={<WatchIcon />} title="Reads" text="Agents connect to your watch and your public results to know your real paces, volume and history." />
-            <Pillar icon={<BotIcon />} title="Plans" text="Claude builds your plan week by week around your goal, your days and your body, then checks the load." className="md:border-x" />
-            <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions land on your wrist. After each week, the next one is rewritten from what you actually ran." />
+            <Pillar icon={<WatchIcon />} title="Reads" text="Your watch and your race results, read for you." />
+            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." className="md:border-x" />
+            <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions on your wrist, rewritten from what you ran." />
           </div>
         </Section>
 
@@ -121,24 +74,31 @@ export function LandingPage() {
           eyebrow="How it works"
           title={
             <>
-              Eight steps, <span className="text-foreground">two minutes</span>
+              Four steps, <span className="text-foreground">two minutes</span>
             </>
           }
         >
           <ol className="grid gap-px border bg-border sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s, i) => (
-              <li key={s.title} className="relative flex min-h-72 flex-col gap-4 overflow-hidden bg-background p-5">
+              <motion.li
+                key={s.title}
+                className="relative flex min-h-80 flex-col gap-4 overflow-hidden bg-background p-5"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ delay: i * 0.08, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              >
                 <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
                 <div className="relative flex items-center justify-between">
                   <span className="flex size-9 items-center justify-center rounded-md border bg-card text-foreground [&>svg]:size-4.5">{s.icon}</span>
                   <span className="text-muted-foreground text-xs">{String(i + 1).padStart(2, '0')}</span>
                 </div>
-                <div className="relative flex flex-col gap-1.5">
+                <div className="relative flex flex-1 items-center justify-center">{s.visual}</div>
+                <div className="relative flex flex-col gap-1">
                   <h3 className="font-medium">{s.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{s.text}</p>
+                  <p className="text-muted-foreground text-sm">{s.text}</p>
                 </div>
-                <div className="relative mt-auto">{s.visual}</div>
-              </li>
+              </motion.li>
             ))}
           </ol>
         </Section>
@@ -285,49 +245,98 @@ function Pillar({ icon, title, text, className }: { icon: ReactNode; title: stri
   )
 }
 
-// ---------- Petits visuels des cartes d'étapes ----------
+// ---------- Visuels animés des étapes ----------
 
-function Chips({ items, active }: { items: string[]; active: number }) {
+const inView = { once: true, amount: 0.5 } as const
+
+/** Montres qui se synchronisent : des points voyagent de la montre vers Raice.run, en boucle. */
+function SyncVisual() {
+  const reduce = useReducedMotion()
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((t, i) => (
-        <span key={t} className={cn('rounded-full border px-2.5 py-1 text-xs', i === active ? 'border-foreground/60 bg-foreground/10 text-foreground' : 'bg-card text-muted-foreground')}>
-          {t}
-        </span>
+    <div className="flex w-full items-center justify-between gap-3">
+      <div className="flex flex-col gap-2">
+        {['/partners/coros.png', '/partners/garmin.png'].map((src, i) => (
+          <span key={src} className="flex size-10 items-center justify-center overflow-hidden rounded-[12px] border bg-card">
+            <img alt="" className={cn('size-full object-contain', i === 1 && 'p-2 invert')} src={src} />
+          </span>
+        ))}
+      </div>
+      <div className="relative h-px flex-1 bg-border">
+        {[0, 1, 2].map((k) => (
+          <motion.span
+            key={k}
+            className="absolute -top-[3px] size-1.5 rounded-full bg-foreground"
+            initial={{ left: '0%', opacity: 0 }}
+            animate={reduce ? { left: `${30 * k + 10}%`, opacity: 0.6 } : { left: ['0%', '100%'], opacity: [0, 1, 0] }}
+            transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, delay: k * 0.5, ease: 'easeInOut' }}
+          />
+        ))}
+      </div>
+      <span className="flex size-12 items-center justify-center rounded-[14px] border bg-card">
+        <LogoIcon className="size-6" />
+      </span>
+    </div>
+  )
+}
+
+/** Résultats publics qui arrivent un par un. */
+function ResultsVisual() {
+  const rows = [
+    ['10 km · 400 m D+', '1:07'],
+    ['Half marathon', '1:42'],
+    ['50 km trail', '6:58'],
+  ]
+  return (
+    <motion.div className="flex w-full flex-col gap-1.5" initial="hidden" whileInView="shown" viewport={inView} transition={{ staggerChildren: 0.25, delayChildren: 0.2 }}>
+      {rows.map(([label, time]) => (
+        <motion.div
+          key={label}
+          className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-xs"
+          variants={{ hidden: { opacity: 0, x: -12 }, shown: { opacity: 1, x: 0 } }}
+        >
+          <span>{label}</span>
+          <span className="text-muted-foreground tabular-nums">{time}</span>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+/** Temps prévu qui défile jusqu'à sa valeur. */
+function TimeVisual() {
+  const seconds = useMotionValue(0)
+  const text = useTransform(seconds, (v) => {
+    const s = Math.round(v)
+    return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+  })
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-xs">
-      <span className="truncate">{label}</span>
-      <span className="text-muted-foreground">{value}</span>
-    </div>
+    <motion.div
+      className="flex w-full flex-col items-center gap-1 rounded-md border bg-card py-4"
+      onViewportEnter={() => void animate(seconds, 6290, { duration: 1.6, ease: [0.22, 1, 0.36, 1] })}
+      viewport={inView}
+    >
+      <span className="text-muted-foreground text-xs">Half marathon</span>
+      <motion.span className="font-semibold text-3xl tabular-nums tracking-tight">{text}</motion.span>
+      <span className="text-muted-foreground text-xs">4:58 /km</span>
+    </motion.div>
   )
 }
 
-function Big({ value, caption }: { value: string; caption: string }) {
+/** Semaines du plan : la charge monte, puis l'affûtage avant la course. */
+function WeeksVisual() {
+  const loads = [0.35, 0.45, 0.55, 0.4, 0.65, 0.75, 0.85, 0.55, 0.9, 1, 0.6, 0.3]
   return (
-    <div className="rounded-md border bg-card px-3 py-2.5">
-      <p className="font-semibold text-2xl tabular-nums tracking-tight">{value}</p>
-      <p className="text-muted-foreground text-xs">{caption}</p>
-    </div>
-  )
-}
-
-function Progress() {
-  return (
-    <div className="flex flex-col gap-1.5 rounded-md border bg-card px-3 py-2.5 text-xs">
-      <div className="flex justify-between">
-        <span>Building your weeks</span>
-        <span className="text-muted-foreground">100%</span>
-      </div>
-      <div className="h-1 rounded-full bg-muted">
-        <div className="h-1 w-full rounded-full bg-foreground/70" />
-      </div>
-    </div>
+    <motion.div className="flex h-24 w-full items-end gap-1" initial="hidden" whileInView="shown" viewport={inView} transition={{ staggerChildren: 0.06 }}>
+      {loads.map((h, i) => (
+        <motion.span
+          key={i}
+          className={cn('flex-1 origin-bottom rounded-sm', i === loads.length - 1 ? 'bg-foreground' : 'bg-foreground/35')}
+          style={{ height: `${h * 100}%` }}
+          variants={{ hidden: { scaleY: 0 }, shown: { scaleY: 1 } }}
+          transition={{ type: 'spring', visualDuration: 0.5, bounce: 0.2 }}
+        />
+      ))}
+    </motion.div>
   )
 }
 

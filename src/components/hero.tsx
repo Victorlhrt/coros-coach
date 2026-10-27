@@ -5,26 +5,45 @@ import { FullWidthDivider } from "@/components/full-width-divider";
 import { ArrowRightIcon, LogInIcon } from "lucide-react";
 import { appHref } from "@/platform/brand";
 import { PlanPreview } from "@/platform/pages/PlanPreview";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 
-/** Logos intégrés au titre : les montres à côté de « running plans », les IA à côté de « Agentic running ». */
-const LOGOS = {
-	claude: { name: "Claude", src: "/partners/claude.png", invert: false },
-	chatgpt: { name: "ChatGPT", src: "/partners/openai.png", invert: true },
-	coros: { name: "COROS", src: "/partners/coros.png", invert: false },
-	garmin: { name: "Garmin", src: "/partners/garmin.png", invert: true },
-};
+/** Logos qui défilent dans le titre : les IA qui écrivent le plan, les montres qui le portent. */
+const LOGOS = [
+	{ name: "Claude", src: "/partners/claude.png", invert: false },
+	{ name: "ChatGPT", src: "/partners/openai.png", invert: true },
+	{ name: "COROS", src: "/partners/coros.png", invert: false },
+	{ name: "Garmin", src: "/partners/garmin.png", invert: true },
+];
 
-/** Pastille de logo à la taille du texte du titre, légèrement inclinée. */
-function InlineLogo({ logo, tilt }: { logo: (typeof LOGOS)[keyof typeof LOGOS]; tilt: string }) {
+/** Une pastille à la taille du texte qui pivote d'un logo à l'autre (immobile si l'animation est réduite). */
+function RotatingLogo() {
+	const reduce = useReducedMotion();
+	const [index, setIndex] = useState(0);
+	useEffect(() => {
+		if (reduce) return;
+		const t = window.setInterval(() => setIndex((i) => (i + 1) % LOGOS.length), 1800);
+		return () => window.clearInterval(t);
+	}, [reduce]);
+	const logo = LOGOS[index];
 	return (
 		<span
-			className={cn(
-				"mx-[0.06em] inline-flex size-[0.82em] translate-y-[0.08em] items-center justify-center overflow-hidden rounded-[0.22em] border bg-card align-baseline shadow-sm",
-				tilt
-			)}
-			title={logo.name}
+			aria-label={LOGOS.map((l) => l.name).join(", ")}
+			className="relative mx-[0.08em] inline-flex size-[0.9em] translate-y-[0.1em] [perspective:400px]"
+			role="img"
 		>
-			<img alt={logo.name} className={cn("size-full object-contain", logo.invert && "p-[0.12em] invert")} src={logo.src} />
+			<AnimatePresence initial={false} mode="popLayout">
+				<motion.span
+					animate={{ rotateY: 0, opacity: 1, scale: 1 }}
+					className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[0.24em] border bg-card shadow-lg"
+					exit={{ rotateY: -90, opacity: 0, scale: 0.9 }}
+					initial={{ rotateY: 90, opacity: 0, scale: 0.9 }}
+					key={logo.name}
+					transition={{ type: "spring", visualDuration: 0.5, bounce: 0.2 }}
+				>
+					<img alt="" className={cn("size-full object-contain", logo.invert && "p-[0.14em] invert")} src={logo.src} />
+				</motion.span>
+			</AnimatePresence>
 		</span>
 	);
 }
@@ -71,20 +90,11 @@ export function HeroSection() {
 
 				<h1
 					className={cn(
-						"font-heading max-w-4xl text-balance text-center font-semibold text-4xl text-foreground tracking-tight md:text-6xl lg:text-7xl",
+						"font-heading max-w-3xl text-balance text-center font-semibold text-4xl text-foreground tracking-tight md:text-5xl lg:text-6xl",
 						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out"
 					)}
 				>
-					Forget generic running plans{" "}
-					<span className="whitespace-nowrap">
-						<InlineLogo logo={LOGOS.coros} tilt="-rotate-6" />
-						<InlineLogo logo={LOGOS.garmin} tilt="rotate-3" />
-					</span>
-					, it’s time for Agentic running{" "}
-					<span className="whitespace-nowrap">
-						<InlineLogo logo={LOGOS.claude} tilt="rotate-6" />
-						<InlineLogo logo={LOGOS.chatgpt} tilt="-rotate-3" />
-					</span>
+					Forget generic running plans, it’s time for <span className="whitespace-nowrap">Agentic running <RotatingLogo /></span>
 				</h1>
 
 				<p
