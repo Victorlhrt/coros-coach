@@ -86,6 +86,11 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="relative h-44 overflow-hidden rounded-[26px] border sm:h-56">
+        <img src="/visuals/invite.webp" alt="" className="absolute inset-0 size-full object-cover object-[50%_40%]" />
+        <div className="absolute inset-0 bg-linear-to-t from-background/90 via-background/10 to-transparent" />
+        <p className="absolute bottom-4 left-5 font-medium text-lg">On court mieux à plusieurs.</p>
+      </div>
       <div className="flex items-start gap-3">
         <CoachAvatar className="size-11" />
         <div className="flex flex-col gap-2">

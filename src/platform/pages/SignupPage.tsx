@@ -6,6 +6,7 @@ import { Logo } from '@/components/logo'
 import { api } from '../api'
 import { BRAND, siteHref } from '../brand'
 import { ONBOARDING_KEY, SIGNUP_PREFILL_KEY } from './OnboardingRunPage'
+import { AuthSplit } from './AuthVisual'
 
 /** Bloc Arc signup-form, branché sur /api/platform/auth/signup. */
 export function SignupPage() {
@@ -40,6 +41,7 @@ export function SignupPage() {
   }
 
   return (
+    <AuthSplit>
     <div className="flex min-h-dvh flex-col items-center gap-8 px-4 py-8">
       <a href={siteHref()} aria-label={`Accueil ${BRAND.name}`}>
         <Logo />
@@ -56,5 +58,6 @@ export function SignupPage() {
         }
       />
     </div>
+    </AuthSplit>
   )
 }

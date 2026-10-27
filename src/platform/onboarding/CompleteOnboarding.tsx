@@ -1668,6 +1668,10 @@ function GenerateStep({ answers, preview, onDone }: { answers: CompleteAnswers; 
 
   return (
     <div className="flex flex-col gap-8">
+      <div className="relative -mx-5 -mt-5 h-48 overflow-hidden rounded-t-[26px] sm:h-60">
+        <img src="/visuals/shoes.webp" alt="" className="absolute inset-0 size-full object-cover object-[60%_55%]" />
+        <div className="absolute inset-0 bg-linear-to-t from-card to-transparent" />
+      </div>
       <Progress value={Math.min(current, BUILD.length)} max={BUILD.length} label={finished ? 'Terminé' : BUILD[Math.min(current, BUILD.length - 1)].label} showValue />
       <Stepper steps={BUILD} current={current} orientation="vertical" details="current" label="Génération du plan" completeLabel="Plan prêt" />
       {!finished && <TextShimmer as="p" className="text-muted-foreground text-sm">{`${BUILD[Math.min(current, BUILD.length - 1)].label}…`}</TextShimmer>}

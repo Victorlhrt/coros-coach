@@ -4,6 +4,7 @@ import { LoginCentered } from '@/components/arc/blocks/login-centered/login-cent
 import { LogoIcon } from '@/components/logo'
 import { api, type Me } from '../api'
 import { BRAND } from '../brand'
+import { AuthSplit } from './AuthVisual'
 
 /** Bloc Arc login-centered, en mode e-mail + mot de passe. */
 export function LoginPage() {
@@ -21,6 +22,7 @@ export function LoginPage() {
   }
 
   return (
+    <AuthSplit>
     <LoginCentered
       fullScreen
       brand={BRAND.name}
@@ -31,5 +33,6 @@ export function LoginPage() {
       termsHref="#conditions"
       privacyHref="#confidentialite"
     />
+    </AuthSplit>
   )
 }

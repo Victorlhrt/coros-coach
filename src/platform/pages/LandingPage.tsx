@@ -177,7 +177,11 @@ export function LandingPage() {
           </div>
         </Section>
 
-        <section className="flex flex-col items-center gap-4 px-4 py-20 text-center">
+        <section className="relative isolate flex flex-col items-center gap-4 px-4 py-28 text-center md:py-36">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-1 w-screen -translate-x-1/2 overflow-hidden">
+            <img src="/visuals/cta.webp" alt="" loading="lazy" className="size-full object-cover object-[50%_60%] opacity-70" />
+            <div className="absolute inset-0 bg-linear-to-b from-background via-transparent to-background" />
+          </div>
           <h2 className="font-heading max-w-xl text-balance font-semibold text-2xl tracking-tight md:text-4xl">Two minutes of questions. A plan all the way to race day.</h2>
           <Button asChild size="lg">
             <a href={appHref('/onboarding')}>
