@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ActivityIcon,
   ArrowLeftIcon,
+  ExternalLinkIcon,
   CompassIcon,
   FlagIcon,
   LayoutListIcon,
@@ -24,6 +25,8 @@ import { Checkbox } from '@/components/arc/checkbox/checkbox'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Combobox } from '@/components/arc/combobox/combobox'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
+import { Dialog, DialogContent } from '@/components/arc/dialog/dialog'
+import { FileDropzone } from '@/components/arc/file-dropzone/file-dropzone'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Input } from '@/components/arc/input/input'
 import { NumberField } from '@/components/arc/number-field/number-field'
@@ -38,6 +41,7 @@ import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { api, type Variant } from '../api'
 import { CoachAvatar } from './CoachAvatar'
+import { readStravaExport, type StravaSummary } from './strava'
 import { distanceCategory, formatDuration, formatPace, parseDuration, predict, type Performance } from './estimate'
 
 /**
@@ -64,6 +68,8 @@ export type CompleteAnswers = {
   distance?: string
   race_date?: string | null
   weekly_km?: number
+  strava?: StravaSummary | null
+  strava_need?: string
 }
 
 const STEPS = [
@@ -136,7 +142,7 @@ export function CompleteOnboarding({
 
   const valid: Record<string, boolean> = {
     reason: !!a.reason,
-    wearables: (a.wearables?.length ?? 0) > 0,
+    wearables: (a.wearables?.length ?? 0) > 0 || !!a.strava,
     identity: !!a.identity?.firstName.trim() && !!a.identity.lastName.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a.identity.email.trim()),
     goal: !!a.goal?.type,
     target: !!a.goal?.race && (a.goal.type !== 'race' || !!a.goal.date),
@@ -256,7 +262,7 @@ export function CompleteOnboarding({
               if (valid[step.id] && ready) void next()
             }}
           >
-            {step.id === 'wearables' && <WearablesStep value={a.wearables ?? []} onChange={(wearables) => patch({ wearables })} />}
+            {step.id === 'wearables' && <WearablesStep answers={a} patch={patch} />}
             {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
             {step.id === 'target' && <TargetStep answers={a} patch={patch} />}
             {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
@@ -352,7 +358,10 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
       return [REASON_PRAISE[a.reason ?? ''] ?? 'Bien reçu.', 'Tu cours avec quelle montre ? Je récupère ton historique pendant qu’on discute.']
     case 'identity': {
       const w = a.wearables ?? []
-      const praise = w.includes('none')
+      const st = a.strava
+      const praise = st
+        ? `J’ai lu tes ${st.runs} sorties Strava${st.recent.runs ? `, dont ${st.recent.runs} ces 12 dernières semaines` : ''}. Joli historique.`
+        : w.includes('none')
         ? 'Pas de montre ? Aucun souci, on fera aux sensations.'
         : w.some((x) => x === 'coros' || x === 'garmin')
           ? 'Top, je pourrai lire tes séances directement depuis ta montre.'
@@ -379,7 +388,12 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
     case 'volume': {
       const e = a.estimate
       const praise = e?.target && e.predicted ? (e.target < e.predicted * 0.97 ? 'Objectif ambitieux, j’aime ton état d’esprit.' : 'Objectif réaliste : c’est comme ça qu’on finit fort.') : 'Merci, c’est noté.'
-      return [praise, 'Combien de kilomètres tu cours par semaine en ce moment ?']
+      return [
+        praise,
+        a.strava?.recent.runs
+          ? `D’après Strava, tu tournes autour de ${a.strava.recent.weeklyKm} km par semaine : je l’ai pré-rempli. Corrige si ça a changé.`
+          : 'Combien de kilomètres tu cours par semaine en ce moment ?',
+      ]
     }
     case 'pains':
       return [volumePraise(h?.weeklyKm ?? 0, ctx.weeklyPct), 'Des douleurs ces dernières semaines ? Touche les zones qui t’ont gêné. Rien du tout ? Envoie directement.']
@@ -401,8 +415,11 @@ function summarize(step: string, a: CompleteAnswers): string {
   switch (step) {
     case 'reason':
       return REASONS.find((r) => r.value === a.reason)?.label ?? '—'
-    case 'wearables':
-      return a.wearables?.includes('none') ? 'Je cours sans montre' : (a.wearables ?? []).map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', ')
+    case 'wearables': {
+      const strava = a.strava ? `historique Strava (${a.strava.runs} sorties)` : ''
+      if (!a.wearables?.length) return strava || '—'
+      return [a.wearables.includes('none') ? 'Je cours sans montre' : a.wearables.map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', '), strava].filter(Boolean).join(' + ')
+    }
     case 'identity': {
       const id = a.identity
       return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · c’est moi sur UTMB' : ''}` : '—'
@@ -475,7 +492,9 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
 
 // ---------- 2. Montres ----------
 
-function WearablesStep({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+function WearablesStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
+  const value = answers.wearables ?? []
+  const onChange = (wearables: string[]) => patch({ wearables })
   const none = value.includes('none')
   const toggle = (id: string, on: boolean) => onChange(on ? [...value.filter((v) => v !== 'none'), id] : value.filter((v) => v !== id))
   return (
@@ -498,12 +517,153 @@ function WearablesStep({ value, onChange }: { value: string[]; onChange: (v: str
           </label>
         ))}
       </div>
+      <StravaImport answers={answers} patch={patch} />
       <Checkbox label="Je cours sans montre" checked={none} onCheckedChange={(c) => onChange(c === true ? ['none'] : [])} />
       {value.some((v) => v === 'coros' || v === 'garmin') && (
         <p className="rounded-[20px] border bg-card p-4 text-muted-foreground text-sm">
           La connexion à ta montre se fait juste après la création du compte. En attendant, on part de tes résultats publics et de ce que tu nous dis.
         </p>
       )}
+    </>
+  )
+}
+
+/** Logo Strava (simple-icons, CC0). */
+function StravaLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+    </svg>
+  )
+}
+
+/**
+ * Strava limite le nombre de coureurs connectables par application : on propose de connecter la montre
+ * directement, ou d'importer l'export du compte Strava (lu dans le navigateur), et une liste d'attente.
+ */
+function StravaImport({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
+  const [open, setOpen] = useState(false)
+  const [view, setView] = useState<'choices' | 'import'>('choices')
+  const [need, setNeed] = useState(answers.strava_need ?? '')
+  const st = answers.strava
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setView(st ? 'import' : 'choices')
+          setOpen(true)
+        }}
+        className={`flex items-center gap-3 rounded-[20px] border p-4 text-left transition-colors hover:border-foreground/50 ${st ? 'border-primary' : ''}`}
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[#FC4C02] text-white">
+          <StravaLogo className="size-5" />
+        </span>
+        <span className="flex flex-1 flex-col">
+          <span className="text-sm">{st ? 'Historique Strava importé' : 'J’utilise Strava'}</span>
+          <span className="text-muted-foreground text-xs">
+            {st ? `${st.runs} sorties · ${st.recent.weeklyKm} km/sem. ces 12 dernières semaines` : 'Importe ton historique en quelques clics'}
+          </span>
+        </span>
+        {st && <CheckIcon className="size-4" />}
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent title="Connecter Strava" description="Strava limite le nombre de coureurs qu’une application peut connecter. Voici comment faire :">
+          {view === 'choices' ? (
+            <div className="flex flex-col gap-5">
+              <div className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs">1</span>
+                <div className="flex flex-col gap-1">
+                  <p className="font-medium text-sm">Connecte ta montre directement</p>
+                  <p className="text-muted-foreground text-sm">
+                    Raice.run marche mieux avec la source qui enregistre tes séances (COROS, Garmin) : des données plus propres, avec le sommeil et la récupération.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 border-t pt-5">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs">2</span>
+                <div className="flex flex-1 flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <p className="font-medium text-sm">Importe ton historique Strava</p>
+                    <p className="text-muted-foreground text-sm">Tes sorties passées servent à calibrer ton plan et tes allures.</p>
+                  </div>
+                  <Button type="button" variant="secondary" onClick={() => setView('import')}>
+                    Importer mon historique Strava
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 border-t pt-5">
+                <p className="text-sm">
+                  <strong className="font-medium">Besoin de Strava quand même ?</strong> Dis-nous pourquoi, ça nous aide à prioriser.
+                </p>
+                <Textarea label="Tu utilises Strava pour quoi ?" rows={2} value={need} onChange={(e) => setNeed(e.target.value)} />
+                <Button type="button" variant="secondary" disabled={!need.trim() || need.trim() === answers.strava_need} onClick={() => patch({ strava_need: need.trim() })}>
+                  {answers.strava_need && need.trim() === answers.strava_need ? 'Merci, c’est noté' : 'Rejoindre la liste d’attente'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {!st && (
+                <button type="button" onClick={() => setView('choices')} className="flex w-fit items-center gap-1 text-muted-foreground text-sm hover:text-foreground">
+                  <ArrowLeftIcon className="size-4" /> Retour
+                </button>
+              )}
+              <p className="text-sm">
+                <strong className="font-medium">Importe ton historique Strava.</strong> L’archive est lue directement dans ton navigateur : seul un résumé (volume, sorties longues, meilleurs chronos) est
+                envoyé à Raice.run.
+              </p>
+              <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm">
+                <li>
+                  <a href="https://www.strava.com/athlete/download_my_account" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+                    Demande ton archive sur Strava <ExternalLinkIcon className="size-3.5" />
+                  </a>
+                </li>
+                <li>Strava t’envoie un lien de téléchargement par e-mail quand elle est prête.</li>
+                <li>Dépose le ZIP ici, pas besoin de le décompresser.</li>
+              </ol>
+              <FileDropzone
+                accept=".zip,application/zip"
+                multiple={false}
+                maxFiles={1}
+                label="Dépose ton export Strava (ZIP)"
+                description="ou choisis le fichier sur ton appareil"
+                dropLabel="Lâche le ZIP ici"
+                note="Lu dans ton navigateur, rien n’est envoyé"
+                onUpload={async (item, { onProgress }) => {
+                  if (!item.file) throw new Error('Fichier introuvable')
+                  const summary = await readStravaExport(item.file, onProgress)
+                  if (!summary.runs) throw new Error('Aucune course à pied dans cet export.')
+                  onProgress(100)
+                  patch({ strava: summary })
+                }}
+              />
+              {st && (
+                <div className="grid grid-cols-3 gap-2 rounded-[20px] border bg-card p-4 text-center">
+                  <div>
+                    <p className="font-semibold text-xl tabular-nums">{st.runs}</p>
+                    <p className="text-muted-foreground text-xs">sorties</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-xl tabular-nums">{st.recent.weeklyKm} km</p>
+                    <p className="text-muted-foreground text-xs">par semaine (12 sem.)</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-xl tabular-nums">{st.recent.longestKm} km</p>
+                    <p className="text-muted-foreground text-xs">plus longue sortie</p>
+                  </div>
+                </div>
+              )}
+              {st && (
+                <Button type="button" onClick={() => setOpen(false)}>
+                  C’est bon
+                </Button>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -781,7 +941,7 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
         .filter((p) => p.seconds > 0),
     [profile.data],
   )
-  const perfs = [...manual, ...utmbPerfs]
+  const perfs = [...manual, ...(answers.strava?.performances ?? []), ...utmbPerfs]
   const race = answers.goal?.race
   const prediction = race ? predict(perfs, race.km, race.elevation) : null
   const target = answers.estimate?.target ?? prediction?.seconds ?? null
@@ -872,7 +1032,7 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 type StepProps = { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }
 
 function useHealth({ answers, patch }: StepProps) {
-  const h = answers.health ?? { pains: [], painLevel: 0, events: [], weeklyKm: 20, notes: '' }
+  const h = answers.health ?? { pains: [], painLevel: 0, events: [], weeklyKm: answers.strava?.recent.runs ? answers.strava.recent.weeklyKm : 20, notes: '' }
   return [h, (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })] as const
 }
 

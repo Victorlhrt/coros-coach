@@ -4,7 +4,7 @@
  * 100 m de dénivelé positif comptent comme 1 km de plat (règle du km-effort).
  */
 
-export type Performance = { label: string; km: number; elevation: number; seconds: number; date?: string; source: 'utmb' | 'manuel' }
+export type Performance = { label: string; km: number; elevation: number; seconds: number; date?: string; source: 'utmb' | 'manuel' | 'strava' }
 
 export const effortKm = (km: number, elevation = 0) => km + elevation / 100
 
