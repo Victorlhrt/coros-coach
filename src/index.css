@@ -202,3 +202,9 @@
   40% { transform: scaleY(1.18); }
   70% { transform: scaleY(0.94); }
 }
+
+/* Apparition douce (bulles de la conversation d'onboarding). */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}

@@ -384,13 +384,27 @@ const inView = { once: true, amount: 0.5 } as const
 /** Montres qui se synchronisent : des points voyagent de la montre vers Raice.run, en boucle. */
 function SyncVisual() {
   const reduce = useReducedMotion()
+  const marks = [
+    { src: '/partners/coros.png', pad: '' },
+    { src: '/partners/garmin.png', pad: 'p-2 invert' },
+    { src: '/partners/apple.png', pad: 'p-2 invert' },
+    { src: '/partners/polar-mark.svg', pad: 'p-1.5' },
+    { src: '/partners/suunto-mark.svg', pad: 'p-1.5' },
+  ]
   return (
     <div className="flex w-full items-center justify-between gap-3">
-      <div className="flex flex-col gap-2">
-        {['/partners/coros.png', '/partners/garmin.png'].map((src, i) => (
-          <span key={src} className="flex size-10 items-center justify-center overflow-hidden rounded-[12px] border bg-card">
-            <img alt="" className={cn('size-full object-contain', i === 1 && 'p-2 invert')} src={src} />
-          </span>
+      <div className="grid grid-cols-2 gap-1.5">
+        {marks.map((m, i) => (
+          <motion.span
+            key={m.src}
+            className={cn('flex size-9 items-center justify-center overflow-hidden rounded-[10px] border bg-card', i === 4 && 'col-span-2 justify-self-center')}
+            initial={{ opacity: 0, scale: 0.8 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={inView}
+            transition={{ delay: i * 0.08, type: 'spring', visualDuration: 0.35, bounce: 0.3 }}
+          >
+            <img alt="" className={cn('size-full object-contain', m.pad)} src={m.src} />
+          </motion.span>
         ))}
       </div>
       <div className="relative h-px flex-1 bg-border">

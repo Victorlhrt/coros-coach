@@ -38,7 +38,8 @@ export function OnboardingRunPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const me = useMe()
-  const forced = params.get('variant')
+  // L'onboarding est toujours le parcours Complet (en conversation avec le coach), sauf parcours forcé.
+  const forced = params.get('variant') ?? 'complet'
   const preview = params.get('preview') === '1'
 
   const variant = useQuery({

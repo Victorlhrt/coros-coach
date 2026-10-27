@@ -2,27 +2,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ActivityIcon,
   ArrowLeftIcon,
-  ArrowRightIcon,
-  CalendarCheckIcon,
   CompassIcon,
   FlagIcon,
-  FootprintsIcon,
-  GaugeIcon,
-  HeartPulseIcon,
   LayoutListIcon,
   MountainIcon,
   PlusIcon,
   RotateCcwIcon,
-  SparklesIcon,
+  SendIcon,
   SproutIcon,
-  TargetIcon,
   TrashIcon,
   TrendingUpIcon,
-  UserIcon,
   WatchIcon,
-  type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -44,6 +36,7 @@ import { Switch } from '@/components/arc/switch/switch'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { api, type Variant } from '../api'
+import { CoachAvatar } from './CoachAvatar'
 import { distanceCategory, formatDuration, formatPace, parseDuration, predict, type Performance } from './estimate'
 
 /**
@@ -117,7 +110,6 @@ const MANUAL_DISTANCES = [
 ]
 
 export function CompleteOnboarding({
-  variant,
   preview,
   ready,
   onSave,
@@ -162,41 +154,181 @@ export function CompleteOnboarding({
     }
   }
 
+  // Défilement vers la dernière bulle à chaque nouvelle question.
+  const endRef = useRef<HTMLDivElement>(null)
+  const [typing, setTyping] = useState(true)
+  useEffect(() => {
+    setTyping(true)
+    const t = window.setTimeout(() => setTyping(false), 700)
+    return () => window.clearTimeout(t)
+  }, [index])
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [index, typing])
+
   return (
-    <div className="flex flex-col gap-8">
-      <Stepper steps={STEPS} current={index} compact label={`Parcours ${variant.name}`} />
-      {step.id === 'generate' ? (
-        <GenerateStep answers={a} preview={preview} onDone={() => onComplete(withPlanFields(a))} />
-      ) : (
-        <form
-          className="flex flex-col gap-8"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (valid[step.id] && ready) void next()
-          }}
-        >
-          {step.id === 'reason' && <ReasonStep value={a.reason} onChange={(reason) => patch({ reason })} />}
-          {step.id === 'wearables' && <WearablesStep value={a.wearables ?? []} onChange={(wearables) => patch({ wearables })} />}
-          {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
-          {step.id === 'goal' && <GoalStep answers={a} patch={patch} />}
-          {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
-          {step.id === 'health' && <HealthStep answers={a} patch={patch} />}
-          {step.id === 'gear' && <GearStep answers={a} patch={patch} />}
-          {error && (
-            <p role="alert" className="text-destructive text-sm">
-              {error}
-            </p>
-          )}
-          <div className="flex items-center justify-between gap-3">
-            <Button type="button" variant="ghost" disabled={index === 0 || busy} onClick={() => setIndex(index - 1)}>
-              <ArrowLeftIcon className="size-4" /> Retour
-            </Button>
-            <Button type="submit" loading={busy} disabled={!ready || !valid[step.id]}>
-              {step.id === 'gear' ? 'Créer mon plan' : 'Continuer'} <ArrowRightIcon className="size-4" />
-            </Button>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-3 border-b pb-4">
+        <CoachAvatar className="size-11" />
+        <div className="flex-1">
+          <p className="font-medium">Pacer</p>
+          <p className="text-muted-foreground text-xs">Ton coach · {Math.min(index + 1, STEPS.length)} / {STEPS.length}</p>
+        </div>
+        <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+          <span className="block h-full rounded-full bg-foreground transition-all duration-500" style={{ width: `${((index + 1) / STEPS.length) * 100}%` }} />
+        </span>
+      </div>
+
+      {/* Échanges passés : la question du coach, puis la réponse résumée */}
+      {STEPS.slice(0, index).map((s) => (
+        <div key={s.id} className="flex flex-col gap-2">
+          {coachLines(s.id, a).map((line, i) => (
+            <CoachBubble key={i} first={i === 0}>
+              {line}
+            </CoachBubble>
+          ))}
+          <UserBubble>{summarize(s.id, a)}</UserBubble>
+        </div>
+      ))}
+
+      {/* Question en cours */}
+      <div className="flex flex-col gap-2">
+        {typing ? (
+          <TypingBubble />
+        ) : (
+          coachLines(step.id, a).map((line, i) => (
+            <CoachBubble key={i} first={i === 0}>
+              {line}
+            </CoachBubble>
+          ))
+        )}
+      </div>
+
+      {!typing &&
+        (step.id === 'generate' ? (
+          <div className="animate-[fade-in_300ms_ease-out] rounded-[26px] border bg-card p-5">
+            <GenerateStep answers={a} preview={preview} onDone={() => onComplete(withPlanFields(a))} />
           </div>
-        </form>
-      )}
+        ) : (
+          <form
+            className="flex animate-[fade-in_300ms_ease-out] flex-col gap-6 rounded-[26px] border bg-card p-5"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (valid[step.id] && ready) void next()
+            }}
+          >
+            {step.id === 'reason' && <ReasonStep value={a.reason} onChange={(reason) => patch({ reason })} />}
+            {step.id === 'wearables' && <WearablesStep value={a.wearables ?? []} onChange={(wearables) => patch({ wearables })} />}
+            {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
+            {step.id === 'goal' && <GoalStep answers={a} patch={patch} />}
+            {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
+            {step.id === 'health' && <HealthStep answers={a} patch={patch} />}
+            {step.id === 'gear' && <GearStep answers={a} patch={patch} />}
+            {error && (
+              <p role="alert" className="text-destructive text-sm">
+                {error}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3 border-t pt-4">
+              <Button type="button" variant="ghost" size="sm" disabled={index === 0 || busy} onClick={() => setIndex(index - 1)}>
+                <ArrowLeftIcon className="size-4" /> Modifier
+              </Button>
+              <Button type="submit" loading={busy} disabled={!ready || !valid[step.id]}>
+                {step.id === 'gear' ? 'Créer mon plan' : 'Envoyer'} <SendIcon className="size-4" />
+              </Button>
+            </div>
+          </form>
+        ))}
+      <div ref={endRef} />
+    </div>
+  )
+}
+
+// ---------- Conversation ----------
+
+/** Ce que dit Pacer à chaque étape (peut dépendre des réponses précédentes). */
+function coachLines(step: string, a: CompleteAnswers): string[] {
+  const first = a.identity?.firstName.trim()
+  const race = a.goal?.race
+  switch (step) {
+    case 'reason':
+      return ['Salut ! Moi c’est Pacer, ton coach.', 'Avant de construire ton plan : qu’est-ce qui t’amène sur Raice.run ?']
+    case 'wearables':
+      return ['Bien noté. Avec quoi cours-tu ?', 'Je récupère ton historique pendant qu’on discute : ton plan partira de tes vraies allures.']
+    case 'identity':
+      return ['Faisons connaissance : ton prénom, ton nom et ton e-mail.', 'Je regarde au passage si tu as des résultats publics, en trail notamment.']
+    case 'goal':
+      return [`Merci${first ? ` ${first}` : ''}. Quel est ton objectif ?`]
+    case 'estimate':
+      return race
+        ? [`J’ai fait le calcul pour ${race.name}.`, 'Ajuste le temps visé si tu veux viser plus vite ou plus prudent.']
+        : ['Donne-moi un chrono récent : je calibre tes allures avec.']
+    case 'health':
+      return ['Comment va ton corps en ce moment ?', 'Ça m’aide à doser la charge des premières semaines.']
+    case 'gear':
+      return ['Dernière question : tes chaussures.', 'Je suivrai leur usure et je te préviendrai quand une paire arrive en fin de vie.']
+    default:
+      return ['Parfait, j’ai tout ce qu’il me faut. Je construis ton plan.']
+  }
+}
+
+/** Réponse du coureur, résumée en une phrase dans sa bulle. */
+function summarize(step: string, a: CompleteAnswers): string {
+  switch (step) {
+    case 'reason':
+      return REASONS.find((r) => r.value === a.reason)?.label ?? '—'
+    case 'wearables':
+      return a.wearables?.includes('none') ? 'Je cours sans montre' : (a.wearables ?? []).map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', ')
+    case 'identity': {
+      const id = a.identity
+      return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · profil UTMB trouvé' : ''}` : '—'
+    }
+    case 'goal': {
+      const g = a.goal
+      if (!g) return '—'
+      const label = GOALS.find((x) => x.value === g.type)?.label ?? ''
+      const date = g.date ? ` · ${new Date(`${g.date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''
+      return g.race ? `${label} : ${g.race.name}${date}` : label
+    }
+    case 'estimate':
+      return a.estimate?.target ? `Je vise ${formatDuration(a.estimate.target)}` : 'On verra en route'
+    case 'health': {
+      const h = a.health
+      if (!h) return 'Tout va bien'
+      const pains = h.pains.length ? `gêne : ${h.pains.join(', ').toLowerCase()}` : 'pas de douleur'
+      return `${h.weeklyKm} km par semaine · ${pains}`
+    }
+    case 'gear': {
+      const g = a.gear
+      return g?.brand ? `${g.brand}${g.model ? ` ${g.model}` : ''} · ${g.shoeKm} km` : 'Pas de paire renseignée'
+    }
+    default:
+      return ''
+  }
+}
+
+function CoachBubble({ children, first }: { children: React.ReactNode; first: boolean }) {
+  return (
+    <div className="flex animate-[fade-in_300ms_ease-out] items-end gap-2">
+      <span className="w-9 shrink-0">{first && <CoachAvatar />}</span>
+      <p className="max-w-[85%] rounded-2xl rounded-bl-md border bg-card px-4 py-2.5 text-sm leading-relaxed">{children}</p>
+    </div>
+  )
+}
+
+function UserBubble({ children }: { children: React.ReactNode }) {
+  return <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background text-sm">{children}</p>
+}
+
+function TypingBubble() {
+  return (
+    <div className="flex items-end gap-2">
+      <CoachAvatar />
+      <span className="flex gap-1 rounded-2xl rounded-bl-md border bg-card px-4 py-3.5">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 120}ms` }} />
+        ))}
+      </span>
     </div>
   )
 }
@@ -212,26 +344,12 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
   }
 }
 
-function Heading({ title, text, icon: Icon }: { title: string; text?: string; icon?: LucideIcon }) {
-  return (
-    <div className="flex flex-col gap-2">
-      {Icon && (
-        <span className="mb-2 flex size-10 items-center justify-center rounded-[14px] border bg-card">
-          <Icon className="size-5" />
-        </span>
-      )}
-      <h1 className="font-heading font-semibold text-balance text-2xl tracking-tight md:text-3xl">{title}</h1>
-      {text && <p className="text-muted-foreground text-sm leading-relaxed">{text}</p>}
-    </div>
-  )
-}
 
 // ---------- 1. Motivation ----------
 
 function ReasonStep({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
   return (
     <>
-      <Heading icon={SparklesIcon} title="Qu’est-ce qui t’amène sur Raice.run ?" text="Une seule réponse : celle qui compte le plus aujourd’hui." />
       <RadioCards aria-label="Motivation" layout="list" options={REASONS} value={value ?? null} onValueChange={onChange} />
     </>
   )
@@ -244,7 +362,6 @@ function WearablesStep({ value, onChange }: { value: string[]; onChange: (v: str
   const toggle = (id: string, on: boolean) => onChange(on ? [...value.filter((v) => v !== 'none'), id] : value.filter((v) => v !== id))
   return (
     <>
-      <Heading icon={WatchIcon} title="Avec quoi cours-tu ?" text="On récupère ton historique pendant que tu finis le questionnaire : le plan démarre de tes vraies allures." />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {WEARABLES.map((w) => (
           <label
@@ -306,7 +423,6 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
   return (
     <>
-      <Heading icon={UserIcon} title="Faisons connaissance" text="On cherche tes résultats publics pour partir de ton vrai niveau." />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input label="Prénom" autoComplete="given-name" value={id.firstName} onChange={(e) => set({ firstName: e.target.value })} />
         <Input label="Nom" autoComplete="family-name" value={id.lastName} onChange={(e) => set({ lastName: e.target.value })} />
@@ -389,7 +505,6 @@ function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
 
   return (
     <>
-      <Heading icon={TargetIcon} title="Quel est ton objectif ?" />
       <RadioCards aria-label="Objectif" layout="list" options={GOALS} value={goal.type || null} onValueChange={(type) => set({ type, race: null })} />
 
       {goal.type === 'distance' && (
@@ -441,7 +556,7 @@ function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
               </Button>
             </>
           ) : (
-            <div className="flex flex-col gap-4 rounded-[26px] border bg-card p-5">
+            <div className="flex flex-col gap-4 rounded-[20px] border bg-background p-4">
               <Input label="Nom de la course" value={customRace.name} onChange={(e) => setCustomRace({ ...customRace, name: e.target.value })} />
               <div className="grid grid-cols-2 gap-4">
                 <NumberField label="Distance" value={customRace.km} min={1} max={250} suffix=" km" locale="fr-FR" onValueChange={(km) => setCustomRace({ ...customRace, km })} />
@@ -514,16 +629,11 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
   return (
     <>
-      <Heading
-        icon={GaugeIcon}
-        title={race ? `Ton temps estimé sur ${race.name}` : 'Ton niveau actuel'}
-        text={race ? 'Calculé à partir de tes résultats récents. Ajuste-le si tu vises plus vite ou plus prudent.' : 'Donne-nous un chrono récent : il sert à calibrer tes allures.'}
-      />
 
       {uri && profile.isPending && <TextShimmer as="p" className="text-sm">Lecture de tes résultats UTMB…</TextShimmer>}
 
       {race && prediction && target && (
-        <div className="flex flex-col gap-6 rounded-[34px] border bg-card p-6">
+        <div className="flex flex-col gap-6 rounded-[26px] border bg-background p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-muted-foreground text-sm">Temps visé</p>
@@ -590,7 +700,6 @@ function HealthStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
   const set = (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })
   return (
     <>
-      <Heading icon={HeartPulseIcon} title="Comment va ton corps ?" text="Ça nous aide à doser la charge des premières semaines." />
       <NumberField label="Kilomètres par semaine en ce moment" value={h.weeklyKm} min={0} max={200} suffix=" km" locale="fr-FR" onValueChange={(weeklyKm) => set({ weeklyKm })} />
       <div className="flex flex-col gap-1">
         <h2 className="font-medium">Des problèmes récents ?</h2>
@@ -626,7 +735,6 @@ function GearStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
   const examples = (shoes.data ?? []).filter((s) => s.brand === g.brand).slice(0, 3).map((s) => s.model)
   return (
     <>
-      <Heading icon={FootprintsIcon} title="Tes chaussures" text="Pour suivre l’usure et te prévenir quand une paire arrive en fin de vie." />
       <Combobox
         label="Marque"
         placeholder="Rechercher une marque"
@@ -670,10 +778,8 @@ function GenerateStep({ answers, preview, onDone }: { answers: CompleteAnswers; 
     return () => window.clearTimeout(t)
   }, [current]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const race = answers.goal?.race
   return (
     <div className="flex flex-col gap-8">
-      <Heading icon={CalendarCheckIcon} title={finished ? 'Ta demande est prête' : 'On construit ton plan'} text={race ? `${race.name}${answers.goal?.date ? ` · ${new Date(`${answers.goal.date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}` : undefined} />
       <Progress value={Math.min(current, BUILD.length)} max={BUILD.length} label={finished ? 'Terminé' : BUILD[Math.min(current, BUILD.length - 1)].label} showValue />
       <Stepper steps={BUILD} current={current} orientation="vertical" details="current" label="Génération du plan" completeLabel="Plan prêt" />
       {!finished && <TextShimmer as="p" className="text-muted-foreground text-sm">{`${BUILD[Math.min(current, BUILD.length - 1)].label}…`}</TextShimmer>}
