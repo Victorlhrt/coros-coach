@@ -4,6 +4,7 @@ import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { useMe } from '../session'
 import { AuditPage } from './AuditPage'
 import { EmailsPage } from './EmailsPage'
+import { InvitesPage } from './InvitesPage'
 import { OnboardingDetailPage } from './OnboardingDetailPage'
 import { OnboardingsPage } from './OnboardingsPage'
 import { OverviewPage } from './OverviewPage'
@@ -33,6 +34,7 @@ export default function AdminApp() {
       <Routes>
         <Route index element={<OverviewPage />} />
         <Route path="inscriptions" element={<SignupsPage />} />
+        <Route path="invitations" element={<InvitesPage />} />
         <Route path="onboardings" element={<OnboardingsPage />} />
         <Route path="testing" element={<TestingPage />} />
         <Route path="onboardings/:id" element={<OnboardingDetailPage />} />

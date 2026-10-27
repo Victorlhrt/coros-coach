@@ -13,6 +13,7 @@ import { api, type OnboardingStep, type Variant } from '../api'
 import { CompleteOnboarding, type CompleteAnswers } from '../onboarding/CompleteOnboarding'
 import { useMe } from '../session'
 import { siteHref } from '../brand'
+import { InviteGate, storedInviteCode } from '../invite/InviteGate'
 
 /** Identifiant du parcours en cours, relu par l'inscription pour rattacher les réponses au compte. */
 export const ONBOARDING_KEY = 'platform.onboardingSession'
@@ -54,11 +55,14 @@ export function OnboardingRunPage() {
   const [error, setError] = useState('')
   const [finished, setFinished] = useState(false)
   const started = useRef(false)
+  // Accès sur invitation : un code est demandé, sauf aux coureurs connectés (le serveur vérifie aussi).
+  const [inviteCode, setInviteCode] = useState<string | null>(() => storedInviteCode())
+  const needsCode = !me.isPending && !me.data && !inviteCode
 
   useEffect(() => {
-    if (!variant.data || started.current) return
+    if (!variant.data || started.current || me.isPending || (!me.data && !inviteCode)) return
     started.current = true
-    api<{ id: string }>('/onboarding/sessions', { body: { variantId: variant.data.id, preview } })
+    api<{ id: string }>('/onboarding/sessions', { body: { variantId: variant.data.id, preview, inviteCode: inviteCode ?? undefined } })
       .then(({ id }) => {
         setSessionId(id)
         if (!preview) {
@@ -69,8 +73,29 @@ export function OnboardingRunPage() {
           }
         }
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-  }, [variant.data, preview])
+      .catch((e: unknown) => {
+        // Code périmé ou épuisé entre-temps : retour à l'écran d'invitation.
+        if (!me.data) {
+          try {
+            sessionStorage.removeItem('platform.inviteCode')
+          } catch {
+            /* rien à nettoyer */
+          }
+          started.current = false
+          setInviteCode(null)
+        }
+        setError(e instanceof Error ? e.message : String(e))
+      })
+  }, [variant.data, preview, me.isPending, me.data, inviteCode])
+
+  if (needsCode) {
+    return (
+      <Frame>
+        {error && <p className="text-destructive text-sm">{error}</p>}
+        <InviteGate initialCode={params.get('code')} referrer={params.get('ref')} onValid={(code) => { setError(''); setInviteCode(code) }} />
+      </Frame>
+    )
+  }
 
   if (variant.isError) {
     return (

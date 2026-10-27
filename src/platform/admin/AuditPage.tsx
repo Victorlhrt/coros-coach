@@ -16,6 +16,9 @@ const ACTIONS: Record<string, string> = {
   'plan.update': 'Plan modifié',
   'settings.signup_mode': 'Mode d’inscription',
   'user.password_reset': 'Mot de passe réinitialisé',
+  'invite.create': 'Code créé',
+  'invite.update': 'Code modifié',
+  'waitlist.invite': 'Invitation envoyée',
 }
 
 const columns: DataColumn<Entry>[] = [

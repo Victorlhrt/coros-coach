@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { currentUser } from './auth.js'
 import { db } from './db.js'
+import { validCode } from './invites.js'
 import type { OnboardingStep } from './onboarding-defaults.js'
 
 type Variant = { id: string; name: string; description: string; status: string; weight: number; steps: OnboardingStep[] }
@@ -44,16 +45,20 @@ onboardingRoutes.get('/pick', async (c) => {
   return c.json(picked)
 })
 
-const StartBody = z.object({ variantId: z.string().min(1), preview: z.boolean().optional() })
+const StartBody = z.object({ variantId: z.string().min(1), preview: z.boolean().optional(), inviteCode: z.string().max(60).optional() })
 const ProgressBody = z.object({ answers: z.record(z.string(), z.unknown()), stepReached: z.number().int().min(0).max(100) })
 
 onboardingRoutes.post('/sessions', async (c) => {
   const parsed = StartBody.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: 'Requête invalide' }, 400)
   const user = await currentUser(c)
+  // Sur invitation : un code valide est demandé, sauf aux coureurs déjà inscrits et aux aperçus des admins.
+  const preview = !!parsed.data.preview && user?.role === 'admin'
+  const code = await validCode(parsed.data.inviteCode)
+  if (!user && !code) return c.json({ error: 'Code d’invitation invalide ou épuisé' }, 403)
   const [row] = await db<{ id: string }[]>`
-    insert into onboarding_sessions (variant_id, user_id, is_preview)
-    values (${parsed.data.variantId}, ${user?.id ?? null}, ${parsed.data.preview ?? false})
+    insert into onboarding_sessions (variant_id, user_id, is_preview, invite_code)
+    values (${parsed.data.variantId}, ${user?.id ?? null}, ${preview}, ${code?.code ?? null})
     returning id`
   return c.json(row)
 })
@@ -73,12 +78,15 @@ onboardingRoutes.patch('/sessions/:id', async (c) => {
 onboardingRoutes.post('/sessions/:id/complete', async (c) => {
   const id = c.req.param('id')
   const user = await currentUser(c)
-  const [row] = await db<{ user_id: string | null; is_preview: boolean }[]>`
-    update onboarding_sessions
-    set completed_at = coalesce(completed_at, now()), user_id = coalesce(user_id, ${user?.id ?? null}), updated_at = now()
-    where id = ${id}
-    returning user_id, is_preview`
+  const [row] = await db<{ user_id: string | null; is_preview: boolean; invite_code: string | null; first: boolean }[]>`
+    update onboarding_sessions s
+    set completed_at = coalesce(s.completed_at, now()), user_id = coalesce(s.user_id, ${user?.id ?? null}), updated_at = now()
+    from (select completed_at is null first from onboarding_sessions where id = ${id}) before
+    where s.id = ${id}
+    returning s.user_id, s.is_preview, s.invite_code, before.first`
   if (!row) return c.json({ error: 'Parcours introuvable' }, 404)
+  // Un usage du code est compté une fois, à la fin du parcours.
+  if (row.first && row.invite_code && !row.is_preview) await db`update invite_codes set uses = uses + 1 where code = ${row.invite_code}`
   if (row.user_id && !row.is_preview) await createPlanFromSession(id, row.user_id)
   return c.json({ ok: true, needsAccount: !row.user_id })
 })

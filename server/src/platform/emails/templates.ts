@@ -84,7 +84,39 @@ export function planReady(p: { name: string; app: string; title: string; distanc
 }
 
 /** Catalogue pour l'aperçu du back office, avec des données d'exemple. */
+export function waitlistJoined(p: { name: string; position: number; shareUrl: string }): Email {
+  return render({
+    subject: `Tu es n° ${p.position} sur la liste Raice.run`,
+    preheader: 'Fais passer ton lien : chaque ami inscrit te fait remonter.',
+    blocks: [
+      { kind: 'eyebrow', text: 'Liste d’attente' },
+      { kind: 'title', text: `Bien reçu, ${first(p.name)} !` },
+      { kind: 'paragraph', text: `Tu es n° ${p.position} sur la liste. Raice.run ouvre sur invitation, par petites vagues. Chaque ami qui s’inscrit avec ton lien te fait remonter.` },
+      { kind: 'button', label: 'Partager mon lien', href: p.shareUrl },
+    ],
+  })
+}
+
+export function invited(p: { name: string; app: string; code: string }): Email {
+  return render({
+    subject: 'Ton invitation Raice.run est arrivée',
+    preheader: `Ton code : ${p.code}. Crée ton plan dès maintenant.`,
+    blocks: [
+      { kind: 'eyebrow', text: 'Invitation' },
+      { kind: 'title', text: `C’est ton tour, ${first(p.name)}.` },
+      { kind: 'paragraph', text: `Ton code d’accès : ${p.code}. Réponds aux questions de Pacer, ton coach, et ton plan est prêt en quelques minutes.` },
+      { kind: 'button', label: 'Créer mon plan', href: `${p.app}/onboarding?code=${encodeURIComponent(p.code)}` },
+    ],
+  })
+}
+
 export const CATALOG = {
+  'waitlist-joined': {
+    label: 'Liste d’attente (parrainage)',
+    when: 'Inscription sur la liste d’attente sans code',
+    sample: (app: string) => waitlistJoined({ name: 'Camille Martin', position: 128, shareUrl: `${app}/onboarding?ref=camille7` }),
+  },
+  invited: { label: 'Invitation', when: 'Un admin invite une personne de la liste', sample: (app: string) => invited({ name: 'Camille Martin', app, code: 'camille-x7' }) },
   welcome: { label: 'Bienvenue', when: 'Inscription avec compte actif', sample: (app: string) => welcome({ name: 'Camille Martin', app }) },
   waitlist: { label: 'Liste d’attente', when: 'Inscription en mode liste d’attente', sample: () => waitlist({ name: 'Camille Martin' }) },
   'account-approved': {

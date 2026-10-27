@@ -4,7 +4,8 @@ import { requireAdmin, type SessionUser } from './auth.js'
 import { config } from '../config.js'
 import { audit, db, getSetting } from './db.js'
 import { sendEmail, sendEmailLater } from './email.js'
-import { CATALOG, accountApproved, planReady, type TemplateId } from './emails/templates.js'
+import { CATALOG, accountApproved, invited, planReady, type TemplateId } from './emails/templates.js'
+import { makeCode, normalizeCode } from './invites.js'
 
 type Env = { Variables: { user: SessionUser } }
 
@@ -317,4 +318,51 @@ adminRoutes.post('/emails/:id/test', async (c) => {
   const me = c.get('user')
   const res = await sendEmail(me.email, `test:${id}`, t.sample(config.origin))
   return res.ok ? c.json({ ok: true, to: me.email }) : c.json({ error: res.error }, 502)
+})
+
+// ---------- Invitations ----------
+
+adminRoutes.get('/invites', async (c) => {
+  const [codes, waitlist] = await Promise.all([
+    db`select ic.code, ic.label, ic.max_uses, ic.uses, ic.active, ic.created_at, u.email owner
+       from invite_codes ic left join users u on u.id = ic.owner_user_id order by ic.owner_user_id nulls first, ic.created_at desc limit 500`,
+    db`select id, email, first_name, ref_code, referred_by, referrals, invite_code, invited_at, created_at,
+              row_number() over (order by invited_at is not null, referrals desc, created_at asc)::int position
+       from waitlist order by position limit 1000`,
+  ])
+  return c.json({ codes, waitlist })
+})
+
+const CodeBody = z.object({ code: z.string().trim().min(3).max(40).regex(/^[a-zA-Z0-9-]+$/), label: z.string().trim().max(120).default(''), maxUses: z.number().int().min(1).nullable() })
+
+adminRoutes.post('/invites', async (c) => {
+  const parsed = CodeBody.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Code invalide (lettres, chiffres et tirets)' }, 400)
+  const code = normalizeCode(parsed.data.code)
+  const [row] = await db`insert into invite_codes (code, label, max_uses) values (${code}, ${parsed.data.label}, ${parsed.data.maxUses}) on conflict do nothing returning code`
+  if (!row) return c.json({ error: 'Ce code existe déjà' }, 409)
+  await audit(c.get('user').id, 'invite.create', code, { maxUses: parsed.data.maxUses })
+  return c.json({ ok: true })
+})
+
+adminRoutes.patch('/invites/:code', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { active?: boolean } | null
+  if (typeof body?.active !== 'boolean') return c.json({ error: 'Requête invalide' }, 400)
+  await db`update invite_codes set active = ${body.active} where code = ${c.req.param('code')}`
+  await audit(c.get('user').id, 'invite.update', c.req.param('code'), { active: body.active })
+  return c.json({ ok: true })
+})
+
+/** Invite une personne de la liste : code à usage unique, envoyé par e-mail. */
+adminRoutes.post('/waitlist/:id/invite', async (c) => {
+  const [w] = await db<{ email: string; first_name: string; invite_code: string | null }[]>`select email, first_name, invite_code from waitlist where id = ${c.req.param('id')}`
+  if (!w) return c.json({ error: 'Introuvable' }, 404)
+  const code = w.invite_code ?? makeCode(w.first_name)
+  if (!w.invite_code) {
+    await db`insert into invite_codes (code, label, max_uses) values (${code}, ${`Liste d’attente · ${w.email}`}, 1)`
+    await db`update waitlist set invite_code = ${code}, invited_at = now() where id = ${c.req.param('id')}`
+  }
+  sendEmailLater(w.email, 'invited', invited({ name: w.first_name, app: config.origin, code }))
+  await audit(c.get('user').id, 'waitlist.invite', w.email, { code })
+  return c.json({ code })
 })

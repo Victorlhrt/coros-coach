@@ -105,6 +105,31 @@ export async function migratePlatform() {
       error text,
       created_at timestamptz not null default now()
     )`
+  // Accès sur invitation : codes (illimités ou à usage limité) et liste d'attente avec parrainage.
+  await db`
+    create table if not exists invite_codes (
+      code text primary key,
+      label text not null default '',
+      owner_user_id uuid references users(id) on delete cascade,
+      max_uses int,
+      uses int not null default 0,
+      active boolean not null default true,
+      created_at timestamptz not null default now()
+    )`
+  await db`
+    create table if not exists waitlist (
+      id uuid primary key default gen_random_uuid(),
+      email text not null unique,
+      first_name text not null default '',
+      ref_code text not null unique,
+      referred_by text,
+      referrals int not null default 0,
+      invite_code text references invite_codes(code) on delete set null,
+      invited_at timestamptz,
+      created_at timestamptz not null default now()
+    )`
+  await db`alter table onboarding_sessions add column if not exists invite_code text`
+  await db`insert into invite_codes (code, label, max_uses) values ('victor43', 'Code de Victor (illimité)', null) on conflict (code) do nothing`
   await db`create index if not exists users_created_idx on users (created_at)`
   await db`create index if not exists onboarding_sessions_variant_idx on onboarding_sessions (variant_id, created_at)`
   await db`create index if not exists plans_user_idx on plans (user_id, created_at)`

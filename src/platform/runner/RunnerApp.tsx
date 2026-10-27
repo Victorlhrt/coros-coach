@@ -31,6 +31,7 @@ import { DISTANCE_LABELS, PLAN_STATUS, formatDate } from '../format'
 import { CoachAvatar } from '../onboarding/CoachAvatar'
 import type { CompleteAnswers } from '../onboarding/CompleteOnboarding'
 import { formatDuration, formatPace } from '../onboarding/estimate'
+import { ShareButtons } from '../invite/ShareButtons'
 import { useLogout, useMe } from '../session'
 
 /**
@@ -438,6 +439,7 @@ function ProfilePage() {
           <Link to="/onboarding">Refaire l’onboarding</Link>
         </LinkButton>
       </Panel>
+      <InvitePanel />
     </>
   )
 }
@@ -462,5 +464,29 @@ function SettingsPage() {
         </Panel>
       </div>
     </>
+  )
+}
+
+/** Code de parrainage du coureur, à partager à ses amis. */
+function InvitePanel() {
+  const invite = useQuery({ queryKey: ['account', 'invite'], queryFn: () => api<{ code: string; uses: number; max_uses: number | null }>('/account/invite') })
+  const d = invite.data
+  if (!d) return null
+  const left = d.max_uses === null ? null : Math.max(0, d.max_uses - d.uses)
+  return (
+    <Panel title="Invite tes potes" className="mt-4 max-w-2xl">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-muted-foreground text-xs">Ton code</p>
+          <p className="font-mono font-semibold text-2xl tracking-wide">{d.code}</p>
+        </div>
+        <Badge tone={left === 0 ? 'warning' : 'neutral'}>{left === null ? 'Illimité' : `${left} invitation${left > 1 ? 's' : ''} restante${left > 1 ? 's' : ''}`}</Badge>
+      </div>
+      <ShareButtons
+        url={`${window.location.origin}/onboarding?code=${d.code}`}
+        subject="Je t’invite sur Raice.run"
+        text={`Je t’invite sur Raice.run, un coach running qui construit ton plan sur mesure. Mon code : ${d.code}.`}
+      />
+    </Panel>
   )
 }
