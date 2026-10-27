@@ -113,6 +113,21 @@ export function HeroSection() {
 		<section>
 			<div className="relative flex flex-col items-center justify-center gap-5 px-4 py-12 md:px-4 md:py-24 lg:py-28">
 				{/* X Faded Borders & Shades */}
+				{/* Photo plein écran : le coureur à droite, fondu vers le fond en bas et sur les bords */}
+				<div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-2 w-screen -translate-x-1/2 overflow-hidden">
+					<picture>
+						<source media="(max-width: 640px)" srcSet="/visuals/hero-sm.webp" />
+						<img
+							alt=""
+							className="fade-in size-full animate-in object-cover object-[78%_center] opacity-70 duration-1000"
+							fetchPriority="high"
+							src="/visuals/hero.webp"
+						/>
+					</picture>
+					<div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_70%_at_50%_45%,var(--background)_0%,transparent_100%)] opacity-80" />
+					<div className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-background to-transparent" />
+					<div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-background to-transparent" />
+				</div>
 				<div
 					aria-hidden="true"
 					className="absolute inset-0 -z-1 size-full overflow-hidden"
