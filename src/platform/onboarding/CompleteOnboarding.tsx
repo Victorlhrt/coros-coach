@@ -1,5 +1,27 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftIcon, ArrowRightIcon, MountainIcon, PlusIcon, TrashIcon } from 'lucide-react'
+import {
+  ActivityIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CalendarCheckIcon,
+  CompassIcon,
+  FlagIcon,
+  FootprintsIcon,
+  GaugeIcon,
+  HeartPulseIcon,
+  LayoutListIcon,
+  MountainIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  SparklesIcon,
+  SproutIcon,
+  TargetIcon,
+  TrashIcon,
+  TrendingUpIcon,
+  UserIcon,
+  WatchIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { Badge } from '@/components/arc/badge/badge'
@@ -43,7 +65,7 @@ export type CompleteAnswers = {
   performances?: Performance[]
   estimate?: { predicted: number | null; target: number | null }
   health?: { pains: string[]; painLevel: number; events: string[]; weeklyKm: number; notes: string }
-  gear?: { shoe: string | null; shoeKm: number; rotation: boolean }
+  gear?: { brand: string | null; model: string; shoeKm: number; rotation: boolean }
   // Champs à plat repris par la demande de plan côté serveur.
   distance?: string
   race_date?: string | null
@@ -62,16 +84,17 @@ const STEPS = [
 ]
 
 const REASONS = [
-  { value: 'race', label: 'Préparer une course', description: 'J’ai une date et un objectif en tête.' },
-  { value: 'progress', label: 'Progresser', description: 'Courir plus vite ou plus longtemps.' },
-  { value: 'structure', label: 'Structurer mes sorties', description: 'Arrêter de courir au hasard.' },
-  { value: 'comeback', label: 'Reprendre', description: 'Après une pause ou une blessure.' },
-  { value: 'start', label: 'Commencer la course', description: 'Je débute.' },
+  { value: 'race', label: 'Préparer une course', description: 'J’ai une date et un objectif en tête.', icon: <FlagIcon /> },
+  { value: 'progress', label: 'Progresser', description: 'Courir plus vite ou plus longtemps.', icon: <TrendingUpIcon /> },
+  { value: 'structure', label: 'Structurer mes sorties', description: 'Arrêter de courir au hasard.', icon: <LayoutListIcon /> },
+  { value: 'comeback', label: 'Reprendre', description: 'Après une pause ou une blessure.', icon: <RotateCcwIcon /> },
+  { value: 'start', label: 'Commencer la course', description: 'Je débute.', icon: <SproutIcon /> },
 ]
 
+/** Logos des montres (`invert` pour les marques noires sur fond sombre). Sans logo : icône générique. */
 const WEARABLES = [
-  { id: 'coros', name: 'COROS', logo: '/coros-logo.png', available: true },
-  { id: 'garmin', name: 'Garmin', available: true },
+  { id: 'coros', name: 'COROS', logo: '/partners/coros.png', invert: false, available: true },
+  { id: 'garmin', name: 'Garmin', logo: '/partners/garmin.png', invert: true, available: true },
   { id: 'apple', name: 'Apple Watch', available: false },
   { id: 'suunto', name: 'Suunto', available: false },
   { id: 'polar', name: 'Polar', available: false },
@@ -189,9 +212,14 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
   }
 }
 
-function Heading({ title, text }: { title: string; text?: string }) {
+function Heading({ title, text, icon: Icon }: { title: string; text?: string; icon?: LucideIcon }) {
   return (
     <div className="flex flex-col gap-2">
+      {Icon && (
+        <span className="mb-2 flex size-10 items-center justify-center rounded-[14px] border bg-card">
+          <Icon className="size-5" />
+        </span>
+      )}
       <h1 className="font-heading font-semibold text-balance text-2xl tracking-tight md:text-3xl">{title}</h1>
       {text && <p className="text-muted-foreground text-sm leading-relaxed">{text}</p>}
     </div>
@@ -203,7 +231,7 @@ function Heading({ title, text }: { title: string; text?: string }) {
 function ReasonStep({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
   return (
     <>
-      <Heading title="Qu’est-ce qui t’amène sur Raice.run ?" text="Une seule réponse : celle qui compte le plus aujourd’hui." />
+      <Heading icon={SparklesIcon} title="Qu’est-ce qui t’amène sur Raice.run ?" text="Une seule réponse : celle qui compte le plus aujourd’hui." />
       <RadioCards aria-label="Motivation" layout="list" options={REASONS} value={value ?? null} onValueChange={onChange} />
     </>
   )
@@ -216,15 +244,19 @@ function WearablesStep({ value, onChange }: { value: string[]; onChange: (v: str
   const toggle = (id: string, on: boolean) => onChange(on ? [...value.filter((v) => v !== 'none'), id] : value.filter((v) => v !== id))
   return (
     <>
-      <Heading title="Avec quoi cours-tu ?" text="On récupère ton historique pendant que tu finis le questionnaire : le plan démarre de tes vraies allures." />
+      <Heading icon={WatchIcon} title="Avec quoi cours-tu ?" text="On récupère ton historique pendant que tu finis le questionnaire : le plan démarre de tes vraies allures." />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {WEARABLES.map((w) => (
           <label
             key={w.id}
             className={`flex items-center gap-3 rounded-[20px] border p-4 ${w.available ? 'cursor-pointer bg-card' : 'opacity-50'} ${value.includes(w.id) ? 'border-primary' : ''}`}
           >
-            <span className="flex h-8 w-20 shrink-0 items-center">
-              {w.logo ? <img src={w.logo} alt="" className="max-h-5 w-auto brightness-0 invert" /> : <span className="font-semibold text-sm tracking-tight">{w.name}</span>}
+            <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-background">
+              {w.logo ? (
+                <img src={w.logo} alt="" className={`size-full object-contain ${w.invert ? 'p-2 invert' : ''}`} />
+              ) : (
+                <WatchIcon className="size-5 text-muted-foreground" />
+              )}
             </span>
             <span className="flex-1 text-sm">{w.available ? w.name : `${w.name} · bientôt`}</span>
             <Checkbox aria-label={w.name} disabled={!w.available} checked={value.includes(w.id)} onCheckedChange={(c) => toggle(w.id, c === true)} />
@@ -274,7 +306,7 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
   return (
     <>
-      <Heading title="Faisons connaissance" text="On cherche tes résultats publics pour partir de ton vrai niveau." />
+      <Heading icon={UserIcon} title="Faisons connaissance" text="On cherche tes résultats publics pour partir de ton vrai niveau." />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input label="Prénom" autoComplete="given-name" value={id.firstName} onChange={(e) => set({ firstName: e.target.value })} />
         <Input label="Nom" autoComplete="family-name" value={id.lastName} onChange={(e) => set({ lastName: e.target.value })} />
@@ -319,19 +351,36 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 // ---------- 4. Objectif ----------
 
 const GOALS = [
-  { value: 'race', label: 'Faire une course', description: 'Une date, une distance, un objectif.' },
-  { value: 'train', label: 'M’entraîner régulièrement', description: 'Sans course en vue pour l’instant.' },
-  { value: 'distance', label: 'Courir une distance', description: 'Mon premier 10 km, semi ou marathon.' },
+  { value: 'race', label: 'Faire une course', description: 'Une date, une distance, un objectif.', icon: <FlagIcon /> },
+  { value: 'train', label: 'M’entraîner régulièrement', description: 'Sans course en vue pour l’instant.', icon: <ActivityIcon /> },
+  { value: 'distance', label: 'Courir une distance', description: 'Mon premier 10 km, semi ou marathon.', icon: <CompassIcon /> },
 ]
+
+/** Filtre de distance, avant la recherche : catégories classiques sur route, tranches de longueur en trail. */
+const DIST_FILTERS = {
+  road: [
+    { value: '5k', label: '5 km' },
+    { value: '10k', label: '10 km' },
+    { value: 'half', label: 'Semi' },
+    { value: 'marathon', label: 'Marathon' },
+  ],
+  trail: [
+    { value: 'trail-short', label: '< 30 km' },
+    { value: 'trail-mid', label: '30–60 km' },
+    { value: 'trail-long', label: '60–100 km' },
+    { value: 'ultra', label: '100 km +' },
+  ],
+}
 
 function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
   const goal = answers.goal ?? { type: '', terrain: 'road' as const, race: null, date: null }
   const set = (p: Partial<typeof goal>) => patch({ goal: { ...goal, ...p } })
   const [q, setQ] = useState('')
+  const [dist, setDist] = useState('')
   const query = useDebounced(q, 300)
   const races = useQuery({
-    queryKey: ['races', goal.terrain, query],
-    queryFn: () => api<Race[]>(`/lookup/races?type=${goal.terrain}&q=${encodeURIComponent(query)}`),
+    queryKey: ['races', goal.terrain, dist, query],
+    queryFn: () => api<Race[]>(`/lookup/races?type=${goal.terrain}&dist=${dist}&q=${encodeURIComponent(query)}`),
     enabled: goal.type === 'race',
     staleTime: 600_000,
   })
@@ -340,7 +389,7 @@ function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
 
   return (
     <>
-      <Heading title="Quel est ton objectif ?" />
+      <Heading icon={TargetIcon} title="Quel est ton objectif ?" />
       <RadioCards aria-label="Objectif" layout="list" options={GOALS} value={goal.type || null} onValueChange={(type) => set({ type, race: null })} />
 
       {goal.type === 'distance' && (
@@ -362,10 +411,14 @@ function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
               { value: 'trail', label: 'Trail' },
             ]}
             value={goal.terrain}
-            onValueChange={(v) => set({ terrain: v as 'road' | 'trail', race: null })}
+            onValueChange={(v) => {
+              setDist('')
+              set({ terrain: v as 'road' | 'trail', race: null })
+            }}
           />
           {!custom ? (
             <>
+              <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS[goal.terrain]} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
               <SearchField label="Rechercher une course" placeholder={goal.terrain === 'trail' ? 'Ex. Grand Raid, Velay…' : 'Ex. Marathon de Paris'} value={q} onValueChange={setQ} />
               {races.data && races.data.length > 0 ? (
                 <RadioCards
@@ -373,7 +426,7 @@ function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
                   layout="list"
                   value={goal.race?.id ?? null}
                   onValueChange={(id) => set({ race: races.data!.find((r) => r.id === id) ?? null })}
-                  options={races.data.slice(0, 8).map((r) => ({
+                  options={races.data.slice(0, 10).map((r) => ({
                     value: r.id,
                     label: r.name,
                     description: r.detail,
@@ -462,6 +515,7 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
   return (
     <>
       <Heading
+        icon={GaugeIcon}
         title={race ? `Ton temps estimé sur ${race.name}` : 'Ton niveau actuel'}
         text={race ? 'Calculé à partir de tes résultats récents. Ajuste-le si tu vises plus vite ou plus prudent.' : 'Donne-nous un chrono récent : il sert à calibrer tes allures.'}
       />
@@ -536,12 +590,20 @@ function HealthStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
   const set = (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })
   return (
     <>
-      <Heading title="Comment va ton corps ?" text="Ça nous aide à doser la charge des premières semaines." />
+      <Heading icon={HeartPulseIcon} title="Comment va ton corps ?" text="Ça nous aide à doser la charge des premières semaines." />
       <NumberField label="Kilomètres par semaine en ce moment" value={h.weeklyKm} min={0} max={200} suffix=" km" locale="fr-FR" onValueChange={(weeklyKm) => set({ weeklyKm })} />
+      <div className="flex flex-col gap-1">
+        <h2 className="font-medium">Des problèmes récents ?</h2>
+        <p className="text-muted-foreground text-sm">Touche les zones qui t’ont gêné ces dernières semaines.</p>
+      </div>
       <ChipGroup label="Des douleurs ces dernières semaines ?" options={PAINS} value={h.pains} onValueChange={(pains) => set({ pains, painLevel: pains.length ? h.painLevel : 0 })} />
       {h.pains.length > 0 && (
         <Rating label="Intensité de la gêne" max={5} value={h.painLevel} onChange={(painLevel) => set({ painLevel })} valueLabels={['Légère', 'Gênante', 'Modérée', 'Forte', 'Très forte']} emptyLabel="Non renseignée" />
       )}
+      <div className="flex flex-col gap-1">
+        <h2 className="font-medium">Quelque chose de récent ?</h2>
+        <p className="text-muted-foreground text-sm">Blessure, maladie, pause, période chargée…</p>
+      </div>
       <ChipGroup label="Quelque chose de récent ?" options={EVENTS} value={h.events} onValueChange={(events) => set({ events })} />
       <Textarea label="À nous dire (facultatif)" placeholder="Ex. entorse en mars, je reprends doucement" rows={3} value={h.notes} onChange={(e) => set({ notes: e.target.value })} />
       {(h.painLevel >= 4 || h.events.includes('surgery')) && (
@@ -556,14 +618,29 @@ function HealthStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
 // ---------- 7. Matériel ----------
 
 function GearStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
-  const g = answers.gear ?? { shoe: null, shoeKm: 200, rotation: false }
+  const g = answers.gear ?? { brand: null, model: '', shoeKm: 200, rotation: false }
   const set = (p: Partial<typeof g>) => patch({ gear: { ...g, ...p } })
+  const brands = useQuery({ queryKey: ['shoe-brands'], queryFn: () => api<string[]>('/lookup/shoe-brands'), staleTime: Infinity })
   const shoes = useQuery({ queryKey: ['shoes'], queryFn: () => api<Shoe[]>('/lookup/shoes'), staleTime: Infinity })
-  const options = (shoes.data ?? []).map((s) => ({ value: s.id, label: `${s.brand} ${s.model}`, keywords: [s.brand, s.use] }))
+  // Quelques modèles connus de la marque, en exemple dans le champ libre.
+  const examples = (shoes.data ?? []).filter((s) => s.brand === g.brand).slice(0, 3).map((s) => s.model)
   return (
     <>
-      <Heading title="Tes chaussures" text="Pour suivre l’usure et te prévenir quand une paire arrive en fin de vie." />
-      <Combobox label="Ta paire principale" placeholder="Rechercher un modèle" emptyMessage="Modèle introuvable" options={options} value={g.shoe ?? undefined} onValueChange={(shoe) => set({ shoe })} />
+      <Heading icon={FootprintsIcon} title="Tes chaussures" text="Pour suivre l’usure et te prévenir quand une paire arrive en fin de vie." />
+      <Combobox
+        label="Marque"
+        placeholder="Rechercher une marque"
+        emptyMessage="Marque introuvable"
+        options={(brands.data ?? []).map((b) => ({ value: b, label: b }))}
+        value={g.brand ?? undefined}
+        onValueChange={(brand) => set({ brand })}
+      />
+      <Input
+        label="Modèle"
+        placeholder={examples.length ? `Ex. ${examples.join(', ')}` : 'Ex. Pegasus 41'}
+        value={g.model}
+        onChange={(e) => set({ model: e.target.value })}
+      />
       <NumberField label="Kilomètres déjà faits avec" value={g.shoeKm} min={0} max={2000} step={10} largeStep={50} suffix=" km" locale="fr-FR" onValueChange={(shoeKm) => set({ shoeKm })} />
       <Switch label="J’alterne avec une autre paire" checked={g.rotation} onCheckedChange={(rotation) => set({ rotation })} />
       {g.shoeKm >= 700 && <p className="text-muted-foreground text-sm">Au-delà de 700 km, l’amorti baisse nettement : pense à prévoir une nouvelle paire.</p>}
@@ -596,7 +673,7 @@ function GenerateStep({ answers, preview, onDone }: { answers: CompleteAnswers; 
   const race = answers.goal?.race
   return (
     <div className="flex flex-col gap-8">
-      <Heading title={finished ? 'Ta demande est prête' : 'On construit ton plan'} text={race ? `${race.name}${answers.goal?.date ? ` · ${new Date(`${answers.goal.date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}` : undefined} />
+      <Heading icon={CalendarCheckIcon} title={finished ? 'Ta demande est prête' : 'On construit ton plan'} text={race ? `${race.name}${answers.goal?.date ? ` · ${new Date(`${answers.goal.date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}` : undefined} />
       <Progress value={Math.min(current, BUILD.length)} max={BUILD.length} label={finished ? 'Terminé' : BUILD[Math.min(current, BUILD.length - 1)].label} showValue />
       <Stepper steps={BUILD} current={current} orientation="vertical" details="current" label="Génération du plan" completeLabel="Plan prêt" />
       {!finished && <TextShimmer as="p" className="text-muted-foreground text-sm">{`${BUILD[Math.min(current, BUILD.length - 1)].label}…`}</TextShimmer>}

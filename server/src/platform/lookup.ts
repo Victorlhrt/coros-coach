@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
-import { ROAD_RACES } from './data/races.js'
+import { KNOWN_RACES } from './data/races.js'
 import { SHOES } from './data/shoes.js'
 
 /**
@@ -105,33 +105,66 @@ type UtmbRaces = {
   races: { id: number; name: string; startDate: string; startLocation: string; details?: { statsUp?: { name: string; value: number | string }[] } }[]
 }
 
+/** Tranches de distance du filtre : route en catégories classiques, trail par longueur. */
+const DIST: Record<string, (km: number) => boolean> = {
+  '5k': (km) => km >= 4 && km <= 7,
+  '10k': (km) => km > 7 && km <= 15,
+  half: (km) => km > 15 && km <= 30,
+  marathon: (km) => km > 30 && km <= 45,
+  'trail-short': (km) => km < 30,
+  'trail-mid': (km) => km >= 30 && km < 60,
+  'trail-long': (km) => km >= 60 && km < 100,
+  ultra: (km) => km >= 100,
+}
+
+type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb' }
+
 lookupRoutes.get('/races', async (c) => {
   if (limited(c)) return c.json({ error: 'Trop de recherches, patiente une minute.' }, 429)
   const q = normalize((c.req.query('q') ?? '').trim())
   const type = c.req.query('type') === 'trail' ? 'trail' : 'road'
-  if (type === 'road') {
-    const list = ROAD_RACES.filter((r) => !q || normalize(`${r.name} ${r.city}`).includes(q)).flatMap((r) =>
-      r.distances.map((d) => ({ id: `${r.id}:${d.km}`, name: r.name, detail: `${d.label} · ${r.city}`, km: d.km, elevation: 0, date: null, source: 'raice' })),
-    )
-    return c.json(list.slice(0, 30))
+  const inDist = DIST[c.req.query('dist') ?? ''] ?? (() => true)
+
+  const known: RaceOut[] = KNOWN_RACES.filter((r) => r.terrain === type && (!q || normalize(`${r.name} ${r.city}`).includes(q))).flatMap((r) =>
+    r.distances.map((d) => ({
+      id: `${r.id}:${d.km}`,
+      name: r.name,
+      detail: d.elevation ? `${d.label} · ≈ ${d.elevation} m D+ · ${r.city}` : `${d.label} · ${r.city}`,
+      km: d.km,
+      elevation: d.elevation ?? 0,
+      date: null,
+      source: 'raice' as const,
+    })),
+  )
+  let utmb: RaceOut[] = []
+  if (type === 'trail') {
+    try {
+      const data = await cached(`utmb:races:${q}`, async () => {
+        const res = await fetch(`https://api.utmb.world/search/races?lang=fr&limit=50${q ? `&search=${encodeURIComponent(q)}` : ''}`, { headers: { 'user-agent': UA } })
+        if (!res.ok) throw new Error(`UTMB ${res.status}`)
+        return (await res.json()) as UtmbRaces
+      })
+      utmb = data.races
+        .map((r) => {
+          const stat = (n: string) => Number(r.details?.statsUp?.find((s) => s.name === n)?.value ?? 0)
+          return { id: `utmb:${r.id}`, name: r.name, detail: `${stat('distance')} km · ${stat('elevationGain')} m D+ · ${r.startLocation}`, km: stat('distance'), elevation: stat('elevationGain'), date: r.startDate, source: 'utmb' as const }
+        })
+        // L'API UTMB ne filtre pas toujours sur le nom : on le fait ici.
+        .filter((r) => !q || normalize(`${r.name} ${r.detail}`).includes(q))
+    } catch {
+      // UTMB indisponible : on garde les courses connues.
+    }
   }
-  try {
-    const data = await cached(`utmb:races:${q}`, async () => {
-      const res = await fetch(`https://api.utmb.world/search/races?lang=fr&limit=20${q ? `&search=${encodeURIComponent(q)}` : ''}`, { headers: { 'user-agent': UA } })
-      if (!res.ok) throw new Error(`UTMB ${res.status}`)
-      return (await res.json()) as UtmbRaces
-    })
-    return c.json(
-      data.races.map((r) => {
-        const stat = (n: string) => Number(r.details?.statsUp?.find((s) => s.name === n)?.value ?? 0)
-        return { id: `utmb:${r.id}`, name: r.name, detail: `${stat('distance')} km · ${stat('elevationGain')} m D+ · ${r.startLocation}`, km: stat('distance'), elevation: stat('elevationGain'), date: r.startDate, source: 'utmb' }
-      }),
-    )
-  } catch {
-    return c.json({ error: 'Recherche de courses trail indisponible pour le moment.' }, 502)
-  }
+  return c.json([...known, ...utmb].filter((r) => inDist(r.km)).slice(0, 30))
 })
 
 // ---------- Chaussures ----------
 
+/** Marques de chaussures de running (celles de la liste de modèles, plus d'autres courantes). */
+const EXTRA_BRANDS = ['Merrell', 'Topo Athletic', 'Craft', 'Diadora', 'Under Armour', 'Reebok', 'Joma', 'Veja', 'Norda', 'VJ', 'Dynafit', 'Arc’teryx', 'The North Face', 'Columbia', 'Karhu', 'Newton']
+
 lookupRoutes.get('/shoes', (c) => c.json(SHOES.map((s) => ({ id: normalize(`${s.brand}-${s.model}`).replace(/[^a-z0-9]+/g, '-'), ...s }))))
+
+lookupRoutes.get('/shoe-brands', (c) =>
+  c.json([...new Set([...SHOES.map((s) => s.brand), ...EXTRA_BRANDS])].sort((a, b) => a.localeCompare(b, 'fr'))),
+)
