@@ -2,10 +2,15 @@ import {
   ArrowRightIcon,
   BotIcon,
   CalendarRangeIcon,
+  CheckCheckIcon,
+  FlagIcon,
+  HeartPulseIcon,
+  MessageCircleIcon,
   MountainIcon,
   RefreshCwIcon,
   TargetIcon,
   WatchIcon,
+  ZapIcon,
 } from 'lucide-react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
 import { useEffect, type ReactNode } from 'react'
@@ -14,7 +19,9 @@ import { FullWidthDivider } from '@/components/full-width-divider'
 import { Header } from '@/components/header'
 import { HeroSection } from '@/components/hero'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
-import { Logo, LogoIcon } from '@/components/logo'
+import { DotWordmark } from './DotWordmark'
+import { CoachFlow, RunnerCursor, WatchFlow } from './landing-flows'
+import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { cn } from '@/lib/utils'
 import { BRAND, appHref } from '../brand'
@@ -50,6 +57,7 @@ export function LandingPage() {
 
   return (
     <div className="min-h-dvh overflow-x-clip">
+      <RunnerCursor />
       <Header />
       <main className="mx-auto max-w-5xl">
         <HeroSection />
@@ -63,9 +71,9 @@ export function LandingPage() {
             </>
           }
         >
-          <div className="grid border md:grid-cols-3">
+          <div className="grid gap-4 px-4 py-4 md:grid-cols-3 md:px-0">
             <Pillar icon={<WatchIcon />} title="Reads" text="Your watch and your race results, read for you." visual={<ReadsVisual />} />
-            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." className="md:border-x" visual={<PlansVisual />} />
+            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." visual={<PlansVisual />} />
             <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions on your wrist, rewritten from what you ran." visual={<ActsVisual />} />
           </div>
         </Section>
@@ -83,7 +91,7 @@ export function LandingPage() {
             {STEPS.map((s, i) => (
               <motion.li
                 key={s.title}
-                className="relative flex min-h-80 flex-col gap-4 overflow-hidden bg-background p-5"
+                className="group/step relative flex min-h-80 flex-col gap-4 overflow-hidden bg-background p-5 transition-colors hover:bg-card/60"
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.4 }}
@@ -113,42 +121,15 @@ export function LandingPage() {
             </>
           }
         >
-          <div className="grid border md:grid-cols-2">
-            <div className="flex flex-col gap-4 border-b p-6 md:border-r md:border-b-0 md:p-8">
-              <p className="text-muted-foreground leading-relaxed">
-                Connect COROS once. Your recent runs set your paces, and each workout is sent to the watch with its warm-up, intervals,
-                recoveries and cool-down. Run it, and the result comes back on its own.
-              </p>
-              <ul className="flex flex-col gap-2 text-sm">
-                {['History imported in the background', 'Structured workouts with target paces', 'Runs matched to planned sessions automatically'].map((t) => (
-                  <li key={t} className="flex items-center gap-2">
-                    <span className="size-1.5 rounded-full bg-foreground" /> {t}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-muted-foreground text-xs">COROS available now · Garmin next · Apple Watch, Suunto and Polar later</p>
-            </div>
-            <div className={cn('relative flex flex-col gap-2 p-6 md:p-8')}>
-              <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
-              <p className="relative text-muted-foreground text-xs">TUE · INTERVALS · 9.6 KM</p>
-              {[
-                ['Warm-up', '15 min · easy', 'w-1/4'],
-                ['6 × 800 m', '3:55 /km', 'w-full'],
-                ['Recovery', '2 min jog', 'w-1/3'],
-                ['Cool-down', '10 min · easy', 'w-1/5'],
-              ].map(([a, b, w]) => (
-                <div key={a} className="relative flex items-center gap-3 rounded-md border bg-card px-3 py-2.5">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{a}</p>
-                    <div className="mt-1.5 h-1 rounded-full bg-muted">
-                      <div className={cn('h-1 rounded-full bg-foreground/70', w)} />
-                    </div>
-                  </div>
-                  <span className="text-muted-foreground text-xs">{b}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <FlowRow
+            text="Connect your watch once. Every workout lands with its steps and paces, and your run comes back on its own."
+            points={[
+              { icon: <RefreshCwIcon />, label: 'History synced in the background' },
+              { icon: <ZapIcon />, label: 'Structured workouts with target paces' },
+              { icon: <CheckCheckIcon />, label: 'Runs matched to your plan automatically' },
+            ]}
+            visual={<WatchFlow />}
+          />
         </Section>
 
         <Section
@@ -160,27 +141,16 @@ export function LandingPage() {
             </>
           }
         >
-          <div className="grid border md:grid-cols-2">
-            <div className="relative flex flex-col gap-3 border-b p-6 md:border-r md:border-b-0 md:p-8">
-              <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
-              <Bubble side="right">Work trip Thursday to Saturday, and my left calf is tight.</Bubble>
-              <Bubble side="left">Got it. I moved the tempo to Tuesday, turned Thursday into rest, and swapped Saturday’s hills for an easy 40 minutes. Sunday’s long run stays, 2 km shorter.</Bubble>
-              <Bubble side="right">Perfect.</Bubble>
-            </div>
-            <div className="flex flex-col gap-4 p-6 md:p-8">
-              <p className="text-muted-foreground leading-relaxed">
-                Tell the coach what changed, in your own words. It reshapes the week around your schedule, your fatigue and your body, without losing
-                the thread of your goal.
-              </p>
-              <ul className="flex flex-col gap-2 text-sm">
-                {['Weekly review from what you actually ran', 'Fatigue, pain and missed sessions taken into account', 'Race-week taper built in'].map((t) => (
-                  <li key={t} className="flex items-center gap-2">
-                    <span className="size-1.5 rounded-full bg-foreground" /> {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <FlowRow
+            reverse
+            text="Tell the coach what changed, in your own words. The week is rewritten around your schedule and your body."
+            points={[
+              { icon: <MessageCircleIcon />, label: 'Plain-language adjustments' },
+              { icon: <HeartPulseIcon />, label: 'Fatigue and pain taken into account' },
+              { icon: <FlagIcon />, label: 'Race-week taper built in' },
+            ]}
+            visual={<CoachFlow />}
+          />
         </Section>
 
         <Section id="faq" eyebrow="FAQ" title={<>Questions, <span className="text-foreground">answered</span></>}>
@@ -204,10 +174,12 @@ export function LandingPage() {
         </section>
       </main>
       <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-muted-foreground text-xs">
-          <Logo className="text-xs" />
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 pt-6 text-muted-foreground text-xs">
           <span>Agentic running: your plan, written by AI, synced to your watch.</span>
           <span>© {new Date().getFullYear()} {BRAND.name}</span>
+        </div>
+        <div className="mx-auto max-w-6xl px-4 pt-10">
+          <DotWordmark />
         </div>
       </footer>
     </div>
@@ -236,17 +208,44 @@ function Section({ id, eyebrow, title, children }: { id: string; eyebrow: string
   )
 }
 
-function Pillar({ icon, title, text, visual, className }: { icon: ReactNode; title: string; text: string; visual: ReactNode; className?: string }) {
+/** Rangée façon Default : texte court (40 %) et flux animé de l'outil (60 %), sur la grille de points. */
+function FlowRow({ text, points, visual, reverse }: { text: string; points: { icon: ReactNode; label: string }[]; visual: ReactNode; reverse?: boolean }) {
   return (
-    <div className={cn('flex flex-col gap-3 border-b p-6 md:border-b-0 md:p-8', className)}>
-      {/* Aperçu de l'outil, sur la grille de points */}
-      <div className="relative -mx-2 mb-3 flex h-56 items-center justify-center overflow-hidden rounded-xl border bg-background px-4">
+    <div className={cn('grid border md:grid-cols-[2fr_3fr]', reverse && 'md:grid-cols-[3fr_2fr]')}>
+      <div className={cn('flex flex-col justify-center gap-6 border-b p-6 md:border-b-0 md:p-10', reverse ? 'md:order-2 md:border-l' : 'md:border-r')}>
+        <p className="text-lg leading-relaxed">{text}</p>
+        <ul className="flex flex-col gap-3 text-sm">
+          {points.map((p) => (
+            <li key={p.label} className="flex items-center gap-3 text-muted-foreground">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card text-foreground [&>svg]:size-4">{p.icon}</span>
+              {p.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="relative flex items-center justify-center p-6 md:p-10">
+        <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
+        <div className="relative w-full max-w-md">{visual}</div>
+      </div>
+    </div>
+  )
+}
+
+/** Un pilier = une seule carte : l'aperçu de l'outil en haut, puis l'icône, le titre et la phrase. */
+function Pillar({ icon, title, text, visual }: { icon: ReactNode; title: string; text: string; visual: ReactNode }) {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border bg-card/40">
+      <div className="relative flex h-60 items-center justify-center border-b px-5">
         <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
         <div className="relative w-full">{visual}</div>
       </div>
-      <span className="flex size-9 items-center justify-center rounded-md border bg-card [&>svg]:size-4.5">{icon}</span>
-      <h3 className="font-medium text-lg">{title}</h3>
-      <p className="text-muted-foreground text-sm leading-relaxed">{text}</p>
+      <div className="flex flex-col gap-1.5 p-5">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-md border bg-card [&>svg]:size-4">{icon}</span>
+          <h3 className="font-medium text-lg">{title}</h3>
+        </div>
+        <p className="text-muted-foreground text-sm">{text}</p>
+      </div>
     </div>
   )
 }
@@ -457,32 +456,35 @@ function TimeVisual() {
 }
 
 /** Semaines du plan : la charge monte, puis l'affûtage avant la course. */
+/**
+ * Semaines du plan : la charge monte, puis l'affûtage avant la course. Au survol de la carte, les barres
+ * rebondissent en vague jusqu'au jour J, qui s'allume avec son drapeau.
+ */
 function WeeksVisual() {
   const loads = [0.35, 0.45, 0.55, 0.4, 0.65, 0.75, 0.85, 0.55, 0.9, 1, 0.6, 0.3]
   return (
-    <motion.div className="flex h-24 w-full items-end gap-1" initial="hidden" whileInView="shown" viewport={inView} transition={{ staggerChildren: 0.06 }}>
-      {loads.map((h, i) => (
-        <motion.span
-          key={i}
-          className={cn('flex-1 origin-bottom rounded-sm', i === loads.length - 1 ? 'bg-foreground' : 'bg-foreground/35')}
-          style={{ height: `${h * 100}%` }}
-          variants={{ hidden: { scaleY: 0 }, shown: { scaleY: 1 } }}
-          transition={{ type: 'spring', visualDuration: 0.5, bounce: 0.2 }}
-        />
-      ))}
-    </motion.div>
-  )
-}
-
-function Bubble({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
-  return (
-    <p
-      className={cn(
-        'relative max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed',
-        side === 'right' ? 'self-end bg-foreground text-background' : 'self-start border bg-card text-foreground'
-      )}
-    >
-      {children}
-    </p>
+    <div className="relative w-full pt-7">
+      <span className="absolute top-0 right-0 flex translate-y-1 items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[11px] opacity-0 transition-all duration-300 group-hover/step:translate-y-0 group-hover/step:opacity-100">
+        <FlagIcon className="size-3" /> Race day
+      </span>
+      <motion.div className="flex h-24 w-full items-end gap-1" initial="hidden" whileInView="shown" viewport={inView} transition={{ staggerChildren: 0.06 }}>
+        {loads.map((h, i) => (
+          <motion.span
+            key={i}
+            className="flex h-full flex-1 origin-bottom items-end"
+            variants={{ hidden: { scaleY: 0 }, shown: { scaleY: 1 } }}
+            transition={{ type: 'spring', visualDuration: 0.5, bounce: 0.2 }}
+          >
+            <span
+              className={cn(
+                'block w-full origin-bottom rounded-sm transition-colors duration-300 group-hover/step:animate-[bar-wave_0.7s_ease-in-out]',
+                i === loads.length - 1 ? 'bg-foreground/50 group-hover/step:bg-foreground' : 'bg-foreground/35 group-hover/step:bg-foreground/60'
+              )}
+              style={{ height: `${h * 100}%`, animationDelay: `${i * 45}ms` }}
+            />
+          </motion.span>
+        ))}
+      </motion.div>
+    </div>
   )
 }

@@ -11,6 +11,7 @@ import { PlanDetailPage } from './PlanDetailPage'
 import { PlansPage } from './PlansPage'
 import { SettingsPage } from './SettingsPage'
 import { SignupsPage } from './SignupsPage'
+import { TestingPage } from './TestingPage'
 
 /** Back office : bloc Efferd app-shell-2, réservé aux administrateurs (le serveur vérifie aussi chaque appel). */
 export default function AdminApp() {
@@ -33,6 +34,7 @@ export default function AdminApp() {
         <Route index element={<OverviewPage />} />
         <Route path="inscriptions" element={<SignupsPage />} />
         <Route path="onboardings" element={<OnboardingsPage />} />
+        <Route path="testing" element={<TestingPage />} />
         <Route path="onboardings/:id" element={<OnboardingDetailPage />} />
         <Route path="plans" element={<PlansPage />} />
         <Route path="plans/:id" element={<PlanDetailPage />} />

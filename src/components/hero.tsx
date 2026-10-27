@@ -1,10 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/button";
-import { DecorIcon } from "@/components/decor-icon";
-import { FullWidthDivider } from "@/components/full-width-divider";
 import { ArrowRightIcon, LogInIcon } from "lucide-react";
 import { appHref } from "@/platform/brand";
-import { PlanPreview } from "@/platform/pages/PlanPreview";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 
@@ -119,16 +116,6 @@ export function HeroSection() {
 						</a>
 					</Button>
 				</div>
-			</div>
-			<div className="relative">
-				<DecorIcon className="size-4" position="top-left" />
-				<DecorIcon className="size-4" position="top-right" />
-				<DecorIcon className="size-4" position="bottom-left" />
-				<DecorIcon className="size-4" position="bottom-right" />
-
-				<FullWidthDivider className="-top-px" />
-				<PlanPreview />
-				<FullWidthDivider className="-bottom-px" />
 			</div>
 		</section>
 	);

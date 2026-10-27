@@ -195,3 +195,16 @@
   --series-3: #6b6b6b;
   --series-4: #3f3f3f;
 }
+
+/* Landing : vague des barres de semaines au survol de « Get your plan ». */
+@keyframes bar-wave {
+  0%, 100% { transform: scaleY(1); }
+  40% { transform: scaleY(1.18); }
+  70% { transform: scaleY(0.94); }
+}
+
+/* Landing : le curseur coureur remplace le curseur système (souris uniquement, voir RunnerCursor). */
+html.runner-cursor,
+html.runner-cursor * {
+  cursor: none !important;
+}
