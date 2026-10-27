@@ -9,6 +9,9 @@ import { SyncBadge } from '@/components/SyncBadge'
 import { TypeBadge } from '@/components/TypeBadge'
 import { WorkoutChart } from '@/components/WorkoutChart'
 import { Card } from '@/components/ui/card'
+import { Panel, PanelHeader, PanelSection } from '@/components/raice/panel'
+import { Button as LinkButton } from '@/components/shadcn/button'
+import { INTENSITY } from '@/platform/runner/coach-data'
 import { formatDay, today } from '@/lib/coach/dates'
 import { formatDistance, formatDuration, formatPace, paceUnit, type Units } from '@/lib/coach/format'
 import { sessionTotals } from '@/lib/coach/metrics'
@@ -43,85 +46,98 @@ export function SessionPage() {
   const { seconds, meters } = sessionTotals(session, zones)
   const status = syncStatus(plan, coros.synced, session)
 
+  const pace = meters > 0 ? seconds / (meters / 1000) : 0
+  const steps = session.blocks.reduce((n, b) => n + (b.kind === 'repeat' ? b.steps.length * b.repeats : 1), 0)
+
   return (
-    <div className="grid items-start gap-4 pb-4 lg:grid-cols-2">
-      <header className="flex items-center gap-2 pt-4 lg:col-span-2">
-        <button onClick={() => navigate(-1)} aria-label="Retour" className="-ml-2 p-2">
-          <ChevronLeft className="size-6" />
-        </button>
-        <p className="flex-1 text-sm font-medium text-muted-foreground capitalize">{formatDay(session.date)}</p>
+    <div className="flex w-full flex-col gap-4 pb-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 pb-2">
+        <div className="flex min-w-0 items-start gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Retour"
+            className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground capitalize">
+              {formatDay(session.date)} <TypeBadge type={session.type} />
+            </p>
+            <h1 className="mt-1 font-heading text-2xl leading-tight font-medium tracking-tight">{session.title}</h1>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{session.description}</p>
+          </div>
+        </div>
+        <LinkButton asChild variant="outline" size="sm">
+          <Link to={ROUTES.plan}>Voir la semaine</Link>
+        </LinkButton>
       </header>
 
-      <div className="px-1 lg:col-span-2">
-        <TypeBadge type={session.type} />
-        <h1 className="mt-2 font-heading text-2xl leading-tight font-medium tracking-tight">{session.title}</h1>
-        <p className="mt-2 text-muted-foreground">{session.description}</p>
-      </div>
-
-      <Card>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">Durée</p>
-            <SlotText value={formatDuration(seconds)} className="text-3xl font-medium tracking-tight tabular-nums" />
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Panel>
+          <PanelHeader title="Structure" subtitle={session.blocks.length ? `${steps} étape${steps > 1 ? 's' : ''} · ${formatDuration(seconds)}${meters > 0 ? ` · ${formatDistance(meters, units)}` : ''}` : 'Renforcement'} />
+          <div className="grid grid-cols-2 divide-x border-t sm:grid-cols-4 sm:divide-y-0">
+            <Kpi label="Durée" value={formatDuration(seconds)} />
+            <Kpi label="Distance estimée" value={meters > 0 ? formatDistance(meters, units) : '—'} />
+            <Kpi label={`Allure moyenne ${paceUnit(units)}`} value={pace > 0 ? formatPace(pace, units) : '—'} />
+            <Kpi label="Intensité" value={['', 'Facile', 'Modérée', 'Dure'][INTENSITY[session.type]]} />
           </div>
-          {meters > 0 && (
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Distance est.</p>
-              <SlotText value={formatDistance(meters, units)} className="text-3xl font-medium tracking-tight tabular-nums" />
-            </div>
+          {session.blocks.length > 0 && (
+            <PanelSection divided>
+              <WorkoutChart blocks={session.blocks} zones={zones} className="h-20" />
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                {[1, 2, 3, 4, 5, 6].map((z) => (
+                  <span key={z} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: zoneColor(z) }} />Z{z} {ZONE_NAMES[z]}
+                  </span>
+                ))}
+              </div>
+            </PanelSection>
           )}
+          {session.blocks.length > 0 && (
+            <ul className="divide-y border-t">
+              {session.blocks.map((b, i) =>
+                b.kind === 'repeat' ? (
+                  <li key={i} className="px-6 py-4">
+                    <p className="flex items-center gap-2 text-sm font-medium">
+                      <span className="flex size-6 items-center justify-center rounded-full border">
+                        <RepeatIcon className="size-3" />
+                      </span>
+                      {b.repeats} × la série
+                    </p>
+                    <ul className="mt-3 ml-3 space-y-3 border-l pl-5">
+                      {b.steps.map((s, j) => (
+                        <StepRow key={j} step={s} zones={zones} units={units} />
+                      ))}
+                    </ul>
+                  </li>
+                ) : (
+                  <li key={i} className="px-6 py-4">
+                    <StepRow step={b} zones={zones} units={units} />
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
+        </Panel>
+
+        <div className="flex flex-col gap-4">
+          <Panel>
+            <PanelHeader title="Montre" subtitle={status === 'app-only' ? 'Le renforcement se suit depuis l’app.' : 'Envoi de la séance sur ta montre COROS'} actions={<SyncBadge status={status} />} />
+          </Panel>
+          {session.type !== 'strength' && <ActivityLinkCard session={session} />}
+          {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
         </div>
-        {session.blocks.length > 0 && <WorkoutChart blocks={session.blocks} zones={zones} className="mt-5" />}
-        <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1">
-          {[1, 2, 3, 4, 5, 6].map((z) => (
-            <span key={z} className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="size-2 rounded-full" style={{ backgroundColor: zoneColor(z) }} />Z{z}
-            </span>
-          ))}
-        </div>
-      </Card>
+      </div>
+    </div>
+  )
+}
 
-      {session.blocks.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-border">
-            {session.blocks.map((b, i) =>
-              b.kind === 'repeat' ? (
-                <li key={i} className="p-4">
-                  <p className="flex items-center gap-2 font-medium">
-                    <RepeatIcon className="size-4 text-accent" /> {b.repeats} ×
-                  </p>
-                  <ul className="mt-2 space-y-2 border-l-2 border-accent/40 pl-3">
-                    {b.steps.map((s, j) => (
-                      <StepRow key={j} step={s} zones={zones} units={units} />
-                    ))}
-                  </ul>
-                </li>
-              ) : (
-                <li key={i} className="p-4">
-                  <StepRow step={b} zones={zones} units={units} />
-                </li>
-              ),
-            )}
-          </ul>
-        </Card>
-      )}
-
-      {session.type !== 'strength' && <ActivityLinkCard session={session} />}
-      {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
-
-      <Card>
-        <div className="flex items-center justify-between">
-          <p className="font-medium">Montre</p>
-          <SyncBadge status={status} />
-        </div>
-        {status === 'app-only' && (
-          <p className="mt-2 text-sm text-muted-foreground">Le renforcement n’est pas pris en charge par COROS : suis-le depuis l’app.</p>
-        )}
-      </Card>
-
-      <Link to={ROUTES.plan} className="block text-center text-sm font-medium text-muted-foreground">
-        Voir la semaine
-      </Link>
+function Kpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="px-6 py-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <SlotText value={value} className="mt-1 text-2xl font-medium tracking-tight tabular-nums" />
     </div>
   )
 }
@@ -136,15 +152,15 @@ function StepRow({ step, zones, units }: { step: Step; zones: Zone[]; units: Uni
         ? `≈ ${formatPace(zone.paceFast, units)}–${formatPace(zone.paceSlow, units)} ${paceUnit(units)} · FC Z${step.zone}`
         : `FC Z${step.zone}`
   return (
-    <div className="flex items-center gap-3">
-      <span className="h-9 w-1 shrink-0 rounded-full" style={{ backgroundColor: zoneColor(step.zone) }} />
-      <div className="flex-1">
-        <p className="text-xs font-medium text-muted-foreground">
+    <div className="flex items-center gap-4">
+      <span className="h-10 w-1 shrink-0 rounded-full" style={{ backgroundColor: zoneColor(step.zone) }} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted-foreground">
           {STEP_LABEL[step.kind]} · Z{step.zone} {ZONE_NAMES[step.zone]}
         </p>
         <p className="font-medium tabular-nums">{target}</p>
       </div>
-      <p className="text-right text-sm font-medium tabular-nums">{pace}</p>
+      <p className="shrink-0 rounded-full border px-3 py-1 text-right text-xs tabular-nums">{pace}</p>
     </div>
   )
 }
