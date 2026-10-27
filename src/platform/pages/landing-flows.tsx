@@ -107,7 +107,7 @@ function WatchChip({ watch, active }: { watch: (typeof WATCHES)[number]; active:
 export function WatchFlow() {
   const { ref, step } = useSequence(4, 1300)
   return (
-    <div ref={ref} className="flex w-full flex-col rounded-xl border bg-card/80 p-4 shadow-sm">
+    <div ref={ref} className="flex w-full flex-col rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-4 flex items-center gap-2 text-muted-foreground text-xs">
         <ZapIcon className="size-3.5" /> Tuesday · Intervals · 9.6 km
       </div>
@@ -168,7 +168,7 @@ export function CoachFlow() {
   // 0 semaine · 1 message du coureur · 2 l'agent réfléchit · 3 réponse · 4 semaine réécrite
   const { ref, step } = useSequence(4, 1200, 3000)
   return (
-    <div ref={ref} className="flex w-full flex-col gap-3 rounded-xl border bg-card/80 p-4 shadow-sm">
+    <div ref={ref} className="flex w-full flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex min-h-36 flex-col gap-2">
         <AnimatePresence>
           {step >= 1 && (

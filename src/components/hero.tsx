@@ -113,18 +113,14 @@ export function HeroSection() {
 		<section>
 			<div className="relative flex flex-col items-center justify-center gap-5 px-4 py-12 md:px-4 md:py-24 lg:py-28">
 				{/* X Faded Borders & Shades */}
-				{/* Photo plein écran : le coureur à droite, fondu vers le fond en bas et sur les bords */}
-				<div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-2 w-screen -translate-x-1/2 overflow-hidden">
-					<picture>
-						<source media="(max-width: 640px)" srcSet="/visuals/hero-sm.webp" />
-						<img
-							alt=""
-							className="fade-in size-full animate-in object-cover object-[78%_center] opacity-70 duration-1000"
-							fetchPriority="high"
-							src="/visuals/hero.webp"
-						/>
-					</picture>
-					<div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_70%_at_50%_45%,var(--background)_0%,transparent_100%)] opacity-80" />
+				{/* Desktop : la photo est calée à droite de l'écran, le coureur hors de la colonne de texte, fondu vers la gauche */}
+				<div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-2 hidden w-screen -translate-x-1/2 overflow-hidden lg:block">
+					<img
+						alt=""
+						className="fade-in absolute top-0 right-0 h-full w-auto max-w-none translate-x-[10%] animate-in opacity-75 duration-1000 [mask-image:linear-gradient(to_right,transparent_0%,black_45%)]"
+						fetchPriority="high"
+						src="/visuals/hero.webp"
+					/>
 					<div className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-background to-transparent" />
 					<div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-background to-transparent" />
 				</div>
@@ -165,7 +161,7 @@ export function HeroSection() {
 
 				<h1
 					className={cn(
-						"font-heading max-w-5xl text-balance text-center font-semibold text-4xl text-foreground tracking-tight md:text-5xl lg:text-6xl",
+						"font-heading max-w-5xl text-balance text-center font-semibold text-[2rem] text-foreground leading-tight tracking-tight sm:text-4xl md:text-5xl lg:text-6xl",
 						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out"
 					)}
 				>
@@ -184,6 +180,13 @@ export function HeroSection() {
 
 				<div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
 					<RunCta href={appHref("/onboarding")} />
+				</div>
+
+				{/* Mobile et tablette : la photo sous le bouton, jamais derrière le texte */}
+				<div aria-hidden="true" className="relative -mx-4 mt-4 h-64 w-screen overflow-hidden sm:h-80 lg:hidden">
+					<img alt="" className="absolute inset-0 size-full object-cover object-[72%_40%] opacity-85" src="/visuals/hero-sm.webp" />
+					<div className="absolute inset-x-0 top-0 h-20 bg-linear-to-b from-background to-transparent" />
+					<div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-background to-transparent" />
 				</div>
 			</div>
 		</section>

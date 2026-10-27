@@ -71,9 +71,9 @@ export function LandingPage() {
           }
         >
           <div className="grid gap-4 px-4 py-4 md:grid-cols-3 md:px-0">
-            <Pillar icon={<WatchIcon />} title="Reads" text="Your watch and your race results, read for you." photo="/visuals/reads.webp" visual={<ReadsVisual />} />
-            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." photo="/visuals/plans.webp" visual={<PlansVisual />} />
-            <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions on your wrist, rewritten from what you ran." photo="/visuals/acts.webp" visual={<ActsVisual />} />
+            <Pillar icon={<WatchIcon />} title="Reads" text="Your watch and your race results, read for you." photo="/visuals/reads.webp" photoPosition="object-[65%_45%]" visual={<ReadsVisual />} />
+            <Pillar icon={<BotIcon />} title="Plans" text="Every week written around your goal and your body." photo="/visuals/plans.webp" photoPosition="object-[50%_20%]" visual={<PlansVisual />} />
+            <Pillar icon={<RefreshCwIcon />} title="Acts" text="Sessions on your wrist, rewritten from what you ran." photo="/visuals/acts.webp" photoPosition="object-[45%_8%]" visual={<ActsVisual />} />
           </div>
         </Section>
 
@@ -128,14 +128,7 @@ export function LandingPage() {
               { icon: <CheckCheckIcon />, label: 'Runs matched to your plan automatically' },
             ]}
             visual={<WatchFlow />}
-            backdrop={
-              <img
-                alt=""
-                loading="lazy"
-                src="/visuals/watch.webp"
-                className="absolute -top-6 -right-10 w-64 rotate-[-8deg] opacity-90 drop-shadow-2xl md:-top-10 md:-right-16 md:w-80"
-              />
-            }
+            media={<img alt="" loading="lazy" src="/visuals/watch.webp" className="mx-auto w-44 rotate-[-8deg] drop-shadow-2xl md:mx-0 md:w-52" />}
           />
         </Section>
 
@@ -157,11 +150,11 @@ export function LandingPage() {
               { icon: <FlagIcon />, label: 'Race-week taper built in' },
             ]}
             visual={<CoachFlow />}
-            backdrop={
-              <>
-                <img alt="" loading="lazy" src="/visuals/coach.webp" className="absolute inset-0 size-full object-cover object-[50%_30%] opacity-45" />
-                <div className="absolute inset-0 bg-linear-to-t from-background via-background/30 to-background/10" />
-              </>
+            media={
+              <div className="relative h-56 overflow-hidden rounded-xl border">
+                <img alt="" loading="lazy" src="/visuals/coach.webp" className="absolute inset-0 size-full object-cover object-[50%_30%]" />
+                <div className="absolute inset-0 bg-linear-to-t from-background/60 to-transparent" />
+              </div>
             }
           />
         </Section>
@@ -231,17 +224,18 @@ function FlowRow({
   points,
   visual,
   reverse,
-  backdrop,
+  media,
 }: {
   text: string
   points: { icon: ReactNode; label: string }[]
   visual: ReactNode
   reverse?: boolean
-  backdrop?: ReactNode
+  media?: ReactNode
 }) {
   return (
     <div className={cn('grid border md:grid-cols-[2fr_3fr]', reverse && 'md:grid-cols-[3fr_2fr]')}>
       <div className={cn('flex flex-col justify-center gap-6 border-b p-6 md:border-b-0 md:p-10', reverse ? 'md:order-2 md:border-l' : 'md:border-r')}>
+        {media && <div aria-hidden="true">{media}</div>}
         <p className="text-lg leading-relaxed">{text}</p>
         <ul className="flex flex-col gap-3 text-sm">
           {points.map((p) => (
@@ -254,11 +248,6 @@ function FlowRow({
       </div>
       <div className="relative flex items-center justify-center overflow-hidden p-6 md:p-10">
         <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
-        {backdrop && (
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            {backdrop}
-          </div>
-        )}
         <div className="relative w-full max-w-md">{visual}</div>
       </div>
     </div>
@@ -266,17 +255,17 @@ function FlowRow({
 }
 
 /** Un pilier = une seule carte : l'aperçu de l'outil en haut, puis l'icône, le titre et la phrase. */
-function Pillar({ icon, title, text, photo, visual }: { icon: ReactNode; title: string; text: string; photo: string; visual: ReactNode }) {
+function Pillar({ icon, title, text, photo, photoPosition, visual }: { icon: ReactNode; title: string; text: string; photo: string; photoPosition: string; visual: ReactNode }) {
   return (
     <div className="group/pillar flex flex-col overflow-hidden rounded-2xl border bg-card/40">
-      <div className="relative flex h-72 items-end justify-center overflow-hidden border-b px-5 pb-5">
+      <div className="relative flex h-80 items-end justify-center overflow-hidden border-b px-5 pb-5">
         <img
           alt=""
           loading="lazy"
           src={photo}
-          className="absolute inset-0 size-full object-cover opacity-60 transition-transform duration-700 ease-out group-hover/pillar:scale-105"
+          className={cn('absolute inset-x-0 top-0 h-3/4 w-full object-cover opacity-70 transition-transform duration-700 ease-out group-hover/pillar:scale-105', photoPosition)}
         />
-        <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent" />
+        <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-card via-card/70 via-45% to-transparent" />
         <div className="relative w-full">{visual}</div>
       </div>
       <div className="flex flex-col gap-1.5 p-5">
