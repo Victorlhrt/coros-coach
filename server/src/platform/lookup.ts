@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { KNOWN_RACES } from './data/races.js'
+import { db } from './db.js'
 import { SHOES } from './data/shoes.js'
 
 /**
@@ -55,7 +56,7 @@ lookupRoutes.get('/utmb/runners', async (c) => {
         ageGroup: r.ageGroup,
         nationality: r.nationality,
         index: r.ip || null,
-        picture: r.picture ? `https://img.utmb.world/image/upload/c_fill,w_96,h_96/${r.picture}` : null,
+        picture: r.picture ? `https://img.utmb.world/image/upload/c_fill,g_face,w_320,h_320/${r.picture}` : null,
       })),
     )
   } catch {
@@ -168,3 +169,23 @@ lookupRoutes.get('/shoes', (c) => c.json(SHOES.map((s) => ({ id: normalize(`${s.
 lookupRoutes.get('/shoe-brands', (c) =>
   c.json([...new Set([...SHOES.map((s) => s.brand), ...EXTRA_BRANDS])].sort((a, b) => a.localeCompare(b, 'fr'))),
 )
+
+// ---------- Statistiques de la communauté ----------
+
+/**
+ * Part des coureurs de Raice.run (onboardings réels, hors aperçus) sous la valeur donnée.
+ * Rien n'est renvoyé tant que l'échantillon est trop petit pour que la statistique ait un sens.
+ */
+const MIN_SAMPLE = 30
+lookupRoutes.get('/stats/weekly-km', async (c) => {
+  const value = Number(c.req.query('value'))
+  if (!Number.isFinite(value) || value < 0) return c.json({ percentile: null, sample: 0 })
+  const [row] = await cached(`stats:weekly-km:${Math.round(value)}`, () =>
+    db<{ below: number; total: number }[]>`
+      select count(*) filter (where (answers->>'weekly_km')::numeric < ${value})::int below, count(*)::int total
+      from onboarding_sessions
+      where not is_preview and jsonb_typeof(answers->'weekly_km') = 'number'`,
+  )
+  if (!row || row.total < MIN_SAMPLE) return c.json({ percentile: null, sample: row?.total ?? 0 })
+  return c.json({ percentile: Math.round((row.below / row.total) * 100), sample: row.total })
+})

@@ -5,6 +5,8 @@ import {
   CompassIcon,
   FlagIcon,
   LayoutListIcon,
+  ChevronDownIcon,
+  CheckIcon,
   MountainIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -30,7 +32,6 @@ import { RadioCards } from '@/components/arc/radio-cards/radio-cards'
 import { Rating } from '@/components/arc/rating/rating'
 import { RulerSlider } from '@/components/arc/ruler-slider/ruler-slider'
 import { SearchField } from '@/components/arc/search-field/search-field'
-import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Switch } from '@/components/arc/switch/switch'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
@@ -53,7 +54,7 @@ export type CompleteAnswers = {
   reason?: string
   wearables?: string[]
   identity?: { firstName: string; lastName: string; email: string }
-  utmb?: { uri: string; name: string } | null
+  utmb?: { uri: string; name: string; index?: number | null } | null
   goal?: { type: string; terrain: 'road' | 'trail'; race: Race | null; date: string | null }
   performances?: Performance[]
   estimate?: { predicted: number | null; target: number | null }
@@ -70,8 +71,11 @@ const STEPS = [
   { id: 'wearables', label: 'Montre' },
   { id: 'identity', label: 'Profil' },
   { id: 'goal', label: 'Objectif' },
+  { id: 'target', label: 'Course' },
   { id: 'estimate', label: 'Estimation' },
-  { id: 'health', label: 'Santé' },
+  { id: 'volume', label: 'Volume' },
+  { id: 'pains', label: 'Douleurs' },
+  { id: 'events', label: 'Récent' },
   { id: 'gear', label: 'Matériel' },
   { id: 'generate', label: 'Plan' },
 ]
@@ -125,25 +129,31 @@ export function CompleteOnboarding({
   const [a, setA] = useState<CompleteAnswers>({ wearables: [], performances: [] })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const step = STEPS[index]
   const patch = (p: Partial<CompleteAnswers>) => setA((cur) => ({ ...cur, ...p }))
+  // « M'entraîner » n'a pas de course à choisir : l'étape Course disparaît du fil.
+  const flow = STEPS.filter((s) => s.id !== 'target' || a.goal?.type !== 'train')
+  const step = flow[Math.min(index, flow.length - 1)]
 
   const valid: Record<string, boolean> = {
     reason: !!a.reason,
     wearables: (a.wearables?.length ?? 0) > 0,
     identity: !!a.identity?.firstName.trim() && !!a.identity.lastName.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a.identity.email.trim()),
-    goal: !!a.goal && (a.goal.type !== 'race' || (!!a.goal.race && !!a.goal.date)),
+    goal: !!a.goal?.type,
+    target: !!a.goal?.race && (a.goal.type !== 'race' || !!a.goal.date),
     estimate: true,
-    health: true,
+    volume: true,
+    pains: true,
+    events: true,
     gear: true,
     generate: true,
   }
 
-  async function next() {
+  /** Enregistre la réponse (avec `extra` pour les réponses rapides, envoyées dès le clic) et passe à la question suivante. */
+  async function next(extra: Partial<CompleteAnswers> = {}) {
     setBusy(true)
     setError('')
     try {
-      const flat = withPlanFields(a)
+      const flat = withPlanFields({ ...a, ...extra })
       await onSave(flat, index + 1)
       setA(flat)
       setIndex(index + 1)
@@ -154,17 +164,40 @@ export function CompleteOnboarding({
     }
   }
 
-  // Défilement vers la dernière bulle à chaque nouvelle question.
-  const endRef = useRef<HTMLDivElement>(null)
+  // Statistique communauté (null tant que l'échantillon est trop petit) : reprise dans les compliments du coach.
+  const weeklyKm = a.health?.weeklyKm
+  const weeklyStat = useQuery({
+    queryKey: ['stats', 'weekly-km', weeklyKm],
+    queryFn: () => api<{ percentile: number | null }>(`/lookup/stats/weekly-km?value=${weeklyKm}`),
+    enabled: weeklyKm !== undefined,
+    staleTime: 600_000,
+  })
+  const ctx = { weeklyPct: weeklyStat.data?.percentile ?? null }
+
+  // Pacer écrit ses bulles une à une, avec un temps de frappe ; la zone de réponse vient ensuite.
+  const lines = coachLines(step.id, a, ctx)
+  const [shown, setShown] = useState(0)
   const [typing, setTyping] = useState(true)
   useEffect(() => {
+    setShown(0)
     setTyping(true)
-    const t = window.setTimeout(() => setTyping(false), 700)
-    return () => window.clearTimeout(t)
-  }, [index])
+    const timers: number[] = []
+    let at = 650
+    lines.forEach((line, i) => {
+      at += Math.min(1300, 450 + line.length * 12)
+      timers.push(window.setTimeout(() => setShown(i + 1), at))
+      if (i < lines.length - 1) timers.push(window.setTimeout(() => setTyping(true), at + 250))
+      at += 250
+    })
+    timers.push(window.setTimeout(() => setTyping(false), at - 250))
+    return () => timers.forEach(window.clearTimeout)
+  }, [index]) // eslint-disable-line react-hooks/exhaustive-deps
+  const ready2 = shown >= lines.length
+
+  const endRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [index, typing])
+  }, [index, shown, typing])
 
   return (
     <div className="flex flex-col gap-6">
@@ -172,17 +205,17 @@ export function CompleteOnboarding({
         <CoachAvatar className="size-11" />
         <div className="flex-1">
           <p className="font-medium">Pacer</p>
-          <p className="text-muted-foreground text-xs">Ton coach · {Math.min(index + 1, STEPS.length)} / {STEPS.length}</p>
+          <p className="text-muted-foreground text-xs">{typing && !ready2 ? 'écrit…' : `Ton coach · ${Math.min(index + 1, flow.length)} / ${flow.length}`}</p>
         </div>
         <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-          <span className="block h-full rounded-full bg-foreground transition-all duration-500" style={{ width: `${((index + 1) / STEPS.length) * 100}%` }} />
+          <span className="block h-full rounded-full bg-foreground transition-all duration-500" style={{ width: `${((index + 1) / flow.length) * 100}%` }} />
         </span>
       </div>
 
-      {/* Échanges passés : la question du coach, puis la réponse résumée */}
-      {STEPS.slice(0, index).map((s) => (
+      {/* Échanges passés : les bulles du coach, puis la réponse résumée */}
+      {flow.slice(0, index).map((s) => (
         <div key={s.id} className="flex flex-col gap-2">
-          {coachLines(s.id, a).map((line, i) => (
+          {coachLines(s.id, a, ctx).map((line, i) => (
             <CoachBubble key={i} first={i === 0}>
               {line}
             </CoachBubble>
@@ -191,24 +224,30 @@ export function CompleteOnboarding({
         </div>
       ))}
 
-      {/* Question en cours */}
+      {/* Question en cours, bulle par bulle */}
       <div className="flex flex-col gap-2">
-        {typing ? (
-          <TypingBubble />
-        ) : (
-          coachLines(step.id, a).map((line, i) => (
-            <CoachBubble key={i} first={i === 0}>
-              {line}
-            </CoachBubble>
-          ))
-        )}
+        {lines.slice(0, shown).map((line, i) => (
+          <CoachBubble key={`${step.id}-${i}`} first={i === 0}>
+            {line}
+          </CoachBubble>
+        ))}
+        {!ready2 && typing && <TypingBubble avatar={shown === 0} />}
       </div>
 
-      {!typing &&
+      {ready2 &&
         (step.id === 'generate' ? (
           <div className="animate-[fade-in_300ms_ease-out] rounded-[26px] border bg-card p-5">
             <GenerateStep answers={a} preview={preview} onDone={() => onComplete(withPlanFields(a))} />
           </div>
+        ) : step.id === 'reason' || step.id === 'goal' ? (
+          <QuickReplies
+            options={step.id === 'reason' ? REASONS : GOALS}
+            disabled={!ready || busy}
+            onPick={(value) =>
+              void next(step.id === 'reason' ? { reason: value } : { goal: { type: value, terrain: 'road', race: null, date: null } })
+            }
+            onBack={index > 0 ? () => setIndex(index - 1) : undefined}
+          />
         ) : (
           <form
             className="flex animate-[fade-in_300ms_ease-out] flex-col gap-6 rounded-[26px] border bg-card p-5"
@@ -217,12 +256,13 @@ export function CompleteOnboarding({
               if (valid[step.id] && ready) void next()
             }}
           >
-            {step.id === 'reason' && <ReasonStep value={a.reason} onChange={(reason) => patch({ reason })} />}
             {step.id === 'wearables' && <WearablesStep value={a.wearables ?? []} onChange={(wearables) => patch({ wearables })} />}
             {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
-            {step.id === 'goal' && <GoalStep answers={a} patch={patch} />}
+            {step.id === 'target' && <TargetStep answers={a} patch={patch} />}
             {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
-            {step.id === 'health' && <HealthStep answers={a} patch={patch} />}
+            {step.id === 'volume' && <VolumeStep answers={a} patch={patch} />}
+            {step.id === 'pains' && <PainsStep answers={a} patch={patch} />}
+            {step.id === 'events' && <EventsStep answers={a} patch={patch} />}
             {step.id === 'gear' && <GearStep answers={a} patch={patch} />}
             {error && (
               <p role="alert" className="text-destructive text-sm">
@@ -244,36 +284,120 @@ export function CompleteOnboarding({
   )
 }
 
+/** Réponses rapides façon chat : un clic envoie la réponse. */
+function QuickReplies({
+  options,
+  onPick,
+  onBack,
+  disabled,
+}: {
+  options: { value: string; label: string; icon?: React.ReactNode }[]
+  onPick: (value: string) => void
+  onBack?: () => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex animate-[fade-in_300ms_ease-out] flex-col items-end gap-3">
+      <div className="flex flex-wrap justify-end gap-2">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(o.value)}
+            className="flex items-center gap-2 rounded-full border bg-card px-4 py-2.5 text-sm transition-colors hover:border-foreground/50 hover:bg-foreground hover:text-background disabled:opacity-50 [&_svg]:size-4"
+          >
+            {o.icon}
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {onBack && (
+        <button type="button" onClick={onBack} className="flex items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
+          <ArrowLeftIcon className="size-3" /> Modifier ma réponse précédente
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ---------- Conversation ----------
 
 /** Ce que dit Pacer à chaque étape (peut dépendre des réponses précédentes). */
-function coachLines(step: string, a: CompleteAnswers): string[] {
+const REASON_PRAISE: Record<string, string> = {
+  race: 'Une course en ligne de mire, c’est le meilleur des moteurs.',
+  progress: 'Envie de progresser : on va bien s’entendre.',
+  structure: 'Bonne idée, c’est la régularité qui fait progresser.',
+  comeback: 'Bravo de t’y remettre, c’est souvent le plus dur.',
+  start: 'Bienvenue dans la course à pied, tu vas adorer.',
+}
+
+function volumePraise(km: number, pct: number | null) {
+  if (pct !== null && pct >= 50) return `${km} km par semaine : tu cours plus que ${pct} % des coureurs de Raice.run. Respect.`
+  if (km >= 60) return `${km} km par semaine, c’est un sacré volume. Chapeau.`
+  if (km >= 30) return `${km} km par semaine, belle régularité.`
+  if (km > 0) return `${km} km par semaine, c’est une bonne base pour construire.`
+  return 'On partira de zéro, tout en douceur. C’est la meilleure façon de commencer.'
+}
+
+/** Répliques de Pacer : un petit mot sur la réponse précédente, puis la question. */
+function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number | null }): string[] {
   const first = a.identity?.firstName.trim()
   const race = a.goal?.race
+  const h = a.health
   switch (step) {
     case 'reason':
-      return ['Salut ! Moi c’est Pacer, ton coach.', 'Avant de construire ton plan : qu’est-ce qui t’amène sur Raice.run ?']
+      return ['Salut ! Moi c’est Pacer, ton coach running.', 'Avant de construire ton plan, dis-moi : qu’est-ce qui t’amène ici ?']
     case 'wearables':
-      return ['Bien noté. Avec quoi cours-tu ?', 'Je récupère ton historique pendant qu’on discute : ton plan partira de tes vraies allures.']
-    case 'identity':
-      return ['Faisons connaissance : ton prénom, ton nom et ton e-mail.', 'Je regarde au passage si tu as des résultats publics, en trail notamment.']
+      return [REASON_PRAISE[a.reason ?? ''] ?? 'Bien reçu.', 'Tu cours avec quelle montre ? Je récupère ton historique pendant qu’on discute.']
+    case 'identity': {
+      const w = a.wearables ?? []
+      const praise = w.includes('none')
+        ? 'Pas de montre ? Aucun souci, on fera aux sensations.'
+        : w.some((x) => x === 'coros' || x === 'garmin')
+          ? 'Top, je pourrai lire tes séances directement depuis ta montre.'
+          : 'Noté, je te préviens dès que ta montre est compatible.'
+      return [praise, 'On fait connaissance ? Ton prénom, ton nom et ton e-mail. Je regarde au passage si tu as des résultats publics.']
+    }
     case 'goal':
-      return [`Merci${first ? ` ${first}` : ''}. Quel est ton objectif ?`]
+      return [
+        a.utmb?.index
+          ? `Enchanté ${first} ! Index UTMB ${a.utmb.index}, joli palmarès.`
+          : a.utmb
+            ? `Enchanté ${first} ! J’ai trouvé ton profil UTMB, je m’en servirai.`
+            : `Enchanté${first ? ` ${first}` : ''} !`,
+        'C’est quoi ton objectif en ce moment ?',
+      ]
+    case 'target':
+      return a.goal?.type === 'distance'
+        ? ['Un nouveau cap, belle idée.', 'Quelle distance tu veux courir ?']
+        : ['Une course, j’adore.', 'Laquelle ? Choisis la distance, trouve-la dans la liste, puis donne-moi la date.']
     case 'estimate':
       return race
-        ? [`J’ai fait le calcul pour ${race.name}.`, 'Ajuste le temps visé si tu veux viser plus vite ou plus prudent.']
-        : ['Donne-moi un chrono récent : je calibre tes allures avec.']
-    case 'health':
-      return ['Comment va ton corps en ce moment ?', 'Ça m’aide à doser la charge des premières semaines.']
+        ? [`${race.name}, excellent choix.`, 'J’ai fait le calcul : voilà ce que je te vois capable de faire. Ajuste si tu veux viser plus vite ou plus prudent.']
+        : ['Régulier, c’est la clé.', 'Donne-moi un chrono récent : je calibre tes allures avec.']
+    case 'volume': {
+      const e = a.estimate
+      const praise = e?.target && e.predicted ? (e.target < e.predicted * 0.97 ? 'Objectif ambitieux, j’aime ton état d’esprit.' : 'Objectif réaliste : c’est comme ça qu’on finit fort.') : 'Merci, c’est noté.'
+      return [praise, 'Combien de kilomètres tu cours par semaine en ce moment ?']
+    }
+    case 'pains':
+      return [volumePraise(h?.weeklyKm ?? 0, ctx.weeklyPct), 'Des douleurs ces dernières semaines ? Touche les zones qui t’ont gêné. Rien du tout ? Envoie directement.']
+    case 'events':
+      return [
+        h?.pains.length ? 'Merci de me le dire, j’en tiendrai compte dans les charges.' : 'Aucune douleur, parfait.',
+        'Et récemment, il s’est passé quelque chose ? Blessure, maladie, pause, période chargée… tout compte.',
+      ]
     case 'gear':
-      return ['Dernière question : tes chaussures.', 'Je suivrai leur usure et je te préviendrai quand une paire arrive en fin de vie.']
+      return [h?.events.length ? 'Merci pour ta franchise, on adaptera la reprise.' : 'Rien à signaler, idéal pour attaquer.', 'Dernière question, promis : tu cours avec quelles chaussures ? Je suivrai leur usure.']
     default:
-      return ['Parfait, j’ai tout ce qu’il me faut. Je construis ton plan.']
+      return [`Merci${first ? ` ${first}` : ''}, tu as été parfait. J’ai tout ce qu’il me faut.`, 'Je construis ton plan, ça prend quelques secondes.']
   }
 }
 
 /** Réponse du coureur, résumée en une phrase dans sa bulle. */
 function summarize(step: string, a: CompleteAnswers): string {
+  const h = a.health
   switch (step) {
     case 'reason':
       return REASONS.find((r) => r.value === a.reason)?.label ?? '—'
@@ -281,22 +405,24 @@ function summarize(step: string, a: CompleteAnswers): string {
       return a.wearables?.includes('none') ? 'Je cours sans montre' : (a.wearables ?? []).map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', ')
     case 'identity': {
       const id = a.identity
-      return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · profil UTMB trouvé' : ''}` : '—'
+      return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · c’est moi sur UTMB' : ''}` : '—'
     }
-    case 'goal': {
+    case 'goal':
+      return GOALS.find((x) => x.value === a.goal?.type)?.label ?? '—'
+    case 'target': {
       const g = a.goal
-      if (!g) return '—'
-      const label = GOALS.find((x) => x.value === g.type)?.label ?? ''
-      const date = g.date ? ` · ${new Date(`${g.date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''
-      return g.race ? `${label} : ${g.race.name}${date}` : label
+      const date = g?.date ? ` · ${new Date(`${g.date}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''
+      return g?.race ? `${g.race.name}${date}` : '—'
     }
     case 'estimate':
       return a.estimate?.target ? `Je vise ${formatDuration(a.estimate.target)}` : 'On verra en route'
-    case 'health': {
-      const h = a.health
-      if (!h) return 'Tout va bien'
-      const pains = h.pains.length ? `gêne : ${h.pains.join(', ').toLowerCase()}` : 'pas de douleur'
-      return `${h.weeklyKm} km par semaine · ${pains}`
+    case 'volume':
+      return `${h?.weeklyKm ?? 20} km par semaine`
+    case 'pains':
+      return h?.pains.length ? `${h.pains.join(', ')}${h.painLevel ? ` · gêne ${['', 'légère', 'gênante', 'modérée', 'forte', 'très forte'][h.painLevel]}` : ''}` : 'Aucune douleur'
+    case 'events': {
+      const ev = (h?.events ?? []).map((e) => EVENTS.find((x) => x.value === e)?.label ?? e)
+      return [ev.length ? ev.join(', ') : 'Rien de particulier', h?.notes.trim()].filter(Boolean).join(' · ')
     }
     case 'gear': {
       const g = a.gear
@@ -320,10 +446,10 @@ function UserBubble({ children }: { children: React.ReactNode }) {
   return <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background text-sm">{children}</p>
 }
 
-function TypingBubble() {
+function TypingBubble({ avatar }: { avatar: boolean }) {
   return (
     <div className="flex items-end gap-2">
-      <CoachAvatar />
+      <span className="w-9 shrink-0">{avatar && <CoachAvatar />}</span>
       <span className="flex gap-1 rounded-2xl rounded-bl-md border bg-card px-4 py-3.5">
         {[0, 1, 2].map((i) => (
           <span key={i} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 120}ms` }} />
@@ -346,14 +472,6 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
 
 
 // ---------- 1. Motivation ----------
-
-function ReasonStep({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
-  return (
-    <>
-      <RadioCards aria-label="Motivation" layout="list" options={REASONS} value={value ?? null} onValueChange={onChange} />
-    </>
-  )
-}
 
 // ---------- 2. Montres ----------
 
@@ -416,7 +534,7 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
   function pick(uri: string) {
     if (uri === 'none') return patch({ utmb: null })
     const r = runners.data?.find((x) => x.uri === uri)
-    patch({ utmb: r ? { uri: r.uri, name: r.name } : null })
+    patch({ utmb: r ? { uri: r.uri, name: r.name, index: r.index } : null })
     // Chargement en arrière-plan des résultats pendant la suite du questionnaire.
     void qc.prefetchQuery({ queryKey: ['utmb', 'runner', uri], queryFn: () => api<UtmbProfile>(`/lookup/utmb/runner/${uri}`), staleTime: Infinity })
   }
@@ -430,37 +548,82 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
       <Input label="E-mail" type="email" autoComplete="email" placeholder="nom@exemple.fr" value={id.email} onChange={(e) => set({ email: e.target.value })} />
 
       {runners.data && runners.data.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <MountainIcon className="size-4 text-muted-foreground" />
-            <span className="font-medium text-sm">C’est toi sur UTMB ?</span>
-          </div>
-          <RadioCards
-            aria-label="Profil UTMB"
-            layout="list"
-            value={answers.utmb?.uri ?? (answers.utmb === null ? 'none' : null)}
-            onValueChange={pick}
-            options={[
-              ...runners.data.slice(0, 4).map((r) => ({
-                value: r.uri,
-                label: r.name,
-                description: `${r.nationality} · ${r.ageGroup}`,
-                meta: (
-                  <span className="flex items-center gap-2">
-                    {r.index ? <Badge size="sm">Index {r.index}</Badge> : null}
-                    <Avatar name={r.name} src={r.picture ?? undefined} size="sm" />
-                  </span>
-                ),
-              })),
-              { value: 'none', label: 'Ce n’est pas moi', description: 'Ou je ne fais pas de trail.' },
-            ]}
-          />
-        </div>
+        <UtmbPicker runners={runners.data.slice(0, 6)} value={answers.utmb?.uri ?? (answers.utmb === null ? 'none' : null)} onPick={pick} />
       )}
       <p className="text-muted-foreground text-xs">
         Course sur route : l’index running FFA n’est pas encore relié. Tu pourras ajouter un chrono récent à l’étape d’estimation.
       </p>
     </>
+  )
+}
+
+/** Profils UTMB : carte carrée avec photo quand il y en a une, carte en dégradé sinon. */
+function UtmbPicker({ runners, value, onPick }: { runners: UtmbRunner[]; value: string | null; onPick: (uri: string) => void }) {
+  const withPhoto = runners.filter((r) => r.picture)
+  const without = runners.filter((r) => !r.picture)
+  const ring = (on: boolean) => (on ? 'border-foreground ring-2 ring-foreground/30' : 'border-border hover:border-foreground/50')
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <MountainIcon className="size-4 text-muted-foreground" />
+        <span className="font-medium text-sm">C’est toi sur UTMB ?</span>
+      </div>
+      {withPhoto.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {withPhoto.map((r) => (
+            <button
+              key={r.uri}
+              type="button"
+              aria-pressed={value === r.uri}
+              onClick={() => onPick(r.uri)}
+              className={`relative aspect-square overflow-hidden rounded-[18px] border text-left transition-all ${ring(value === r.uri)}`}
+            >
+              <img src={r.picture!} alt="" className="absolute inset-0 size-full object-cover" />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+              <span className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-3 text-white">
+                <span className="font-medium text-sm leading-tight">{r.name}</span>
+                <span className="text-[11px] text-white/70">
+                  {r.nationality} · {r.ageGroup}
+                  {r.index ? ` · Index ${r.index}` : ''}
+                </span>
+              </span>
+              {value === r.uri && (
+                <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-white text-black">
+                  <CheckIcon className="size-3.5" />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+      {without.map((r) => (
+        <button
+          key={r.uri}
+          type="button"
+          aria-pressed={value === r.uri}
+          onClick={() => onPick(r.uri)}
+          className={`flex items-center gap-3 rounded-[18px] border bg-gradient-to-br from-foreground/[0.09] via-foreground/[0.03] to-transparent p-4 text-left transition-all ${ring(value === r.uri)}`}
+        >
+          <Avatar name={r.name} size="sm" />
+          <span className="flex flex-1 flex-col">
+            <span className="font-medium text-sm">{r.name}</span>
+            <span className="text-muted-foreground text-xs">
+              {r.nationality} · {r.ageGroup}
+            </span>
+          </span>
+          {r.index ? <Badge size="sm">Index {r.index}</Badge> : null}
+          {value === r.uri && <CheckIcon className="size-4" />}
+        </button>
+      ))}
+      <button
+        type="button"
+        aria-pressed={value === 'none'}
+        onClick={() => onPick('none')}
+        className={`rounded-[18px] border border-dashed p-3 text-muted-foreground text-sm transition-all ${value === 'none' ? 'border-foreground text-foreground' : 'hover:text-foreground'}`}
+      >
+        Ce n’est pas moi
+      </button>
+    </div>
   )
 }
 
@@ -488,104 +651,115 @@ const DIST_FILTERS = {
   ],
 }
 
-function GoalStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
-  const goal = answers.goal ?? { type: '', terrain: 'road' as const, race: null, date: null }
+const RACES_PAGE = 4
+
+function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
+  const goal = answers.goal ?? { type: 'race', terrain: 'road' as const, race: null, date: null }
   const set = (p: Partial<typeof goal>) => patch({ goal: { ...goal, ...p } })
   const [q, setQ] = useState('')
   const [dist, setDist] = useState('')
   const query = useDebounced(q, 300)
+  // Nombre de courses affichées, remis à zéro quand le filtre ou la recherche change.
+  const [page, setPage] = useState({ key: '', n: RACES_PAGE })
+  const pageKey = `${dist}|${query}`
+  const shown = page.key === pageKey ? page.n : RACES_PAGE
+  // Le trail est fermé pour l'instant : recherche sur route uniquement.
   const races = useQuery({
-    queryKey: ['races', goal.terrain, dist, query],
-    queryFn: () => api<Race[]>(`/lookup/races?type=${goal.terrain}&dist=${dist}&q=${encodeURIComponent(query)}`),
+    queryKey: ['races', 'road', dist, query],
+    queryFn: () => api<Race[]>(`/lookup/races?type=road&dist=${dist}&q=${encodeURIComponent(query)}`),
     enabled: goal.type === 'race',
     staleTime: 600_000,
   })
   const [custom, setCustom] = useState(false)
   const [customRace, setCustomRace] = useState({ name: '', km: 10, elevation: 0 })
 
+  if (goal.type === 'distance')
+    return (
+      <ChipGroup
+        label="Distance"
+        multiple={false}
+        options={MANUAL_DISTANCES}
+        value={goal.race ? [String(goal.race.km)] : []}
+        onValueChange={([v]) => set({ race: v ? { id: `distance:${v}`, name: MANUAL_DISTANCES.find((d) => d.value === v)!.label, detail: 'Distance visée', km: Number(v), elevation: 0, date: null, source: 'saisie' } : null })}
+      />
+    )
+
+  const list = races.data ?? []
+  const more = list.length > shown
   return (
-    <>
-      <RadioCards aria-label="Objectif" layout="list" options={GOALS} value={goal.type || null} onValueChange={(type) => set({ type, race: null })} />
-
-      {goal.type === 'distance' && (
-        <ChipGroup
-          label="Distance"
-          multiple={false}
-          options={MANUAL_DISTANCES}
-          value={goal.race ? [String(goal.race.km)] : []}
-          onValueChange={([v]) => set({ race: v ? { id: `distance:${v}`, name: MANUAL_DISTANCES.find((d) => d.value === v)!.label, detail: 'Distance visée', km: Number(v), elevation: 0, date: null, source: 'saisie' } : null })}
-        />
-      )}
-
-      {goal.type === 'race' && (
-        <div className="flex flex-col gap-4">
-          <SegmentedControl
-            label="Terrain"
-            options={[
-              { value: 'road', label: 'Route' },
-              { value: 'trail', label: 'Trail' },
-            ]}
-            value={goal.terrain}
-            onValueChange={(v) => {
-              setDist('')
-              set({ terrain: v as 'road' | 'trail', race: null })
-            }}
-          />
-          {!custom ? (
-            <>
-              <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS[goal.terrain]} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
-              <SearchField label="Rechercher une course" placeholder={goal.terrain === 'trail' ? 'Ex. Grand Raid, Velay…' : 'Ex. Marathon de Paris'} value={q} onValueChange={setQ} />
-              {races.data && races.data.length > 0 ? (
+    <div className="flex flex-col gap-4">
+      {!custom ? (
+        <>
+          <div className="flex flex-col gap-2">
+            <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS.road} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
+            <span className="flex w-fit items-center gap-1.5 rounded-full border border-dashed px-3 py-1 text-muted-foreground text-xs">
+              <MountainIcon className="size-3" /> Trail · bientôt
+            </span>
+          </div>
+          <SearchField label="Rechercher une course" placeholder="Ex. Marathon de Paris" value={q} onValueChange={setQ} />
+          {list.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <div className="relative">
                 <RadioCards
                   aria-label="Course"
                   layout="list"
                   value={goal.race?.id ?? null}
-                  onValueChange={(id) => set({ race: races.data!.find((r) => r.id === id) ?? null })}
-                  options={races.data.slice(0, 10).map((r) => ({
+                  onValueChange={(id) => set({ race: list.find((r) => r.id === id) ?? null })}
+                  options={list.slice(0, shown).map((r) => ({
                     value: r.id,
                     label: r.name,
                     description: r.detail,
                     meta: r.date ? <span className="text-muted-foreground text-xs">{r.date}</span> : undefined,
                   }))}
                 />
-              ) : (
-                races.isFetched && <EmptyState title="Aucune course trouvée" description="Essaie un autre nom, ou saisis ta course." />
-              )}
-              <Button type="button" variant="secondary" onClick={() => setCustom(true)}>
-                <PlusIcon className="size-4" /> Ma course n’est pas dans la liste
-              </Button>
-            </>
-          ) : (
-            <div className="flex flex-col gap-4 rounded-[20px] border bg-background p-4">
-              <Input label="Nom de la course" value={customRace.name} onChange={(e) => setCustomRace({ ...customRace, name: e.target.value })} />
-              <div className="grid grid-cols-2 gap-4">
-                <NumberField label="Distance" value={customRace.km} min={1} max={250} suffix=" km" locale="fr-FR" onValueChange={(km) => setCustomRace({ ...customRace, km })} />
-                <NumberField label="Dénivelé +" value={customRace.elevation} min={0} max={12000} step={50} suffix=" m" locale="fr-FR" onValueChange={(elevation) => setCustomRace({ ...customRace, elevation })} />
+                {more && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card to-transparent" />}
               </div>
-              <Button
-                type="button"
-                disabled={!customRace.name.trim()}
-                onClick={() => {
-                  set({ race: { id: 'saisie', name: customRace.name.trim(), detail: `${customRace.km} km · ${customRace.elevation} m D+`, km: customRace.km, elevation: customRace.elevation, date: null, source: 'saisie' } })
-                  setCustom(false)
-                }}
-              >
-                Utiliser cette course
-              </Button>
+              {more && (
+                <Button type="button" variant="ghost" size="sm" className="self-center" onClick={() => setPage({ key: pageKey, n: shown + 6 })}>
+                  Voir plus ({list.length - shown}) <ChevronDownIcon className="size-4" />
+                </Button>
+              )}
             </div>
+          ) : (
+            races.isFetched && <EmptyState title="Aucune course trouvée" description="Essaie un autre nom, ou saisis ta course." />
           )}
-          {goal.race && <p className="text-sm">Course choisie : <strong className="font-medium">{goal.race.name}</strong> · {goal.race.detail}</p>}
-          <DatePicker
-            label="Date de la course"
-            locale="fr-FR"
-            placeholder="Choisir la date"
-            minDate={new Date()}
-            value={goal.date ? new Date(`${goal.date}T12:00:00`) : undefined}
-            onChange={(d) => set({ date: d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null })}
-          />
+          <Button type="button" variant="secondary" onClick={() => setCustom(true)}>
+            <PlusIcon className="size-4" /> Ma course n’est pas dans la liste
+          </Button>
+        </>
+      ) : (
+        <div className="flex flex-col gap-4 rounded-[20px] border bg-background p-4">
+          <Input label="Nom de la course" value={customRace.name} onChange={(e) => setCustomRace({ ...customRace, name: e.target.value })} />
+          <div className="grid grid-cols-2 gap-4">
+            <NumberField label="Distance" value={customRace.km} min={1} max={250} suffix=" km" locale="fr-FR" onValueChange={(km) => setCustomRace({ ...customRace, km })} />
+            <NumberField label="Dénivelé +" value={customRace.elevation} min={0} max={12000} step={50} suffix=" m" locale="fr-FR" onValueChange={(elevation) => setCustomRace({ ...customRace, elevation })} />
+          </div>
+          <Button
+            type="button"
+            disabled={!customRace.name.trim()}
+            onClick={() => {
+              set({ race: { id: 'saisie', name: customRace.name.trim(), detail: `${customRace.km} km · ${customRace.elevation} m D+`, km: customRace.km, elevation: customRace.elevation, date: null, source: 'saisie' } })
+              setCustom(false)
+            }}
+          >
+            Utiliser cette course
+          </Button>
         </div>
       )}
-    </>
+      {goal.race && (
+        <p className="text-sm">
+          Course choisie : <strong className="font-medium">{goal.race.name}</strong> · {goal.race.detail}
+        </p>
+      )}
+      <DatePicker
+        label="Date de la course"
+        locale="fr-FR"
+        placeholder="Choisir la date"
+        minDate={new Date()}
+        value={goal.date ? new Date(`${goal.date}T12:00:00`) : undefined}
+        onChange={(d) => set({ date: d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null })}
+      />
+    </div>
   )
 }
 
@@ -695,32 +869,51 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
 // ---------- 6. Santé ----------
 
-function HealthStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
+type StepProps = { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }
+
+function useHealth({ answers, patch }: StepProps) {
   const h = answers.health ?? { pains: [], painLevel: 0, events: [], weeklyKm: 20, notes: '' }
-  const set = (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })
+  return [h, (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })] as const
+}
+
+function VolumeStep(props: StepProps) {
+  const [h, set] = useHealth(props)
+  // Enregistre la valeur par défaut, pour qu'un envoi direct garde bien 20 km.
+  useEffect(() => {
+    if (!props.answers.health) set({})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return <NumberField label="Kilomètres par semaine en ce moment" value={h.weeklyKm} min={0} max={200} suffix=" km" locale="fr-FR" onValueChange={(weeklyKm) => set({ weeklyKm })} />
+}
+
+function PainsStep(props: StepProps) {
+  const [h, set] = useHealth(props)
   return (
     <>
-      <NumberField label="Kilomètres par semaine en ce moment" value={h.weeklyKm} min={0} max={200} suffix=" km" locale="fr-FR" onValueChange={(weeklyKm) => set({ weeklyKm })} />
-      <div className="flex flex-col gap-1">
-        <h2 className="font-medium">Des problèmes récents ?</h2>
-        <p className="text-muted-foreground text-sm">Touche les zones qui t’ont gêné ces dernières semaines.</p>
-      </div>
-      <ChipGroup label="Des douleurs ces dernières semaines ?" options={PAINS} value={h.pains} onValueChange={(pains) => set({ pains, painLevel: pains.length ? h.painLevel : 0 })} />
+      <ChipGroup label="Zones douloureuses" options={PAINS} value={h.pains} onValueChange={(pains) => set({ pains, painLevel: pains.length ? h.painLevel : 0 })} />
       {h.pains.length > 0 && (
         <Rating label="Intensité de la gêne" max={5} value={h.painLevel} onChange={(painLevel) => set({ painLevel })} valueLabels={['Légère', 'Gênante', 'Modérée', 'Forte', 'Très forte']} emptyLabel="Non renseignée" />
       )}
-      <div className="flex flex-col gap-1">
-        <h2 className="font-medium">Quelque chose de récent ?</h2>
-        <p className="text-muted-foreground text-sm">Blessure, maladie, pause, période chargée…</p>
-      </div>
-      <ChipGroup label="Quelque chose de récent ?" options={EVENTS} value={h.events} onValueChange={(events) => set({ events })} />
-      <Textarea label="À nous dire (facultatif)" placeholder="Ex. entorse en mars, je reprends doucement" rows={3} value={h.notes} onChange={(e) => set({ notes: e.target.value })} />
-      {(h.painLevel >= 4 || h.events.includes('surgery')) && (
-        <p className="rounded-[20px] border border-[var(--warning)] p-4 text-sm">
-          Avec une douleur forte ou une opération récente, demande l’avis d’un médecin avant de reprendre l’entraînement. Ton plan démarrera de façon très progressive.
-        </p>
-      )}
+      {h.painLevel >= 4 && <DoctorNote />}
     </>
+  )
+}
+
+function EventsStep(props: StepProps) {
+  const [h, set] = useHealth(props)
+  return (
+    <>
+      <ChipGroup label="Ces derniers mois" options={EVENTS} value={h.events} onValueChange={(events) => set({ events })} />
+      <Textarea label="À nous dire (facultatif)" placeholder="Ex. entorse en mars, je reprends doucement" rows={3} value={h.notes} onChange={(e) => set({ notes: e.target.value })} />
+      {h.events.includes('surgery') && <DoctorNote />}
+    </>
+  )
+}
+
+function DoctorNote() {
+  return (
+    <p className="rounded-[20px] border border-[var(--warning)] p-4 text-sm">
+      Avec une douleur forte ou une opération récente, demande l’avis d’un médecin avant de reprendre l’entraînement. Ton plan démarrera de façon très progressive.
+    </p>
   )
 }
 
