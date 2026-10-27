@@ -54,7 +54,7 @@ export function SessionPage() {
 
       <div className="px-1 lg:col-span-2">
         <TypeBadge type={session.type} />
-        <h1 className="mt-2 text-3xl leading-tight font-medium tracking-tight">{session.title}</h1>
+        <h1 className="mt-2 font-heading text-2xl leading-tight font-medium tracking-tight">{session.title}</h1>
         <p className="mt-2 text-muted-foreground">{session.description}</p>
       </div>
 

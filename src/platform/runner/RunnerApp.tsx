@@ -7,7 +7,6 @@ import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
-import { MetricCard } from '@/components/arc/metric-card/metric-card'
 import { Button as LinkButton } from '@/components/shadcn/button'
 import { UsageMeter } from '@/components/arc/usage-meter/usage-meter'
 import { CustomSidebarTrigger } from '@/components/custom-sidebar-trigger'
@@ -46,12 +45,12 @@ import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
 import { AdjustPage } from '@/pages/AdjustPage'
 import { DebugPage } from '@/pages/DebugPage'
-import { HistoryPage } from '@/pages/HistoryPage'
 import { OnboardingPage as GoalPage } from '@/pages/OnboardingPage'
 import { PlanPage as CoachPlanPage } from '@/pages/PlanPage'
 import { SessionPage } from '@/pages/SessionPage'
 import { SettingsPage as CoachSettingsPage } from '@/pages/SettingsPage'
-import { TodayPage } from '@/pages/TodayPage'
+import { AnalyticsDashboards, HomeTab, PlanTab } from './CoachTabs'
+import { Panel as RPanel, PanelHeader as RPanelHeader } from '@/components/raice/panel'
 
 /**
  * Espace coureur (app.raice.run/compte) : barre latérale avec Plan, Analytics, Coach et Equipment,
@@ -170,8 +169,8 @@ function CoachRoutes() {
   return (
     <Routes>
       <Route index element={<Navigate to="home" replace />} />
-      <Route path="home" element={hasPlan ? <TodayPage /> : <OnboardingPlanPage />} />
-      <Route path="plan" element={<CoachPlanPage />} />
+      <Route path="home" element={hasPlan ? <HomeTab /> : <OnboardingPlanPage />} />
+      <Route path="plan" element={hasPlan ? <PlanTab /> : <CoachPlanPage />} />
       <Route path="analytics" element={<AnalyticsTab />} />
       <Route path="coach" element={hasPlan ? <AdjustPage /> : <CoachPlaceholder />} />
       <Route path="equipment" element={<EquipmentPage />} />
@@ -189,8 +188,8 @@ function AnalyticsTab() {
   const { data } = useOverview()
   return (
     <div className="flex w-full flex-col gap-8">
+      <AnalyticsDashboards />
       {data?.answers && <OnboardingAnalytics />}
-      <HistoryPage />
     </div>
   )
 }
@@ -286,7 +285,7 @@ function PageTitle({ title, children, action }: { title: string; children?: Reac
 
 function Panel({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={cn('flex flex-col gap-4 rounded-[22px] border bg-card p-5', className)}>
+    <section className={cn('flex flex-col gap-4 rounded-[24px] border bg-card p-6', className)}>
       {title && <h2 className="font-medium text-sm">{title}</h2>}
       {children}
     </section>
@@ -380,39 +379,45 @@ function OnboardingPlanPage() {
 
 // ---------- Analytics ----------
 
+/** Historique hors COROS : résumé Strava et meilleurs chronos déclarés à l'onboarding (masqué s'il n'y a rien). */
 function OnboardingAnalytics() {
   const { data } = useOverview()
   const a = data?.answers
-  if (!a) return null
-  const st = a.strava
-  const perfs = [...(st?.performances ?? []), ...(a.performances ?? [])]
+  const st = a?.strava
+  const perfs = [...(st?.performances ?? []), ...(a?.performances ?? [])]
+  if (!st && !perfs.length) return null
   return (
-    <>
-      <PageTitle title="Analytics">{st ? `Depuis ton historique Strava (${st.runs} sorties).` : 'D’après tes réponses. Connecte ta montre pour des données en continu.'}</PageTitle>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Volume hebdo" value={a.health?.weeklyKm ?? a.weekly_km ?? 0} suffix=" km" context={st ? 'Moyenne des 12 dernières semaines' : 'Déclaré à l’onboarding'} />
-        {st && <MetricCard label="Sorties (12 sem.)" value={st.recent.runs} context={`${st.recent.km} km au total`} />}
-        {st && <MetricCard label="Plus longue sortie" value={st.recent.longestKm} suffix=" km" context="12 dernières semaines" />}
-        {st && <MetricCard label="Sorties enregistrées" value={st.runs} context={st.since ? `Depuis ${new Date(st.since).getFullYear()}` : 'Historique Strava'} />}
-      </div>
-      <Panel title="Meilleurs chronos" className="mt-4">
-        {perfs.length ? (
-          <ul className="divide-y">
-            {perfs.map((p, i) => (
-              <li key={i} className="flex items-center justify-between py-2.5 text-sm">
-                <span>{p.label}</span>
-                <span className="flex items-center gap-3">
-                  <span className="text-muted-foreground text-xs">{p.date ? formatDate(p.date) : ''}</span>
-                  <span className="font-medium tabular-nums">{formatDuration(p.seconds)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground text-sm">Aucun chrono pour l’instant. Importe ton historique Strava ou ajoute un chrono récent.</p>
-        )}
-      </Panel>
-    </>
+    <RPanel>
+      <RPanelHeader title="Historique importé" subtitle={st ? `Depuis ton export Strava · ${st.runs} sorties` : 'Chronos déclarés à l’onboarding'} />
+      {st && (
+        <div className="grid grid-cols-2 divide-x border-t sm:grid-cols-4">
+          {[
+            ['Sorties (12 sem.)', String(st.recent.runs)],
+            ['Volume hebdo', `${st.recent.weeklyKm} km`],
+            ['Plus longue sortie', `${st.recent.longestKm} km`],
+            ['Depuis', st.since ? String(new Date(st.since).getFullYear()) : '—'],
+          ].map(([k, v]) => (
+            <div key={k} className="px-6 py-4">
+              <p className="text-muted-foreground text-xs">{k}</p>
+              <p className="mt-1 font-medium text-2xl tabular-nums tracking-tight">{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {perfs.length > 0 && (
+        <ul className="divide-y border-t">
+          {perfs.map((p, i) => (
+            <li key={i} className="flex items-center justify-between px-6 py-3 text-sm">
+              <span>{p.label}</span>
+              <span className="flex items-center gap-4">
+                <span className="text-muted-foreground text-xs">{p.date ? formatDate(p.date) : ''}</span>
+                <span className="font-medium tabular-nums">{formatDuration(p.seconds)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </RPanel>
   )
 }
 

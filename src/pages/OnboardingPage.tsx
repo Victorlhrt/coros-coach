@@ -132,7 +132,7 @@ export function OnboardingPage() {
         <Link to={ROUTES.today} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="text-3xl font-medium tracking-tight">Mon objectif</h1>
+        <h1 className="font-heading text-2xl font-medium tracking-tight">Mon objectif</h1>
       </header>
 
       <div className="flex flex-col gap-4">

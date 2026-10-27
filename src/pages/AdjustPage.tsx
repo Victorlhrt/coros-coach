@@ -73,7 +73,7 @@ export function AdjustPage() {
         <Link to={ROUTES.plan} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="text-3xl font-medium tracking-tight">Bilan de la semaine</h1>
+        <h1 className="font-heading text-2xl font-medium tracking-tight">Bilan de la semaine</h1>
       </header>
 
       {!result && !analyse.isPending && (
