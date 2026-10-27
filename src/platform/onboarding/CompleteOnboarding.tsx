@@ -49,26 +49,79 @@ import { distanceCategory, formatDuration, formatPace, parseDuration, predict, t
  * estimation de temps, santé, chaussures, puis écran de génération. Tout est construit avec les composants Arc UI.
  */
 
-type Race = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb' | 'saisie' }
-type UtmbRunner = { uri: string; name: string; ageGroup: string; nationality: string; index: number | null; picture: string | null }
-type UtmbProfile = { uri: string; name: string; indexes: { piCategory: string; index: number }[]; results: { date: string; race: string; km: number; elevation: number; time: string | null }[] }
+type Race = {
+  id: string
+  name: string
+  detail: string
+  km: number
+  elevation: number
+  date: string | null
+  source: 'raice' | 'utmb' | 'saisie'
+}
+type UtmbRunner = {
+  uri: string
+  name: string
+  ageGroup: string
+  nationality: string
+  index: number | null
+  picture: string | null
+}
+type UtmbProfile = {
+  uri: string
+  name: string
+  indexes: { piCategory: string; index: number }[]
+  results: {
+    date: string
+    race: string
+    km: number
+    elevation: number
+    time: string | null
+  }[]
+}
 type Shoe = { id: string; brand: string; model: string; use: string }
+
+type StepProps = {
+  answers: CompleteAnswers
+  patch: (p: Partial<CompleteAnswers>) => void
+}
 
 export type CompleteAnswers = {
   reason?: string
   wearables?: string[]
   identity?: { firstName: string; lastName: string; email: string }
   utmb?: { uri: string; name: string; index?: number | null } | null
-  goal?: { type: string; terrain: 'road' | 'trail'; race: Race | null; date: string | null }
+  goal?: {
+    type: string
+    terrain: 'road' | 'trail'
+    race: Race | null
+    date: string | null
+  }
   performances?: Performance[]
   estimate?: { predicted: number | null; target: number | null }
-  health?: { pains: string[]; painLevel: number; events: string[]; weeklyKm: number; notes: string }
-  gear?: { brand: string | null; model: string; shoeKm: number; rotation: boolean }
+  health?: {
+    pains: string[]
+    painLevel: number
+    events: string[]
+    weeklyKm: number
+    notes: string
+  }
+  gear?: {
+    brand: string | null
+    model: string
+    shoeKm: number
+    rotation: boolean
+  }
   // Champs à plat repris par la demande de plan côté serveur.
   distance?: string
   race_date?: string | null
   weekly_km?: number
   strava?: StravaSummary | null
+  about?: { sex: string | null; birthYear: number | null }
+  experience?: string
+  schedule?: { days: string[]; longDay: string | null }
+  session_max?: string
+  days?: string[]
+  level?: string
   strava_need?: string
 }
 
@@ -76,34 +129,94 @@ const STEPS = [
   { id: 'reason', label: 'Motivation' },
   { id: 'wearables', label: 'Montre' },
   { id: 'identity', label: 'Profil' },
+  { id: 'about', label: 'À propos' },
+  { id: 'experience', label: 'Expérience' },
   { id: 'goal', label: 'Objectif' },
   { id: 'target', label: 'Course' },
   { id: 'estimate', label: 'Estimation' },
   { id: 'volume', label: 'Volume' },
   { id: 'pains', label: 'Douleurs' },
   { id: 'events', label: 'Récent' },
+  { id: 'days', label: 'Disponibilités' },
+  { id: 'duration', label: 'Durée' },
   { id: 'gear', label: 'Matériel' },
   { id: 'generate', label: 'Plan' },
 ]
 
 const REASONS = [
-  { value: 'race', label: 'Préparer une course', description: 'J’ai une date et un objectif en tête.', icon: <FlagIcon /> },
-  { value: 'progress', label: 'Progresser', description: 'Courir plus vite ou plus longtemps.', icon: <TrendingUpIcon /> },
-  { value: 'structure', label: 'Structurer mes sorties', description: 'Arrêter de courir au hasard.', icon: <LayoutListIcon /> },
-  { value: 'comeback', label: 'Reprendre', description: 'Après une pause ou une blessure.', icon: <RotateCcwIcon /> },
-  { value: 'start', label: 'Commencer la course', description: 'Je débute.', icon: <SproutIcon /> },
+  {
+    value: 'race',
+    label: 'Préparer une course',
+    description: 'J’ai une date et un objectif en tête.',
+    icon: <FlagIcon />,
+  },
+  {
+    value: 'progress',
+    label: 'Progresser',
+    description: 'Courir plus vite ou plus longtemps.',
+    icon: <TrendingUpIcon />,
+  },
+  {
+    value: 'structure',
+    label: 'Structurer mes sorties',
+    description: 'Arrêter de courir au hasard.',
+    icon: <LayoutListIcon />,
+  },
+  {
+    value: 'comeback',
+    label: 'Reprendre',
+    description: 'Après une pause ou une blessure.',
+    icon: <RotateCcwIcon />,
+  },
+  {
+    value: 'start',
+    label: 'Commencer la course',
+    description: 'Je débute.',
+    icon: <SproutIcon />,
+  },
 ]
 
 /** Logos des montres (`invert` pour les marques noires sur fond sombre). Sans logo : icône générique. */
 const WEARABLES = [
-  { id: 'coros', name: 'COROS', logo: '/partners/coros.png', invert: false, available: true },
-  { id: 'garmin', name: 'Garmin', logo: '/partners/garmin.png', invert: true, available: true },
-  { id: 'apple', name: 'Apple Watch', logo: '/partners/apple.png', invert: true, available: false },
-  { id: 'suunto', name: 'Suunto', logo: '/partners/suunto-mark.svg', available: false },
-  { id: 'polar', name: 'Polar', logo: '/partners/polar-mark.svg', available: false },
+  {
+    id: 'coros',
+    name: 'COROS',
+    logo: '/partners/coros.png',
+    invert: false,
+    available: true,
+  },
+  {
+    id: 'garmin',
+    name: 'Garmin',
+    logo: '/partners/garmin.png',
+    invert: true,
+    available: true,
+  },
+  {
+    id: 'apple',
+    name: 'Apple Watch',
+    logo: '/partners/apple.png',
+    invert: true,
+    available: false,
+  },
+  {
+    id: 'suunto',
+    name: 'Suunto',
+    logo: '/partners/suunto-mark.svg',
+    available: false,
+  },
+  {
+    id: 'polar',
+    name: 'Polar',
+    logo: '/partners/polar-mark.svg',
+    available: false,
+  },
 ]
 
-const PAINS = ['Genou', 'Tendon d’Achille', 'Mollet', 'Périostite', 'Ischios', 'Hanche', 'Dos', 'Voûte plantaire', 'Cheville'].map((p) => ({ value: p, label: p }))
+const PAINS = ['Genou', 'Tendon d’Achille', 'Mollet', 'Périostite', 'Ischios', 'Hanche', 'Dos', 'Voûte plantaire', 'Cheville'].map((p) => ({
+  value: p,
+  label: p,
+}))
 const EVENTS = [
   { value: 'injury', label: 'Blessure récente' },
   { value: 'illness', label: 'Maladie' },
@@ -111,6 +224,55 @@ const EVENTS = [
   { value: 'pregnancy', label: 'Grossesse ou post-partum' },
   { value: 'surgery', label: 'Opération' },
   { value: 'stress', label: 'Période chargée (travail, sommeil)' },
+]
+const SEXES = [
+  { value: 'f', label: 'Femme' },
+  { value: 'm', label: 'Homme' },
+  { value: 'x', label: 'Je préfère ne pas dire' },
+]
+const EXPERIENCES = [
+  {
+    value: 'lt1',
+    label: 'Moins d’un an',
+    icon: <SproutIcon />,
+    level: 'debutant',
+  },
+  {
+    value: '1to3',
+    label: '1 à 3 ans',
+    icon: <TrendingUpIcon />,
+    level: 'intermediaire',
+  },
+  {
+    value: 'gt3',
+    label: 'Plus de 3 ans',
+    icon: <FlagIcon />,
+    level: 'confirme',
+  },
+]
+const WEEKDAYS = [
+  { value: 'mon', label: 'Lun' },
+  { value: 'tue', label: 'Mar' },
+  { value: 'wed', label: 'Mer' },
+  { value: 'thu', label: 'Jeu' },
+  { value: 'fri', label: 'Ven' },
+  { value: 'sat', label: 'Sam' },
+  { value: 'sun', label: 'Dim' },
+]
+const DAY_NAMES: Record<string, string> = {
+  mon: 'lundi',
+  tue: 'mardi',
+  wed: 'mercredi',
+  thu: 'jeudi',
+  fri: 'vendredi',
+  sat: 'samedi',
+  sun: 'dimanche',
+}
+const DURATIONS = [
+  { value: '30', label: '30 min' },
+  { value: '45', label: '45 min' },
+  { value: '60', label: '1 h' },
+  { value: '90', label: '1 h 30 et plus' },
 ]
 const MANUAL_DISTANCES = [
   { value: '5', label: '5 km' },
@@ -132,7 +294,10 @@ export function CompleteOnboarding({
   onComplete: (answers: CompleteAnswers) => Promise<void>
 }) {
   const [index, setIndex] = useState(0)
-  const [a, setA] = useState<CompleteAnswers>({ wearables: [], performances: [] })
+  const [a, setA] = useState<CompleteAnswers>({
+    wearables: [],
+    performances: [],
+  })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const patch = (p: Partial<CompleteAnswers>) => setA((cur) => ({ ...cur, ...p }))
@@ -144,6 +309,10 @@ export function CompleteOnboarding({
     reason: !!a.reason,
     wearables: (a.wearables?.length ?? 0) > 0 || !!a.strava,
     identity: !!a.identity?.firstName.trim() && !!a.identity.lastName.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a.identity.email.trim()),
+    about: true,
+    experience: !!a.experience,
+    days: (a.schedule?.days.length ?? 0) > 0,
+    duration: !!a.session_max,
     goal: !!a.goal?.type,
     target: !!a.goal?.race && (a.goal.type !== 'race' || !!a.goal.date),
     estimate: true,
@@ -245,13 +414,11 @@ export function CompleteOnboarding({
           <div className="animate-[fade-in_300ms_ease-out] rounded-[26px] border bg-card p-5">
             <GenerateStep answers={a} preview={preview} onDone={() => onComplete(withPlanFields(a))} />
           </div>
-        ) : step.id === 'reason' || step.id === 'goal' ? (
+        ) : QUICK[step.id] ? (
           <QuickReplies
-            options={step.id === 'reason' ? REASONS : GOALS}
+            options={QUICK[step.id].options}
             disabled={!ready || busy}
-            onPick={(value) =>
-              void next(step.id === 'reason' ? { reason: value } : { goal: { type: value, terrain: 'road', race: null, date: null } })
-            }
+            onPick={(value) => void next(QUICK[step.id].answer(value))}
             onBack={index > 0 ? () => setIndex(index - 1) : undefined}
           />
         ) : (
@@ -264,6 +431,8 @@ export function CompleteOnboarding({
           >
             {step.id === 'wearables' && <WearablesStep answers={a} patch={patch} />}
             {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
+            {step.id === 'about' && <AboutStep answers={a} patch={patch} />}
+            {step.id === 'days' && <DaysStep answers={a} patch={patch} />}
             {step.id === 'target' && <TargetStep answers={a} patch={patch} />}
             {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
             {step.id === 'volume' && <VolumeStep answers={a} patch={patch} />}
@@ -362,19 +531,35 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
       const praise = st
         ? `J’ai lu tes ${st.runs} sorties Strava${st.recent.runs ? `, dont ${st.recent.runs} ces 12 dernières semaines` : ''}. Joli historique.`
         : w.includes('none')
-        ? 'Pas de montre ? Aucun souci, on fera aux sensations.'
-        : w.some((x) => x === 'coros' || x === 'garmin')
-          ? 'Top, je pourrai lire tes séances directement depuis ta montre.'
-          : 'Noté, je te préviens dès que ta montre est compatible.'
+          ? 'Pas de montre ? Aucun souci, on fera aux sensations.'
+          : w.some((x) => x === 'coros' || x === 'garmin')
+            ? 'Top, je pourrai lire tes séances directement depuis ta montre.'
+            : 'Noté, je te préviens dès que ta montre est compatible.'
       return [praise, 'On fait connaissance ? Ton prénom, ton nom et ton e-mail. Je regarde au passage si tu as des résultats publics.']
     }
-    case 'goal':
+    case 'about':
       return [
         a.utmb?.index
           ? `Enchanté ${first} ! Index UTMB ${a.utmb.index}, joli palmarès.`
           : a.utmb
             ? `Enchanté ${first} ! J’ai trouvé ton profil UTMB, je m’en servirai.`
             : `Enchanté${first ? ` ${first}` : ''} !`,
+        'Pour régler tes zones et tes allures : tu es une femme ou un homme, et tu es né en quelle année ? Les deux sont facultatifs.',
+      ]
+    case 'experience':
+      return [
+        a.about?.birthYear ? 'Merci, c’est noté.' : 'Pas de souci, on s’en passera.',
+        a.strava?.since
+          ? `Ton premier run Strava date de ${new Date(a.strava.since).getFullYear()}. Tu cours depuis combien de temps, en tout ?`
+          : 'Tu cours depuis combien de temps ?',
+      ]
+    case 'goal':
+      return [
+        a.experience === 'gt3'
+          ? 'Un coureur expérimenté, je vais pouvoir te pousser un peu.'
+          : a.experience === 'lt1'
+            ? 'Super, on va construire des bases solides.'
+            : 'Bonne expérience, de quoi bien progresser.',
         'C’est quoi ton objectif en ce moment ?',
       ]
     case 'target':
@@ -387,7 +572,12 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
         : ['Régulier, c’est la clé.', 'Donne-moi un chrono récent : je calibre tes allures avec.']
     case 'volume': {
       const e = a.estimate
-      const praise = e?.target && e.predicted ? (e.target < e.predicted * 0.97 ? 'Objectif ambitieux, j’aime ton état d’esprit.' : 'Objectif réaliste : c’est comme ça qu’on finit fort.') : 'Merci, c’est noté.'
+      const praise =
+        e?.target && e.predicted
+          ? e.target < e.predicted * 0.97
+            ? 'Objectif ambitieux, j’aime ton état d’esprit.'
+            : 'Objectif réaliste : c’est comme ça qu’on finit fort.'
+          : 'Merci, c’est noté.'
       return [
         praise,
         a.strava?.recent.runs
@@ -402,8 +592,20 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
         h?.pains.length ? 'Merci de me le dire, j’en tiendrai compte dans les charges.' : 'Aucune douleur, parfait.',
         'Et récemment, il s’est passé quelque chose ? Blessure, maladie, pause, période chargée… tout compte.',
       ]
+    case 'days':
+      return [
+        h?.events.length ? 'Merci pour ta franchise, on adaptera la reprise.' : 'Rien à signaler, idéal pour attaquer.',
+        'Quels jours tu peux courir ? Et lequel pour la sortie longue ?',
+      ]
+    case 'duration': {
+      const n = a.schedule?.days.length ?? 0
+      return [
+        n >= 5 ? `${n} jours par semaine, quelle motivation !` : n >= 3 ? `${n} jours, c’est parfait pour progresser.` : 'Peu de jours mais bien utilisés, ça marche très bien.',
+        'En semaine, combien de temps tu peux y consacrer par séance ?',
+      ]
+    }
     case 'gear':
-      return [h?.events.length ? 'Merci pour ta franchise, on adaptera la reprise.' : 'Rien à signaler, idéal pour attaquer.', 'Dernière question, promis : tu cours avec quelles chaussures ? Je suivrai leur usure.']
+      return ['Noté, je calerai les séances là-dessus.', 'Dernière question, promis : tu cours avec quelles chaussures ? Je suivrai leur usure.']
     default:
       return [`Merci${first ? ` ${first}` : ''}, tu as été parfait. J’ai tout ce qu’il me faut.`, 'Je construis ton plan, ça prend quelques secondes.']
   }
@@ -418,12 +620,30 @@ function summarize(step: string, a: CompleteAnswers): string {
     case 'wearables': {
       const strava = a.strava ? `historique Strava (${a.strava.runs} sorties)` : ''
       if (!a.wearables?.length) return strava || '—'
-      return [a.wearables.includes('none') ? 'Je cours sans montre' : a.wearables.map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', '), strava].filter(Boolean).join(' + ')
+      return [a.wearables.includes('none') ? 'Je cours sans montre' : a.wearables.map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', '), strava]
+        .filter(Boolean)
+        .join(' + ')
     }
     case 'identity': {
       const id = a.identity
       return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · c’est moi sur UTMB' : ''}` : '—'
     }
+    case 'about': {
+      const parts = [SEXES.find((x) => x.value === a.about?.sex && x.value !== 'x')?.label, a.about?.birthYear ? `né·e en ${a.about.birthYear}` : null].filter(Boolean)
+      return parts.length ? parts.join(' · ') : 'Je préfère passer'
+    }
+    case 'experience':
+      return EXPERIENCES.find((x) => x.value === a.experience)?.label ?? '—'
+    case 'days': {
+      const d = a.schedule
+      return d
+        ? `${WEEKDAYS.filter((w) => d.days.includes(w.value))
+            .map((w) => w.label)
+            .join(', ')}${d.longDay ? ` · sortie longue le ${DAY_NAMES[d.longDay]}` : ''}`
+        : '—'
+    }
+    case 'duration':
+      return `${DURATIONS.find((x) => x.value === a.session_max)?.label ?? '—'} par séance`
     case 'goal':
       return GOALS.find((x) => x.value === a.goal?.type)?.label ?? '—'
     case 'target': {
@@ -484,9 +704,10 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
     distance: race ? distanceCategory(race.km, race.elevation) : a.distance,
     race_date: a.goal?.date ?? null,
     weekly_km: a.health?.weeklyKm,
+    days: a.schedule?.days ?? a.days,
+    level: EXPERIENCES.find((e) => e.value === a.experience)?.level ?? a.level,
   }
 }
-
 
 // ---------- 1. Motivation ----------
 
@@ -528,15 +749,6 @@ function WearablesStep({ answers, patch }: { answers: CompleteAnswers; patch: (p
   )
 }
 
-/** Logo Strava (simple-icons, CC0). */
-function StravaLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-    </svg>
-  )
-}
-
 /**
  * Strava limite le nombre de coureurs connectables par application : on propose de connecter la montre
  * directement, ou d'importer l'export du compte Strava (lu dans le navigateur), et une liste d'attente.
@@ -556,9 +768,7 @@ function StravaImport({ answers, patch }: { answers: CompleteAnswers; patch: (p:
         }}
         className={`flex items-center gap-3 rounded-[20px] border p-4 text-left transition-colors hover:border-foreground/50 ${st ? 'border-primary' : ''}`}
       >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[#FC4C02] text-white">
-          <StravaLogo className="size-5" />
-        </span>
+        <img src="/partners/strava.png" alt="" className="size-10 shrink-0 rounded-[12px]" />
         <span className="flex flex-1 flex-col">
           <span className="text-sm">{st ? 'Historique Strava importé' : 'J’utilise Strava'}</span>
           <span className="text-muted-foreground text-xs">
@@ -611,12 +821,17 @@ function StravaImport({ answers, patch }: { answers: CompleteAnswers; patch: (p:
                 </button>
               )}
               <p className="text-sm">
-                <strong className="font-medium">Importe ton historique Strava.</strong> L’archive est lue directement dans ton navigateur : seul un résumé (volume, sorties longues, meilleurs chronos) est
-                envoyé à Raice.run.
+                <strong className="font-medium">Importe ton historique Strava.</strong> L’archive est lue directement dans ton navigateur : seul un résumé (volume, sorties longues,
+                meilleurs chronos) est envoyé à Raice.run.
               </p>
               <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm">
                 <li>
-                  <a href="https://www.strava.com/athlete/download_my_account" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+                  <a
+                    href="https://www.strava.com/athlete/download_my_account"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 underline underline-offset-2"
+                  >
                     Demande ton archive sur Strava <ExternalLinkIcon className="size-3.5" />
                   </a>
                 </li>
@@ -696,7 +911,11 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
     const r = runners.data?.find((x) => x.uri === uri)
     patch({ utmb: r ? { uri: r.uri, name: r.name, index: r.index } : null })
     // Chargement en arrière-plan des résultats pendant la suite du questionnaire.
-    void qc.prefetchQuery({ queryKey: ['utmb', 'runner', uri], queryFn: () => api<UtmbProfile>(`/lookup/utmb/runner/${uri}`), staleTime: Infinity })
+    void qc.prefetchQuery({
+      queryKey: ['utmb', 'runner', uri],
+      queryFn: () => api<UtmbProfile>(`/lookup/utmb/runner/${uri}`),
+      staleTime: Infinity,
+    })
   }
 
   return (
@@ -710,9 +929,7 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
       {runners.data && runners.data.length > 0 && (
         <UtmbPicker runners={runners.data.slice(0, 6)} value={answers.utmb?.uri ?? (answers.utmb === null ? 'none' : null)} onPick={pick} />
       )}
-      <p className="text-muted-foreground text-xs">
-        Course sur route : l’index running FFA n’est pas encore relié. Tu pourras ajouter un chrono récent à l’étape d’estimation.
-      </p>
+      <p className="text-muted-foreground text-xs">Course sur route : l’index running FFA n’est pas encore relié. Tu pourras ajouter un chrono récent à l’étape d’estimation.</p>
     </>
   )
 }
@@ -787,12 +1004,95 @@ function UtmbPicker({ runners, value, onPick }: { runners: UtmbRunner[]; value: 
   )
 }
 
+// ---------- À propos et disponibilités ----------
+
+function AboutStep({ answers, patch }: StepProps) {
+  const ab = answers.about ?? { sex: null, birthYear: null }
+  const set = (p: Partial<typeof ab>) => patch({ about: { ...ab, ...p } })
+  const year = new Date().getFullYear()
+  const [yearText, setYearText] = useState('')
+  return (
+    <>
+      <ChipGroup label="Sexe" multiple={false} options={SEXES} value={ab.sex ? [ab.sex] : []} onValueChange={([sex]) => set({ sex: sex ?? null })} />
+      <Input
+        label="Année de naissance"
+        placeholder="Ex. 1992"
+        inputMode="numeric"
+        maxLength={4}
+        value={ab.birthYear ? String(ab.birthYear) : yearText}
+        onChange={(e) => {
+          const t = e.target.value.replace(/\D/g, '')
+          setYearText(t)
+          const y = Number(t)
+          set({
+            birthYear: t.length === 4 && y >= year - 90 && y <= year - 12 ? y : null,
+          })
+        }}
+      />
+    </>
+  )
+}
+
+function DaysStep({ answers, patch }: StepProps) {
+  const sc = answers.schedule ?? { days: [], longDay: null }
+  const set = (p: Partial<typeof sc>) => patch({ schedule: { ...sc, ...p } })
+  return (
+    <>
+      <ChipGroup
+        label="Jours disponibles"
+        options={WEEKDAYS}
+        value={sc.days}
+        onValueChange={(days) => {
+          // Sortie longue par défaut le dernier jour du week-end disponible.
+          const longDay = sc.longDay && days.includes(sc.longDay) ? sc.longDay : (['sun', 'sat'].find((d) => days.includes(d)) ?? null)
+          set({
+            days: WEEKDAYS.map((w) => w.value).filter((d) => days.includes(d)),
+            longDay,
+          })
+        }}
+      />
+      {sc.days.length > 1 && (
+        <div className="flex flex-col gap-2">
+          <span className="font-medium text-sm">Sortie longue le</span>
+          <ChipGroup
+            label="Sortie longue le"
+            multiple={false}
+            options={WEEKDAYS.filter((w) => sc.days.includes(w.value))}
+            value={sc.longDay ? [sc.longDay] : []}
+            onValueChange={([longDay]) => set({ longDay: longDay ?? null })}
+          />
+        </div>
+      )}
+      {sc.days.length > 0 && (
+        <p className="text-muted-foreground text-sm">
+          {sc.days.length} séance{sc.days.length > 1 ? 's' : ''} par semaine au maximum.
+        </p>
+      )}
+    </>
+  )
+}
+
 // ---------- 4. Objectif ----------
 
 const GOALS = [
-  { value: 'race', label: 'Faire une course', description: 'Une date, une distance, un objectif.', icon: <FlagIcon /> },
-  { value: 'train', label: 'M’entraîner régulièrement', description: 'Sans course en vue pour l’instant.', icon: <ActivityIcon /> },
-  { value: 'distance', label: 'Courir une distance', description: 'Mon premier 10 km, semi ou marathon.', icon: <CompassIcon /> },
+  {
+    value: 'race',
+    label: 'Faire une course',
+    description: 'Une date, une distance, un objectif.',
+    icon: <FlagIcon />,
+  },
+  {
+    value: 'train',
+    label: 'M’entraîner régulièrement',
+    description: 'Sans course en vue pour l’instant.',
+    icon: <ActivityIcon />,
+  },
+  {
+    value: 'distance',
+    label: 'Courir une distance',
+    description: 'Mon premier 10 km, semi ou marathon.',
+    icon: <CompassIcon />,
+  },
 ]
 
 /** Filtre de distance, avant la recherche : catégories classiques sur route, tranches de longueur en trail. */
@@ -814,7 +1114,12 @@ const DIST_FILTERS = {
 const RACES_PAGE = 4
 
 function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
-  const goal = answers.goal ?? { type: 'race', terrain: 'road' as const, race: null, date: null }
+  const goal = answers.goal ?? {
+    type: 'race',
+    terrain: 'road' as const,
+    race: null,
+    date: null,
+  }
   const set = (p: Partial<typeof goal>) => patch({ goal: { ...goal, ...p } })
   const [q, setQ] = useState('')
   const [dist, setDist] = useState('')
@@ -831,7 +1136,11 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
     staleTime: 600_000,
   })
   const [custom, setCustom] = useState(false)
-  const [customRace, setCustomRace] = useState({ name: '', km: 10, elevation: 0 })
+  const [customRace, setCustomRace] = useState({
+    name: '',
+    km: 10,
+    elevation: 0,
+  })
 
   if (goal.type === 'distance')
     return (
@@ -840,7 +1149,21 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
         multiple={false}
         options={MANUAL_DISTANCES}
         value={goal.race ? [String(goal.race.km)] : []}
-        onValueChange={([v]) => set({ race: v ? { id: `distance:${v}`, name: MANUAL_DISTANCES.find((d) => d.value === v)!.label, detail: 'Distance visée', km: Number(v), elevation: 0, date: null, source: 'saisie' } : null })}
+        onValueChange={([v]) =>
+          set({
+            race: v
+              ? {
+                  id: `distance:${v}`,
+                  name: MANUAL_DISTANCES.find((d) => d.value === v)!.label,
+                  detail: 'Distance visée',
+                  km: Number(v),
+                  elevation: 0,
+                  date: null,
+                  source: 'saisie',
+                }
+              : null,
+          })
+        }
       />
     )
 
@@ -892,13 +1215,32 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
           <Input label="Nom de la course" value={customRace.name} onChange={(e) => setCustomRace({ ...customRace, name: e.target.value })} />
           <div className="grid grid-cols-2 gap-4">
             <NumberField label="Distance" value={customRace.km} min={1} max={250} suffix=" km" locale="fr-FR" onValueChange={(km) => setCustomRace({ ...customRace, km })} />
-            <NumberField label="Dénivelé +" value={customRace.elevation} min={0} max={12000} step={50} suffix=" m" locale="fr-FR" onValueChange={(elevation) => setCustomRace({ ...customRace, elevation })} />
+            <NumberField
+              label="Dénivelé +"
+              value={customRace.elevation}
+              min={0}
+              max={12000}
+              step={50}
+              suffix=" m"
+              locale="fr-FR"
+              onValueChange={(elevation) => setCustomRace({ ...customRace, elevation })}
+            />
           </div>
           <Button
             type="button"
             disabled={!customRace.name.trim()}
             onClick={() => {
-              set({ race: { id: 'saisie', name: customRace.name.trim(), detail: `${customRace.km} km · ${customRace.elevation} m D+`, km: customRace.km, elevation: customRace.elevation, date: null, source: 'saisie' } })
+              set({
+                race: {
+                  id: 'saisie',
+                  name: customRace.name.trim(),
+                  detail: `${customRace.km} km · ${customRace.elevation} m D+`,
+                  km: customRace.km,
+                  elevation: customRace.elevation,
+                  date: null,
+                  source: 'saisie',
+                },
+              })
               setCustom(false)
             }}
           >
@@ -917,10 +1259,36 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
         placeholder="Choisir la date"
         minDate={new Date()}
         value={goal.date ? new Date(`${goal.date}T12:00:00`) : undefined}
-        onChange={(d) => set({ date: d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null })}
+        onChange={(d) =>
+          set({
+            date: d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null,
+          })
+        }
       />
     </div>
   )
+}
+
+/** Questions à choix unique : réponses rapides envoyées dès le clic. */
+const QUICK: Record<
+  string,
+  {
+    options: { value: string; label: string; icon?: React.ReactNode }[]
+    answer: (value: string) => Partial<CompleteAnswers>
+  }
+> = {
+  reason: { options: REASONS, answer: (reason) => ({ reason }) },
+  experience: {
+    options: EXPERIENCES,
+    answer: (experience) => ({ experience }),
+  },
+  goal: {
+    options: GOALS,
+    answer: (type) => ({
+      goal: { type, terrain: 'road', race: null, date: null },
+    }),
+  },
+  duration: { options: DURATIONS, answer: (session_max) => ({ session_max }) },
 }
 
 // ---------- 5. Estimation ----------
@@ -937,7 +1305,14 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
   const utmbPerfs: Performance[] = useMemo(
     () =>
       (profile.data?.results ?? [])
-        .map((r) => ({ label: r.race, km: r.km, elevation: r.elevation, seconds: parseDuration(r.time) ?? 0, date: r.date, source: 'utmb' as const }))
+        .map((r) => ({
+          label: r.race,
+          km: r.km,
+          elevation: r.elevation,
+          seconds: parseDuration(r.time) ?? 0,
+          date: r.date,
+          source: 'utmb' as const,
+        }))
         .filter((p) => p.seconds > 0),
     [profile.data],
   )
@@ -948,7 +1323,12 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
   useEffect(() => {
     if (prediction && answers.estimate?.predicted !== Math.round(prediction.seconds)) {
-      patch({ estimate: { predicted: Math.round(prediction.seconds), target: answers.estimate?.target ?? Math.round(prediction.seconds) } })
+      patch({
+        estimate: {
+          predicted: Math.round(prediction.seconds),
+          target: answers.estimate?.target ?? Math.round(prediction.seconds),
+        },
+      })
     }
   }, [prediction?.seconds]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -957,14 +1337,29 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
     const seconds = parseDuration(draft.time)
     if (!seconds) return
     const km = Number(draft.km)
-    patch({ performances: [...(answers.performances ?? []), { label: `${MANUAL_DISTANCES.find((d) => d.value === draft.km)?.label} récent`, km, elevation: 0, seconds, source: 'manuel', date: new Date().toISOString().slice(0, 10) }] })
+    patch({
+      performances: [
+        ...(answers.performances ?? []),
+        {
+          label: `${MANUAL_DISTANCES.find((d) => d.value === draft.km)?.label} récent`,
+          km,
+          elevation: 0,
+          seconds,
+          source: 'manuel',
+          date: new Date().toISOString().slice(0, 10),
+        },
+      ],
+    })
     setDraft({ ...draft, time: '' })
   }
 
   return (
     <>
-
-      {uri && profile.isPending && <TextShimmer as="p" className="text-sm">Lecture de tes résultats UTMB…</TextShimmer>}
+      {uri && profile.isPending && (
+        <TextShimmer as="p" className="text-sm">
+          Lecture de tes résultats UTMB…
+        </TextShimmer>
+      )}
 
       {race && prediction && target && (
         <div className="flex flex-col gap-6 rounded-[26px] border bg-background p-5">
@@ -985,7 +1380,14 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
             step={60}
             majorEvery={10}
             value={Math.round(target / 60) * 60}
-            onValueChange={(v) => patch({ estimate: { predicted: Math.round(prediction.seconds), target: v } })}
+            onValueChange={(v) =>
+              patch({
+                estimate: {
+                  predicted: Math.round(prediction.seconds),
+                  target: v,
+                },
+              })
+            }
             format={formatDuration}
           />
           <p className="text-muted-foreground text-xs">Basé sur : {prediction.basedOn.map((p) => `${p.label} (${formatDuration(p.seconds)})`).join(' · ')}</p>
@@ -1016,7 +1418,12 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
               type="button"
               aria-label="Retirer ce chrono"
               className="text-muted-foreground hover:text-foreground"
-              onClick={() => patch({ performances: (answers.performances ?? []).filter((x) => x !== p), estimate: { predicted: null, target: null } })}
+              onClick={() =>
+                patch({
+                  performances: (answers.performances ?? []).filter((x) => x !== p),
+                  estimate: { predicted: null, target: null },
+                })
+              }
             >
               <TrashIcon className="size-4" />
             </button>
@@ -1029,10 +1436,14 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 
 // ---------- 6. Santé ----------
 
-type StepProps = { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }
-
 function useHealth({ answers, patch }: StepProps) {
-  const h = answers.health ?? { pains: [], painLevel: 0, events: [], weeklyKm: answers.strava?.recent.runs ? answers.strava.recent.weeklyKm : 20, notes: '' }
+  const h = answers.health ?? {
+    pains: [],
+    painLevel: 0,
+    events: [],
+    weeklyKm: answers.strava?.recent.runs ? answers.strava.recent.weeklyKm : 20,
+    notes: '',
+  }
   return [h, (p: Partial<typeof h>) => patch({ health: { ...h, ...p } })] as const
 }
 
@@ -1042,7 +1453,9 @@ function VolumeStep(props: StepProps) {
   useEffect(() => {
     if (!props.answers.health) set({})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  return <NumberField label="Kilomètres par semaine en ce moment" value={h.weeklyKm} min={0} max={200} suffix=" km" locale="fr-FR" onValueChange={(weeklyKm) => set({ weeklyKm })} />
+  return (
+    <NumberField label="Kilomètres par semaine en ce moment" value={h.weeklyKm} min={0} max={200} suffix=" km" locale="fr-FR" onValueChange={(weeklyKm) => set({ weeklyKm })} />
+  )
 }
 
 function PainsStep(props: StepProps) {
@@ -1051,7 +1464,14 @@ function PainsStep(props: StepProps) {
     <>
       <ChipGroup label="Zones douloureuses" options={PAINS} value={h.pains} onValueChange={(pains) => set({ pains, painLevel: pains.length ? h.painLevel : 0 })} />
       {h.pains.length > 0 && (
-        <Rating label="Intensité de la gêne" max={5} value={h.painLevel} onChange={(painLevel) => set({ painLevel })} valueLabels={['Légère', 'Gênante', 'Modérée', 'Forte', 'Très forte']} emptyLabel="Non renseignée" />
+        <Rating
+          label="Intensité de la gêne"
+          max={5}
+          value={h.painLevel}
+          onChange={(painLevel) => set({ painLevel })}
+          valueLabels={['Légère', 'Gênante', 'Modérée', 'Forte', 'Très forte']}
+          emptyLabel="Non renseignée"
+        />
       )}
       {h.painLevel >= 4 && <DoctorNote />}
     </>
@@ -1063,7 +1483,13 @@ function EventsStep(props: StepProps) {
   return (
     <>
       <ChipGroup label="Ces derniers mois" options={EVENTS} value={h.events} onValueChange={(events) => set({ events })} />
-      <Textarea label="À nous dire (facultatif)" placeholder="Ex. entorse en mars, je reprends doucement" rows={3} value={h.notes} onChange={(e) => set({ notes: e.target.value })} />
+      <Textarea
+        label="À nous dire (facultatif)"
+        placeholder="Ex. entorse en mars, je reprends doucement"
+        rows={3}
+        value={h.notes}
+        onChange={(e) => set({ notes: e.target.value })}
+      />
       {h.events.includes('surgery') && <DoctorNote />}
     </>
   )
@@ -1080,12 +1506,28 @@ function DoctorNote() {
 // ---------- 7. Matériel ----------
 
 function GearStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
-  const g = answers.gear ?? { brand: null, model: '', shoeKm: 200, rotation: false }
+  const g = answers.gear ?? {
+    brand: null,
+    model: '',
+    shoeKm: 200,
+    rotation: false,
+  }
   const set = (p: Partial<typeof g>) => patch({ gear: { ...g, ...p } })
-  const brands = useQuery({ queryKey: ['shoe-brands'], queryFn: () => api<string[]>('/lookup/shoe-brands'), staleTime: Infinity })
-  const shoes = useQuery({ queryKey: ['shoes'], queryFn: () => api<Shoe[]>('/lookup/shoes'), staleTime: Infinity })
+  const brands = useQuery({
+    queryKey: ['shoe-brands'],
+    queryFn: () => api<string[]>('/lookup/shoe-brands'),
+    staleTime: Infinity,
+  })
+  const shoes = useQuery({
+    queryKey: ['shoes'],
+    queryFn: () => api<Shoe[]>('/lookup/shoes'),
+    staleTime: Infinity,
+  })
   // Quelques modèles connus de la marque, en exemple dans le champ libre.
-  const examples = (shoes.data ?? []).filter((s) => s.brand === g.brand).slice(0, 3).map((s) => s.model)
+  const examples = (shoes.data ?? [])
+    .filter((s) => s.brand === g.brand)
+    .slice(0, 3)
+    .map((s) => s.model)
   return (
     <>
       <Combobox
@@ -1096,13 +1538,18 @@ function GearStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Par
         value={g.brand ?? undefined}
         onValueChange={(brand) => set({ brand })}
       />
-      <Input
-        label="Modèle"
-        placeholder={examples.length ? `Ex. ${examples.join(', ')}` : 'Ex. Pegasus 41'}
-        value={g.model}
-        onChange={(e) => set({ model: e.target.value })}
+      <Input label="Modèle" placeholder={examples.length ? `Ex. ${examples.join(', ')}` : 'Ex. Pegasus 41'} value={g.model} onChange={(e) => set({ model: e.target.value })} />
+      <NumberField
+        label="Kilomètres déjà faits avec"
+        value={g.shoeKm}
+        min={0}
+        max={2000}
+        step={10}
+        largeStep={50}
+        suffix=" km"
+        locale="fr-FR"
+        onValueChange={(shoeKm) => set({ shoeKm })}
       />
-      <NumberField label="Kilomètres déjà faits avec" value={g.shoeKm} min={0} max={2000} step={10} largeStep={50} suffix=" km" locale="fr-FR" onValueChange={(shoeKm) => set({ shoeKm })} />
       <Switch label="J’alterne avec une autre paire" checked={g.rotation} onCheckedChange={(rotation) => set({ rotation })} />
       {g.shoeKm >= 700 && <p className="text-muted-foreground text-sm">Au-delà de 700 km, l’amorti baisse nettement : pense à prévoir une nouvelle paire.</p>}
     </>
