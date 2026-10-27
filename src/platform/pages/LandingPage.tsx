@@ -20,7 +20,7 @@ import { Header } from '@/components/header'
 import { HeroSection } from '@/components/hero'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { DotWordmark } from './DotWordmark'
-import { CoachFlow, RunnerCursor, WatchFlow } from './landing-flows'
+import { CoachFlow, WatchFlow } from './landing-flows'
 import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { cn } from '@/lib/utils'
@@ -57,7 +57,6 @@ export function LandingPage() {
 
   return (
     <div className="min-h-dvh overflow-x-clip">
-      <RunnerCursor />
       <Header />
       <main className="mx-auto max-w-5xl">
         <HeroSection />
@@ -122,7 +121,7 @@ export function LandingPage() {
           }
         >
           <FlowRow
-            text="Connect your watch once. Every workout lands with its steps and paces, and your run comes back on its own."
+            text="Sync your data, get your plan, run it from your wrist. Your run comes back on its own and shapes the next one."
             points={[
               { icon: <RefreshCwIcon />, label: 'History synced in the background' },
               { icon: <ZapIcon />, label: 'Structured workouts with target paces' },

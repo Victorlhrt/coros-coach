@@ -202,9 +202,3 @@
   40% { transform: scaleY(1.18); }
   70% { transform: scaleY(0.94); }
 }
-
-/* Landing : le curseur coureur remplace le curseur système (souris uniquement, voir RunnerCursor). */
-html.runner-cursor,
-html.runner-cursor * {
-  cursor: none !important;
-}

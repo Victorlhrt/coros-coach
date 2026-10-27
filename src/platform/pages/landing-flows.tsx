@@ -81,13 +81,37 @@ const status = (step: number, index: number): Status => (step > index ? 'done' :
 
 // ---------- Montre ----------
 
-const WATCHES: { name: string; logo?: string; invert?: boolean; state: 'live' | 'next' | 'soon' }[] = [
+/**
+ * Montres et leurs logos. `wordmark` : logo en toutes lettres (affiché seul) ; `invert` : marque noire,
+ * inversée sur fond sombre (hue-rotate garde le rouge des logos Polar et Suunto).
+ */
+const WATCHES: { name: string; logo: string; wordmark?: boolean; invert?: boolean; state: 'live' | 'next' | 'soon' }[] = [
   { name: 'COROS', logo: '/partners/coros.png', state: 'live' },
   { name: 'Garmin', logo: '/partners/garmin.png', invert: true, state: 'next' },
-  { name: 'Apple Watch', state: 'soon' },
-  { name: 'Suunto', state: 'soon' },
-  { name: 'Polar', state: 'soon' },
+  { name: 'Apple Watch', logo: '/partners/apple.png', invert: true, state: 'soon' },
+  { name: 'Polar', logo: '/partners/polar.png', wordmark: true, invert: true, state: 'soon' },
+  { name: 'Suunto', logo: '/partners/suunto.png', wordmark: true, invert: true, state: 'soon' },
 ]
+
+function WatchChip({ watch, active }: { watch: (typeof WATCHES)[number]; active: boolean }) {
+  return (
+    <span
+      title={watch.name}
+      className={cn(
+        'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-all duration-300',
+        active ? 'border-foreground/50 bg-foreground/10 text-foreground' : 'bg-card text-muted-foreground'
+      )}
+    >
+      <img
+        alt={watch.wordmark ? watch.name : ''}
+        className={cn('object-contain', watch.wordmark ? 'h-3.5 w-auto' : 'size-3.5 rounded-[3px]', watch.invert && 'invert hue-rotate-180')}
+        src={watch.logo}
+      />
+      {!watch.wordmark && watch.name}
+      {watch.state !== 'live' && <span className="opacity-60">· {watch.state === 'next' ? 'next' : 'soon'}</span>}
+    </span>
+  )
+}
 
 export function WatchFlow() {
   const { ref, step } = useSequence(4, 1300)
@@ -96,47 +120,33 @@ export function WatchFlow() {
       <div className="mb-4 flex items-center gap-2 text-muted-foreground text-xs">
         <ZapIcon className="size-3.5" /> Tuesday · Intervals · 9.6 km
       </div>
-      <Node icon={CalendarCheckIcon} title="Workout built" status={status(step, 0)}>
+      <Node icon={RefreshCwIcon} title="1. Sync your data" status={status(step, 0)}>
+        <div className="flex flex-wrap gap-1.5">
+          {WATCHES.map((w) => (
+            <WatchChip key={w.name} watch={w} active={w.state === 'live' && step >= 1} />
+          ))}
+        </div>
+      </Node>
+      <Node icon={CalendarCheckIcon} title="2. Create your plan" status={status(step, 1)}>
         <div className="flex gap-1">
           {[0.25, 0.9, 0.35, 0.9, 0.35, 0.9, 0.2].map((h, i) => (
             <motion.span
               key={i}
               className="h-5 flex-1 origin-bottom rounded-sm bg-foreground/40"
-              animate={{ scaleY: step >= 1 ? h : 0.1 }}
+              animate={{ scaleY: step >= 2 ? h : 0.1 }}
               transition={{ delay: i * 0.04, type: 'spring', visualDuration: 0.4, bounce: 0.2 }}
             />
           ))}
         </div>
       </Node>
-      <Node icon={SendIcon} title="Sent to your watch" status={status(step, 1)}>
-        <div className="flex flex-wrap gap-1.5">
-          {WATCHES.map((w) => (
-            <span
-              key={w.name}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] transition-all duration-300',
-                w.state === 'live' && step >= 2 ? 'border-foreground/50 bg-foreground/10 text-foreground' : 'bg-card text-muted-foreground'
-              )}
-            >
-              {w.logo ? (
-                <img alt="" className={cn('size-3.5 rounded-[3px] object-contain', w.invert && 'invert')} src={w.logo} />
-              ) : (
-                <WatchIcon className="size-3.5" />
-              )}
-              {w.name}
-              {w.state !== 'live' && <span className="opacity-60">· {w.state === 'next' ? 'next' : 'soon'}</span>}
-            </span>
-          ))}
-        </div>
-      </Node>
-      <Node icon={WatchIcon} title="On your wrist" status={status(step, 2)}>
+      <Node icon={WatchIcon} title="3. On your wrist" status={status(step, 2)}>
         <div className="flex items-center gap-2 text-xs">
           <span className="rounded-md border bg-background px-2 py-1 tabular-nums">Rep {Math.min(Math.max(step - 1, 1), 6)}/6</span>
           <span className="rounded-md border bg-background px-2 py-1 tabular-nums">3:55 /km</span>
           <span className="text-muted-foreground">800 m</span>
         </div>
       </Node>
-      <Node icon={RefreshCwIcon} title="Run synced back" status={status(step, 3)} last>
+      <Node icon={SendIcon} title="4. Run synced back" status={status(step, 3)} last>
         <AnimatePresence>
           {step >= 4 && (
             <motion.p
@@ -240,84 +250,6 @@ export function CoachFlow() {
           )
         })}
       </div>
-    </div>
-  )
-}
-
-// ---------- Curseur coureur ----------
-
-/** Deux poses d'un coureur, alternées pendant le défilement. */
-const POSES = [
-  'M14 4.5a2 2 0 1 0 0-.01M13 7.5l-2 6M12.6 9 9 10.5 8 8.5M12.6 9l2.6 2.4 2-1M11 13.5l3 3-1 4M11 13.5l-3 2.5-3-1',
-  'M14 4.5a2 2 0 1 0 0-.01M13 7.5l-2 6M12.6 9l-2.6 2.6 1 2M12.6 9l3-.6 1.4-2M11 13.5l1.4 4 3 1.5M11 13.5l-2 4v4',
-]
-
-/**
- * Curseur de la landing : un petit coureur qui suit la souris et court pendant le défilement.
- * Seulement avec une souris (pointeur fin) et sans mouvement réduit ; sinon le curseur normal reste.
- */
-export function RunnerCursor() {
-  const reduce = useReducedMotion()
-  const [enabled, setEnabled] = useState(false)
-  const [pos, setPos] = useState({ x: -100, y: -100 })
-  const [running, setRunning] = useState(false)
-  const [pose, setPose] = useState(0)
-  const [hover, setHover] = useState(false)
-
-  useEffect(() => {
-    const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-    setEnabled(fine && !reduce)
-  }, [reduce])
-
-  useEffect(() => {
-    if (!enabled) return
-    document.documentElement.classList.add('runner-cursor')
-    let stop = 0
-    const move = (e: MouseEvent) => {
-      setPos({ x: e.clientX, y: e.clientY })
-      setHover(!!(e.target as Element | null)?.closest('a, button, [role="button"], input, label'))
-    }
-    const scroll = () => {
-      setRunning(true)
-      window.clearTimeout(stop)
-      stop = window.setTimeout(() => setRunning(false), 220)
-    }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('scroll', scroll, { passive: true })
-    return () => {
-      document.documentElement.classList.remove('runner-cursor')
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('scroll', scroll)
-      window.clearTimeout(stop)
-    }
-  }, [enabled])
-
-  useEffect(() => {
-    if (!running) return
-    const t = window.setInterval(() => setPose((p) => 1 - p), 120)
-    return () => window.clearInterval(t)
-  }, [running])
-
-  if (!enabled) return null
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none fixed top-0 left-0 z-[100]"
-      style={{ transform: `translate(${pos.x - 6}px, ${pos.y - 4}px)` }}
-    >
-      <motion.svg
-        animate={{ scale: hover ? 1.35 : 1, y: running ? [0, -2, 0] : 0 }}
-        className="size-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
-        fill="none"
-        stroke="#fff"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        transition={{ y: { duration: 0.24, repeat: running ? Infinity : 0 }, scale: { type: 'spring', visualDuration: 0.2, bounce: 0.3 } }}
-        viewBox="0 0 24 24"
-      >
-        <path d={POSES[running ? pose : 0]} />
-      </motion.svg>
     </div>
   )
 }
