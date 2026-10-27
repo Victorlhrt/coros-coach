@@ -6,31 +6,25 @@ import { ArrowRightIcon, LogInIcon } from "lucide-react";
 import { appHref } from "@/platform/brand";
 import { PlanPreview } from "@/platform/pages/PlanPreview";
 
-/** Logos posés autour du titre, en chips. `invert` pour les marques noires sur fond sombre. */
-const PARTNERS = [
-	{ name: "Claude", src: "/partners/claude.png", invert: false, className: "lg:-left-44 lg:top-0 lg:-rotate-6" },
-	{ name: "OpenAI", src: "/partners/openai.png", invert: true, className: "lg:-right-44 lg:-top-2 lg:rotate-6" },
-	{ name: "COROS", src: "/partners/coros.png", invert: false, className: "lg:-left-36 lg:bottom-4 lg:rotate-3" },
-	{ name: "Garmin", src: "/partners/garmin.png", invert: true, className: "lg:-right-36 lg:bottom-6 lg:-rotate-3" },
-];
+/** Logos intégrés au titre : les montres à côté de « running plans », les IA à côté de « Agentic running ». */
+const LOGOS = {
+	claude: { name: "Claude", src: "/partners/claude.png", invert: false },
+	chatgpt: { name: "ChatGPT", src: "/partners/openai.png", invert: true },
+	coros: { name: "COROS", src: "/partners/coros.png", invert: false },
+	garmin: { name: "Garmin", src: "/partners/garmin.png", invert: true },
+};
 
-function PartnerChip({ name, src, invert, className }: (typeof PARTNERS)[number]) {
+/** Pastille de logo à la taille du texte du titre, légèrement inclinée. */
+function InlineLogo({ logo, tilt }: { logo: (typeof LOGOS)[keyof typeof LOGOS]; tilt: string }) {
 	return (
 		<span
 			className={cn(
-				"flex items-center gap-2 rounded-full border bg-card/80 py-1.5 pr-3.5 pl-1.5 shadow-sm backdrop-blur-sm",
-				"lg:absolute",
-				className
+				"mx-[0.06em] inline-flex size-[0.82em] translate-y-[0.08em] items-center justify-center overflow-hidden rounded-[0.22em] border bg-card align-baseline shadow-sm",
+				tilt
 			)}
+			title={logo.name}
 		>
-			<span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-background">
-				<img
-					alt=""
-					className={cn("size-full object-contain", invert && "p-1 invert", name === "COROS" && "scale-110")}
-					src={src}
-				/>
-			</span>
-			<span className="font-medium text-sm">{name}</span>
+			<img alt={logo.name} className={cn("size-full object-contain", logo.invert && "p-[0.12em] invert")} src={logo.src} />
 		</span>
 	);
 }
@@ -64,7 +58,7 @@ export function HeroSection() {
 					href={appHref("/onboarding")}
 				>
 					<div className="rounded-xs border bg-card px-1.5 py-0.5 shadow-sm">
-						<p className="font-mono text-xs">BETA</p>
+						<p className="text-xs">BETA</p>
 					</div>
 
 					<span className="text-xs">free training plans during the beta</span>
@@ -75,27 +69,23 @@ export function HeroSection() {
 					</div>
 				</a>
 
-				<div className="relative flex flex-col items-center gap-5">
-					<h1
-						className={cn(
-							"font-heading max-w-3xl text-balance text-center font-semibold text-4xl text-foreground tracking-tight md:text-6xl lg:text-7xl",
-							"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out"
-						)}
-					>
-						Forget generic running plans, it’s time for <span className="italic">Agentic running</span>
-					</h1>
-					<div
-						className={cn(
-							"flex flex-wrap justify-center gap-2 lg:contents",
-							"fade-in animate-in fill-mode-backwards delay-300 duration-700"
-						)}
-						aria-label="Works with"
-					>
-						{PARTNERS.map((p) => (
-							<PartnerChip key={p.name} {...p} />
-						))}
-					</div>
-				</div>
+				<h1
+					className={cn(
+						"font-heading max-w-4xl text-balance text-center font-semibold text-4xl text-foreground tracking-tight md:text-6xl lg:text-7xl",
+						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out"
+					)}
+				>
+					Forget generic running plans{" "}
+					<span className="whitespace-nowrap">
+						<InlineLogo logo={LOGOS.coros} tilt="-rotate-6" />
+						<InlineLogo logo={LOGOS.garmin} tilt="rotate-3" />
+					</span>
+					, it’s time for Agentic running{" "}
+					<span className="whitespace-nowrap">
+						<InlineLogo logo={LOGOS.claude} tilt="rotate-6" />
+						<InlineLogo logo={LOGOS.chatgpt} tilt="-rotate-3" />
+					</span>
+				</h1>
 
 				<p
 					className={cn(

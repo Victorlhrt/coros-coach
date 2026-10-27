@@ -18,12 +18,12 @@ export function PlanPreview() {
         <p className="font-medium text-sm">
           Week 6 of 14 · <span className="text-muted-foreground">build phase</span>
         </p>
-        <p className="font-mono text-muted-foreground text-xs">Sample · half marathon in 1:45</p>
+        <p className="text-muted-foreground text-xs">Sample · half marathon in 1:45</p>
       </div>
       <ol className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-7">
         {WEEK.map((s) => (
           <li key={s.day} className="flex min-h-28 flex-col gap-2 bg-background p-3">
-            <span className="font-mono text-muted-foreground text-xs">{s.day}</span>
+            <span className="text-muted-foreground text-xs">{s.day}</span>
             <span className="flex items-center gap-2 font-medium text-sm">
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: s.color }} />
               {s.type}

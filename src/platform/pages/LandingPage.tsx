@@ -131,7 +131,7 @@ export function LandingPage() {
                 <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
                 <div className="relative flex items-center justify-between">
                   <span className="flex size-9 items-center justify-center rounded-md border bg-card text-foreground [&>svg]:size-4.5">{s.icon}</span>
-                  <span className="font-mono text-muted-foreground text-xs">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="text-muted-foreground text-xs">{String(i + 1).padStart(2, '0')}</span>
                 </div>
                 <div className="relative flex flex-col gap-1.5">
                   <h3 className="font-medium">{s.title}</h3>
@@ -169,7 +169,7 @@ export function LandingPage() {
             </div>
             <div className={cn('relative flex flex-col gap-2 p-6 md:p-8')}>
               <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
-              <p className="relative font-mono text-muted-foreground text-xs">TUE · INTERVALS · 9.6 KM</p>
+              <p className="relative text-muted-foreground text-xs">TUE · INTERVALS · 9.6 KM</p>
               {[
                 ['Warm-up', '15 min · easy', 'w-1/4'],
                 ['6 × 800 m', '3:55 /km', 'w-full'],
@@ -183,7 +183,7 @@ export function LandingPage() {
                       <div className={cn('h-1 rounded-full bg-foreground/70', w)} />
                     </div>
                   </div>
-                  <span className="font-mono text-muted-foreground text-xs">{b}</span>
+                  <span className="text-muted-foreground text-xs">{b}</span>
                 </div>
               ))}
             </div>
@@ -257,7 +257,7 @@ function Section({ id, eyebrow, title, children }: { id: string; eyebrow: string
   return (
     <section id={id} className="relative mt-20 scroll-mt-24" aria-labelledby={`${id}-title`}>
       <div className="flex flex-col items-center gap-2 px-4 pb-8 text-center">
-        <span className="font-mono text-muted-foreground text-xs uppercase tracking-widest">{eyebrow}</span>
+        <span className="text-muted-foreground text-xs uppercase tracking-widest">{eyebrow}</span>
         <h2 id={`${id}-title`} className="font-heading text-balance font-medium text-2xl text-muted-foreground tracking-tight md:text-3xl">
           {title}
         </h2>
@@ -303,7 +303,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5 text-xs">
       <span className="truncate">{label}</span>
-      <span className="font-mono text-muted-foreground">{value}</span>
+      <span className="text-muted-foreground">{value}</span>
     </div>
   )
 }
@@ -322,7 +322,7 @@ function Progress() {
     <div className="flex flex-col gap-1.5 rounded-md border bg-card px-3 py-2.5 text-xs">
       <div className="flex justify-between">
         <span>Building your weeks</span>
-        <span className="font-mono text-muted-foreground">100%</span>
+        <span className="text-muted-foreground">100%</span>
       </div>
       <div className="h-1 rounded-full bg-muted">
         <div className="h-1 w-full rounded-full bg-foreground/70" />
