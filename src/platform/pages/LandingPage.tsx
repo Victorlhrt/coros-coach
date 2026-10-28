@@ -188,7 +188,7 @@ export function LandingPage() {
           <span>Agentic running: your plan, written by AI, synced to your watch.</span>
           <span>© {new Date().getFullYear()} {BRAND.name}</span>
         </div>
-        <div className="mx-auto max-w-6xl px-4 pt-10">
+        <div className="mx-auto hidden max-w-6xl px-4 pt-10 md:block">
           <DotWordmark />
         </div>
       </footer>

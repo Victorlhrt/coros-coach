@@ -196,7 +196,7 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
   const { track, height } = useViewHeight(view, reduce);
   const drift = useDrift(reduce);
 
-  const emailError = (touched || attempted) && !isEmail(email) ? (email.trim() ? "Saisis une adresse complète, comme nom@exemple.fr." : "Saisis ton adresse e-mail.") : "";
+  const emailError = (touched || attempted) && !isEmail(email) ? (email.trim() ? "Enter a full address, like name@example.com." : "Enter your email address.") : "";
   const custom: StepCustom = { direction, reduce };
   const signingUp = mode === "sign-up";
 
@@ -230,7 +230,7 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
     setAccount(address);
     setMethod(how);
     go("done", 1);
-    setStatus(`${signingUp ? "Compte créé" : "Connecté"} ${how === "Email code" ? "avec un code e-mail" : how === "Passkey" ? "avec un passkey" : how === "Password" ? "avec ton mot de passe" : `avec ${how}`}`);
+    setStatus(`${signingUp ? "Account created" : "Signed in"} ${how === "Email code" ? "with an email code" : how === "Passkey" ? "with a passkey" : how === "Password" ? "with your password" : `with ${how}`}`);
     onSignIn?.(address, how, mode);
   }
 
@@ -274,15 +274,15 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
     setAttempted(true);
     if (!isEmail(email)) { emailRef.current?.focus(); return; }
     if (onPasswordSignIn) {
-      if (!password) { setSignInError("Saisis ton mot de passe."); return; }
+      if (!password) { setSignInError("Enter your password."); return; }
       setBusy("email");
       setSignInError("");
       setStatus("Connexion");
       const address = email.trim().toLowerCase();
       onPasswordSignIn(address, password).then(() => complete(address, "Password"), (error: unknown) => {
         setBusy(null);
-        setSignInError(error instanceof Error && error.message ? error.message : "Connexion impossible. Réessaie.");
-        setStatus("Connexion refusée");
+        setSignInError(error instanceof Error && error.message ? error.message : "Couldn’t sign in. Try again.");
+        setStatus("Sign-in refused");
       });
       return;
     }
@@ -397,8 +397,8 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
       <header className={styles.bar}>
         <span className={styles.mark}>{brandMark ?? <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 15a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="10" cy="15" r="1.75" fill="currentColor" /></svg>}{brand}</span>
         <p className={styles.switch}>
-          <span className={styles.switchPrompt}>{(["sign-in", "sign-up"] as const).map(option => <motion.span key={option} aria-hidden={option !== mode || undefined} initial={false} animate={labelState(option === mode, reduce)} transition={labelTransition(reduce)}>{option === "sign-up" ? "Déjà un compte ?" : "Pas encore de compte ?"}</motion.span>)}</span>
-          <button type="button" className={styles.switchButton} aria-label={signingUp ? "Se connecter" : "Créer un compte"} onClick={switchMode}>{(["sign-in", "sign-up"] as const).map(option => <motion.span key={option} aria-hidden="true" initial={false} animate={labelState(option === mode, reduce)} transition={labelTransition(reduce)}>{option === "sign-up" ? "Se connecter" : "Créer un compte"}</motion.span>)}</button>
+          <span className={styles.switchPrompt}>{(["sign-in", "sign-up"] as const).map(option => <motion.span key={option} aria-hidden={option !== mode || undefined} initial={false} animate={labelState(option === mode, reduce)} transition={labelTransition(reduce)}>{option === "sign-up" ? "Have an account?" : "New here?"}</motion.span>)}</span>
+          <button type="button" className={styles.switchButton} aria-label={signingUp ? "Sign in" : "Create an account"} onClick={switchMode}>{(["sign-in", "sign-up"] as const).map(option => <motion.span key={option} aria-hidden="true" initial={false} animate={labelState(option === mode, reduce)} transition={labelTransition(reduce)}>{option === "sign-up" ? "Sign in" : "Sign up"}</motion.span>)}</button>
         </p>
       </header>
 
@@ -408,7 +408,7 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
             <div ref={track} className={styles.track}>
               <AnimatePresence mode="popLayout" initial={false} custom={custom}>
                 {step === "passkey" && <motion.div key="passkey" className={styles.step} custom={custom} variants={stepMotion} initial="enter" animate="center" exit="exit">
-                  <div className={styles.heading}><h2>Sign in to Arc</h2><p>Use the passkey saved on this device. No password needed.</p></div>
+                  <div className={styles.heading}><h2>Sign in to {brand}</h2><p>Use the passkey saved on this device. No password needed.</p></div>
                   <div className={styles.actions}>
                     <Button ref={passkeyRef} type="button" className={styles.wide} aria-busy={passkey === "waiting" || undefined} aria-disabled={passkey !== "idle" || !!busy || undefined} onClick={startPasskey}>{passkeyLabel}</Button>
                     <Button type="button" variant="secondary" className={styles.wide} aria-disabled={passkey === "verified" || !!busy || undefined} onClick={passkey === "waiting" ? cancelPasskey : switchToEmail}>{passkey === "waiting" ? "Cancel" : <><Mail size={16} strokeWidth={1.75} aria-hidden="true" />Use email instead</>}</Button>
@@ -420,15 +420,15 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
                 </motion.div>}
 
                 {step === "email" && <motion.div key={`email-${mode}`} className={styles.step} custom={custom} variants={stepMotion} initial="enter" animate="center" exit="exit">
-                  <div className={styles.heading}>{signingUp ? <><h2>Crée ton compte</h2><p>Saisis ton e-mail : on t’envoie un code pour le confirmer.</p></> : passwordMode ? <><h2>Connexion à {brand}</h2><p>Avec l’e-mail et le mot de passe de ton compte.</p></> : <><h2>Connexion par e-mail</h2><p>On t’envoie un code à 6 chiffres.</p></>}</div>
+                  <div className={styles.heading}>{signingUp ? <><h2>Create your account</h2><p>Enter your email and we’ll send you a code to confirm it.</p></> : passwordMode ? <><h2>Sign in to {brand}</h2><p>With your account’s email and password.</p></> : <><h2>Sign in with email</h2><p>We’ll send you a 6-digit code.</p></>}</div>
                   <form className={styles.form} onSubmit={submitEmail} noValidate>
-                    <Input ref={emailRef} label="E-mail" type="email" name="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="nom@exemple.fr" value={email} readOnly={busy === "email"} error={emailError} onChange={event => setEmail(event.target.value)} onBlur={() => { if (email.trim()) setTouched(true); }} />
-                    {passwordMode && <PasswordField label="Mot de passe" name="password" autoComplete="current-password" value={password} readOnly={busy === "email"} onChange={event => { setPassword(event.target.value); if (signInError) setSignInError(""); }} messages={{ showPassword: "Afficher le mot de passe", hidePassword: "Masquer le mot de passe" }} />}
+                    <Input ref={emailRef} label="Email" type="email" name="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="name@example.com" value={email} readOnly={busy === "email"} error={emailError} onChange={event => setEmail(event.target.value)} onBlur={() => { if (email.trim()) setTouched(true); }} />
+                    {passwordMode && <PasswordField label="Password" name="password" autoComplete="current-password" value={password} readOnly={busy === "email"} onChange={event => { setPassword(event.target.value); if (signInError) setSignInError(""); }} messages={{ showPassword: "Show password", hidePassword: "Hide password" }} />}
                     {signInError && <p className={styles.signInError} role="alert">{signInError}</p>}
-                    <Button type="submit" className={styles.wide} loading={busy === "email"}>{signingUp ? "Créer mon compte" : passwordMode ? "Se connecter" : "Envoyer le code"}</Button>
+                    <Button type="submit" className={styles.wide} loading={busy === "email"}>{signingUp ? "Create my account" : passwordMode ? "Sign in" : "Send code"}</Button>
                   </form>
-                  {passwordMode && onForgotPassword && <button type="button" className={styles.textButton} onClick={onForgotPassword}>Mot de passe oublié ?</button>}
-                  {!signingUp && !passwordMode && <button type="button" className={styles.textButton} onClick={switchToPasskey}><FingerprintPattern size={14} strokeWidth={1.75} aria-hidden="true" />Utiliser un passkey</button>}
+                  {passwordMode && onForgotPassword && <button type="button" className={styles.textButton} onClick={onForgotPassword}>Forgot password?</button>}
+                  {!signingUp && !passwordMode && <button type="button" className={styles.textButton} onClick={switchToPasskey}><FingerprintPattern size={14} strokeWidth={1.75} aria-hidden="true" />Use a passkey</button>}
                 </motion.div>}
 
                 {step === "code" && <motion.div key="code" className={styles.step} custom={custom} variants={stepMotion} initial="enter" animate="center" exit="exit">
@@ -449,12 +449,12 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
                     <g transform="rotate(-90 24 24)"><motion.circle cx="24" cy="24" r="22.25" fill="none" stroke="currentColor" strokeWidth="1.5" initial={reduce ? false : { pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { duration: motionTokens.duration.considered, ease: [...motionTokens.ease.inOut], delay: .16 }, opacity: { duration: motionTokens.duration.instant, delay: .16 } }} /></g>
                     <motion.path d="M15.5 24.5l5.5 5.5 11.5-12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { duration: motionTokens.duration.standard + .08, ease: [...motionTokens.ease.enter], delay: .52 }, opacity: { duration: motionTokens.duration.instant, delay: .52 } }} />
                   </svg>
-                  <div className={styles.heading}><h2 ref={doneRef} tabIndex={-1}>{signingUp ? `Bienvenue sur ${brand}` : "Content de te revoir"}</h2><p>{signingUp ? "Ton compte est prêt. " : "Tu es connecté en tant que "}<span className={styles.address}>{account}</span>{signingUp ? "" : "."}</p></div>
+                  <div className={styles.heading}><h2 ref={doneRef} tabIndex={-1}>{signingUp ? `Welcome to ${brand}` : "Welcome back"}</h2><p>{signingUp ? "Your account is ready. " : "You’re signed in as "}<span className={styles.address}>{account}</span>{signingUp ? "" : "."}</p></div>
                   <dl className={styles.details}>
-                    <div><dt>Méthode</dt><dd>{method === "Password" ? "Mot de passe" : method}</dd></div>
-                    <div><dt>Cet appareil</dt><dd>Mémorisé 30 jours</dd></div>
+                    <div><dt>Method</dt><dd>{method}</dd></div>
+                    <div><dt>This device</dt><dd>Remembered for 30 days</dd></div>
                   </dl>
-                  {!passwordMode && <Button type="button" variant="secondary" className={styles.wide} onClick={signOut}>Se déconnecter</Button>}
+                  {!passwordMode && <Button type="button" variant="secondary" className={styles.wide} onClick={signOut}>Sign out</Button>}
                 </motion.div>}
               </AnimatePresence>
             </div>
@@ -465,9 +465,9 @@ export function LoginCentered({ demoCode = "482913", fullScreen = false, demoEma
       <footer className={styles.foot}>
         <p className={styles.srOnly} role="status" aria-live="polite">{status}</p>
         <span className={styles.status} aria-hidden="true"><AnimatePresence mode="popLayout" initial={false}><motion.span key={status} {...swap(reduce)}>{status}</motion.span></AnimatePresence></span>
-        <nav className={styles.legal} aria-label="Mentions légales">
-          <a href={termsHref} onClick={openLegal(termsHref, "Conditions")}>Conditions</a>
-          <a href={privacyHref} onClick={openLegal(privacyHref, "Confidentialité")}>Confidentialité</a>
+        <nav className={styles.legal} aria-label="Legal">
+          <a href={termsHref} onClick={openLegal(termsHref, "Terms")}>Terms</a>
+          <a href={privacyHref} onClick={openLegal(privacyHref, "Privacy")}>Privacy</a>
         </nav>
       </footer>
     </section>

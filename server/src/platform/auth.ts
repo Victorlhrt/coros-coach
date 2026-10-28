@@ -51,15 +51,15 @@ type Env = { Variables: { user: SessionUser } }
 
 export const requireUser: MiddlewareHandler<Env> = async (c, next) => {
   const user = await currentUser(c)
-  if (!user || user.status !== 'active') return c.json({ error: 'Non connecté' }, 401)
+  if (!user || user.status !== 'active') return c.json({ error: 'Not logged in' }, 401)
   c.set('user', user)
   await next()
 }
 
 export const requireAdmin: MiddlewareHandler<Env> = async (c, next) => {
   const user = await currentUser(c)
-  if (!user || user.status !== 'active') return c.json({ error: 'Non connecté' }, 401)
-  if (user.role !== 'admin') return c.json({ error: 'Réservé aux administrateurs' }, 403)
+  if (!user || user.status !== 'active') return c.json({ error: 'Not logged in' }, 401)
+  if (user.role !== 'admin') return c.json({ error: 'Admins only' }, 403)
   c.set('user', user)
   await next()
 }
@@ -105,16 +105,16 @@ platformAuthRoutes.get('/me', async (c) => {
 
 platformAuthRoutes.post('/signup', async (c) => {
   const parsed = SignupBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Vérifie le nom, l’e-mail et le mot de passe (8 caractères minimum).' }, 400)
+  if (!parsed.success) return c.json({ error: 'Check your name, email and password (at least 8 characters).' }, 400)
   const body = parsed.data
 
   const isAdmin = config.adminEmails.includes(body.email)
   const mode = await getSetting<'open' | 'waitlist' | 'closed'>('signup_mode', 'open')
-  if (mode === 'closed' && !isAdmin) return c.json({ error: 'Les inscriptions sont fermées pour le moment.' }, 403)
+  if (mode === 'closed' && !isAdmin) return c.json({ error: 'Sign-ups are closed for now.' }, 403)
   const status: UserStatus = isAdmin || mode === 'open' ? 'active' : 'waitlist'
 
   const [existing] = await db`select 1 from users where email = ${body.email}`
-  if (existing) return c.json({ error: 'Un compte existe déjà avec cet e-mail. Connecte-toi.' }, 409)
+  if (existing) return c.json({ error: 'An account already exists with this email. Log in instead.' }, 409)
 
   let variant: string | null = null
   if (body.onboardingSessionId) {
@@ -148,23 +148,23 @@ platformAuthRoutes.post('/signup', async (c) => {
 
 platformAuthRoutes.post('/login', async (c) => {
   const ip = clientIp(c)
-  if (throttled(ip)) return c.json({ error: 'Trop d’essais, réessaie dans 15 minutes.' }, 429)
+  if (throttled(ip)) return c.json({ error: 'Too many attempts, try again in 15 minutes.' }, 429)
   const parsed = LoginBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'E-mail ou mot de passe incorrect.' }, 400)
+  if (!parsed.success) return c.json({ error: 'Incorrect email or password.' }, 400)
   const { email, password } = parsed.data
 
   const [user] = await db<{ id: string; password_hash: string; status: UserStatus; role: UserRole }[]>`
     select id, password_hash, status, role from users where email = ${email}`
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     recordFailure(ip)
-    return c.json({ error: 'E-mail ou mot de passe incorrect.' }, 401)
+    return c.json({ error: 'Incorrect email or password.' }, 401)
   }
   if (config.adminEmails.includes(email) && (user.role !== 'admin' || user.status !== 'active')) {
     await db`update users set role = 'admin', status = 'active' where id = ${user.id}`
     user.status = 'active'
   }
-  if (user.status === 'waitlist') return c.json({ error: 'Ton compte est sur liste d’attente : on te prévient dès qu’il est ouvert.' }, 403)
-  if (user.status === 'suspended') return c.json({ error: 'Ce compte est suspendu.' }, 403)
+  if (user.status === 'waitlist') return c.json({ error: 'Your account is on the waitlist: we’ll let you know as soon as it’s open.' }, 403)
+  if (user.status === 'suspended') return c.json({ error: 'This account is suspended.' }, 403)
 
   await db`update users set last_login_at = now() where id = ${user.id}`
   await startSession(c, user.id)
@@ -185,17 +185,17 @@ const RESET_MINUTES = 60
 /** Répond toujours pareil, que l'adresse existe ou non : on ne révèle pas qui a un compte. */
 platformAuthRoutes.post('/forgot', async (c) => {
   const ip = clientIp(c)
-  if (throttled(ip)) return c.json({ error: 'Trop d’essais, réessaie dans 15 minutes.' }, 429)
+  if (throttled(ip)) return c.json({ error: 'Too many attempts, try again in 15 minutes.' }, 429)
   recordFailure(ip)
   const parsed = z.object({ email: z.string().trim().toLowerCase().email() }).safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Adresse e-mail invalide.' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid email address.' }, 400)
   const [user] = await db<{ id: string; name: string; status: UserStatus }[]>`select id, name, status from users where email = ${parsed.data.email}`
   if (user && user.status !== 'suspended') {
     const token = randomBytes(32).toString('base64url')
     await db`
       insert into password_resets (token_hash, user_id, expires_at)
       values (${hashToken(token)}, ${user.id}, now() + ${`${RESET_MINUTES} minutes`}::interval)`
-    const url = `${config.origin}/reinitialiser?token=${token}`
+    const url = `${config.origin}/reset-password?token=${token}`
     sendEmailLater(parsed.data.email, 'password-reset', emails.passwordReset({ name: user.name, url, minutes: RESET_MINUTES }))
   }
   return c.json({ ok: true })
@@ -203,12 +203,12 @@ platformAuthRoutes.post('/forgot', async (c) => {
 
 platformAuthRoutes.post('/reset', async (c) => {
   const parsed = z.object({ token: z.string().min(20), password: z.string().min(8).max(200) }).safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Mot de passe trop court (8 caractères minimum).' }, 400)
+  if (!parsed.success) return c.json({ error: 'Password too short (at least 8 characters).' }, 400)
   const [reset] = await db<{ user_id: string }[]>`
     update password_resets set used_at = now()
     where token_hash = ${hashToken(parsed.data.token)} and used_at is null and expires_at > now()
     returning user_id`
-  if (!reset) return c.json({ error: 'Ce lien a expiré ou a déjà servi. Refais une demande.' }, 400)
+  if (!reset) return c.json({ error: 'This link has expired or has already been used. Request a new one.' }, 400)
   const [user] = await db<{ email: string; status: UserStatus }[]>`
     update users set password_hash = ${await hashPassword(parsed.data.password)} where id = ${reset.user_id} returning email, status`
   // Toutes les autres sessions tombent : le mot de passe a changé.

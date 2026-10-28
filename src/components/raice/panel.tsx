@@ -16,7 +16,7 @@ export function PanelHeader({ title, subtitle, actions, className }: { title: Re
         <h2 className="font-medium text-[17px] leading-snug tracking-tight">{title}</h2>
         {subtitle && <p className="mt-0.5 text-muted-foreground text-sm">{subtitle}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   )
 }

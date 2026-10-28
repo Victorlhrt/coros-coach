@@ -62,7 +62,7 @@ export function NavUser() {
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
-					onSelect={() => void logout().then(() => navigate("/connexion"))}
+					onSelect={() => void logout().then(() => navigate("/login"))}
 					variant="destructive"
 				>
 					<LogOutIcon />

@@ -25,7 +25,7 @@ export const requireCoachAccess: MiddlewareHandler = async (c, next) => {
     return next()
   }
   if (await isAuthenticated(c)) return next()
-  return c.json({ error: 'Non connecté' }, 401)
+  return c.json({ error: 'Not logged in' }, 401)
 }
 
 const platformUser = (c: Context) => c.get('platformUser' as never) as SessionUser | undefined
@@ -56,7 +56,7 @@ stateRoutes.get('/', async (c) => {
 
 stateRoutes.put('/', async (c) => {
   const { baseVersion, data } = await c.req.json<{ baseVersion: number; data: unknown }>()
-  if (typeof baseVersion !== 'number' || data === null || typeof data !== 'object') return c.json({ error: 'Requête invalide.' }, 400)
+  if (typeof baseVersion !== 'number' || data === null || typeof data !== 'object') return c.json({ error: 'Invalid request.' }, 400)
 
   const user = platformUser(c)
   if (user) {
@@ -72,7 +72,7 @@ stateRoutes.put('/', async (c) => {
             where user_id = ${user.id} and version = ${baseVersion}
             returning version, data, updated_at`
     if (row) return c.json({ version: row.version, updated_at: row.updated_at })
-    return c.json({ error: 'Conflit de version', current: await readUserState(user) }, 409)
+    return c.json({ error: 'Version conflict', current: await readUserState(user) }, 409)
   }
 
   const json = sql.json(data as Parameters<typeof sql.json>[0])
@@ -89,5 +89,5 @@ stateRoutes.put('/', async (c) => {
   if (row) return c.json({ version: row.version, updated_at: row.updated_at })
 
   const [current] = await sql<Row[]>`select version, data, updated_at from app_state where id = 1`
-  return c.json({ error: 'Conflit de version', current }, 409)
+  return c.json({ error: 'Version conflict', current }, 409)
 })

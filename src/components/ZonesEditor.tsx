@@ -38,14 +38,18 @@ export function ZonesEditor() {
       <p className="mt-1.5 text-xs text-muted-foreground">Threshold pace (min/km) used to derive the zones.</p>
       <div className="mt-4 space-y-2">
         {zones.map((z) => (
-          <div key={`${z.zone}-${z.paceFast}-${z.paceSlow}`} className="flex items-center gap-2">
+          <div
+            key={`${z.zone}-${z.paceFast}-${z.paceSlow}`}
+            className="grid grid-cols-[0.375rem_5.5rem_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:grid-cols-[0.375rem_7rem_minmax(0,1fr)_auto_minmax(0,1fr)]"
+          >
             <span className="h-8 w-1.5 rounded-full" style={{ backgroundColor: zoneColor(z.zone) }} />
-            <span className="w-24 text-sm font-medium">
-              Z{z.zone} {ZONE_NAMES[z.zone] ?? z.name}
+            <span className="min-w-0 text-sm leading-tight">
+              <span className="block font-medium">Z{z.zone}</span>
+              <span className="block truncate text-muted-foreground text-xs">{ZONE_NAMES[z.zone] ?? z.name}</span>
             </span>
-            <Input className="h-10 text-center tabular-nums" defaultValue={formatPace(z.paceFast)} onBlur={(e) => edit(z.zone, 'paceFast', e.target.value)} />
+            <Input className="h-10 w-full min-w-0 text-center tabular-nums" defaultValue={formatPace(z.paceFast)} onBlur={(e) => edit(z.zone, 'paceFast', e.target.value)} />
             <span className="text-muted-foreground">–</span>
-            <Input className="h-10 text-center tabular-nums" defaultValue={formatPace(z.paceSlow)} onBlur={(e) => edit(z.zone, 'paceSlow', e.target.value)} />
+            <Input className="h-10 w-full min-w-0 text-center tabular-nums" defaultValue={formatPace(z.paceSlow)} onBlur={(e) => edit(z.zone, 'paceSlow', e.target.value)} />
           </div>
         ))}
       </div>

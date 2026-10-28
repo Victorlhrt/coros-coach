@@ -7,7 +7,7 @@ import type { OnboardingStep } from './onboarding-defaults.js'
 
 type Variant = { id: string; name: string; description: string; status: string; weight: number; steps: OnboardingStep[] }
 
-const DISTANCE_LABELS: Record<string, string> = { '5k': '5 km', '10k': '10 km', half: 'Semi-marathon', marathon: 'Marathon', trail: 'Trail' }
+const DISTANCE_LABELS: Record<string, string> = { '5k': '5 km', '10k': '10 km', half: 'Half marathon', marathon: 'Marathon', trail: 'Trail' }
 
 /** Demande de plan créée à la fin d'un onboarding, dès qu'un compte y est rattaché (une seule par parcours). */
 export async function createPlanFromSession(sessionId: string, userId: string) {
@@ -24,7 +24,7 @@ export async function createPlanFromSession(sessionId: string, userId: string) {
   const weeks = raceDate ? Math.max(1, Math.round((Date.parse(raceDate) - Date.now()) / (7 * 86400_000))) : null
   await db`
     insert into plans (user_id, onboarding_session_id, title, goal_distance, goal_date, level, weeks, sessions_per_week, status, data)
-    values (${userId}, ${sessionId}, ${`Préparation ${DISTANCE_LABELS[distance] ?? distance}`}, ${distance}, ${raceDate},
+    values (${userId}, ${sessionId}, ${`${DISTANCE_LABELS[distance] ?? distance} plan`}, ${distance}, ${raceDate},
             ${typeof a.level === 'string' ? a.level : null}, ${weeks}, ${days}, 'requested', ${db.json({ answers: a } as never)})`
 }
 
@@ -35,10 +35,10 @@ onboardingRoutes.get('/pick', async (c) => {
   const forced = c.req.query('variant')
   if (forced) {
     const [v] = await db<Variant[]>`select id, name, description, status, weight, steps from onboarding_variants where id = ${forced} and status <> 'archived'`
-    return v ? c.json(v) : c.json({ error: 'Parcours introuvable' }, 404)
+    return v ? c.json(v) : c.json({ error: 'Onboarding flow not found' }, 404)
   }
   const live = await db<Variant[]>`select id, name, description, status, weight, steps from onboarding_variants where status = 'live' and weight > 0`
-  if (!live.length) return c.json({ error: 'Aucun parcours actif' }, 404)
+  if (!live.length) return c.json({ error: 'No active onboarding flow' }, 404)
   const total = live.reduce((sum, v) => sum + v.weight, 0)
   let r = Math.random() * total
   const picked = live.find((v) => (r -= v.weight) < 0) ?? live[0]
@@ -50,12 +50,12 @@ const ProgressBody = z.object({ answers: z.record(z.string(), z.unknown()), step
 
 onboardingRoutes.post('/sessions', async (c) => {
   const parsed = StartBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Requête invalide' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid request' }, 400)
   const user = await currentUser(c)
   // Sur invitation : un code valide est demandé, sauf aux coureurs déjà inscrits et aux aperçus des admins.
   const preview = !!parsed.data.preview && user?.role === 'admin'
   const code = await validCode(parsed.data.inviteCode)
-  if (!user && !code) return c.json({ error: 'Code d’invitation invalide ou épuisé' }, 403)
+  if (!user && !code) return c.json({ error: 'Invite code is invalid or used up' }, 403)
   const [row] = await db<{ id: string }[]>`
     insert into onboarding_sessions (variant_id, user_id, is_preview, invite_code)
     values (${parsed.data.variantId}, ${user?.id ?? null}, ${preview}, ${code?.code ?? null})
@@ -65,14 +65,14 @@ onboardingRoutes.post('/sessions', async (c) => {
 
 onboardingRoutes.patch('/sessions/:id', async (c) => {
   const parsed = ProgressBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Requête invalide' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid request' }, 400)
   const { answers, stepReached } = parsed.data
   const [row] = await db`
     update onboarding_sessions
     set answers = ${db.json(answers as never)}, step_reached = greatest(step_reached, ${stepReached}), updated_at = now()
     where id = ${c.req.param('id')} and completed_at is null
     returning id`
-  return row ? c.json({ ok: true }) : c.json({ error: 'Parcours introuvable ou terminé' }, 404)
+  return row ? c.json({ ok: true }) : c.json({ error: 'Onboarding session not found or already finished' }, 404)
 })
 
 onboardingRoutes.post('/sessions/:id/complete', async (c) => {
@@ -84,7 +84,7 @@ onboardingRoutes.post('/sessions/:id/complete', async (c) => {
     from (select completed_at is null first from onboarding_sessions where id = ${id}) before
     where s.id = ${id}
     returning s.user_id, s.is_preview, s.invite_code, before.first`
-  if (!row) return c.json({ error: 'Parcours introuvable' }, 404)
+  if (!row) return c.json({ error: 'Onboarding flow not found' }, 404)
   // Un usage du code est compté une fois, à la fin du parcours.
   if (row.first && row.invite_code && !row.is_preview) await db`update invite_codes set uses = uses + 1 where code = ${row.invite_code}`
   if (row.user_id && !row.is_preview) {

@@ -40,3 +40,32 @@ accountRoutes.get('/invite', async (c) => {
   }
   return c.json(code)
 })
+
+type Shoe = { brand: string; model: string; km: number; rotation: boolean }
+
+/**
+ * Paires de chaussures du coureur, modifiables depuis Equipment. Rangées dans les réponses du dernier
+ * onboarding (`shoes`), avec `gear` gardé sur la première paire pour ce qui lit encore l'ancien champ.
+ */
+accountRoutes.put('/shoes', async (c) => {
+  const body = await c.req.json<{ shoes?: unknown }>().catch(() => ({ shoes: undefined }))
+  if (!Array.isArray(body.shoes) || body.shoes.length > 20) return c.json({ error: 'Invalid shoe list.' }, 400)
+  const shoes: Shoe[] = []
+  for (const s of body.shoes as Partial<Shoe>[]) {
+    const brand = typeof s?.brand === 'string' ? s.brand.trim().slice(0, 60) : ''
+    const km = Number(s?.km)
+    if (!brand || !Number.isFinite(km) || km < 0 || km > 10000) return c.json({ error: 'Each pair needs a brand and a mileage between 0 and 10,000 km.' }, 400)
+    shoes.push({ brand, model: typeof s.model === 'string' ? s.model.trim().slice(0, 80) : '', km: Math.round(km), rotation: !!s.rotation })
+  }
+  const first = shoes[0]
+  const gear = first ? { brand: first.brand, model: first.model, shoeKm: first.km, rotation: first.rotation } : null
+  const [row] = await db<{ id: string }[]>`
+    update onboarding_sessions set answers = answers || ${db.json({ shoes, gear } as never)}, updated_at = now()
+    where id = (
+      select id from onboarding_sessions where user_id = ${c.get('user').id}
+      order by completed_at desc nulls last, updated_at desc limit 1
+    )
+    returning id`
+  if (!row) return c.json({ error: 'Finish onboarding before adding shoes.' }, 404)
+  return c.json({ shoes })
+})

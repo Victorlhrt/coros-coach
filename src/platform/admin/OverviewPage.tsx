@@ -105,7 +105,7 @@ export function OverviewPage() {
                 <strong className="font-medium">{m.waitlist}</strong> {m.waitlist > 1 ? 'personnes attendent' : 'personne attend'} sur la liste d’attente.
               </span>
               <Button asChild size="sm" variant="outline">
-                <Link to="/admin/inscriptions?status=waitlist">Valider les inscriptions</Link>
+                <Link to="/admin/signups?status=waitlist">Valider les inscriptions</Link>
               </Button>
             </div>
           )}

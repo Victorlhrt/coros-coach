@@ -7,14 +7,14 @@ export function ShareButtons({ url, text, subject }: { url: string; text: string
   const links = [
     { label: 'WhatsApp', href: `https://wa.me/?text=${encodeURIComponent(message)}`, icon: <MessageCircleIcon /> },
     { label: 'SMS', href: `sms:?&body=${encodeURIComponent(message)}`, icon: <MessageSquareTextIcon /> },
-    { label: 'E-mail', href: `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`, icon: <MailIcon /> },
+    { label: 'Email', href: `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`, icon: <MailIcon /> },
   ]
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 rounded-[16px] border bg-background py-1.5 pr-1.5 pl-4">
         <span className="min-w-0 flex-1 truncate text-sm">{url.replace(/^https?:\/\//, '')}</span>
-        <CopyButton value={url} label="Copier" />
+        <CopyButton value={url} label="Copy" />
       </div>
       <div className="grid grid-cols-3 gap-2">
         {links.map((l) => (
@@ -36,7 +36,7 @@ export function ShareButtons({ url, text, subject }: { url: string; text: string
           onClick={() => void navigator.share({ title: subject, text, url }).catch(() => {})}
           className="flex items-center justify-center gap-2 rounded-[16px] border p-3 text-sm hover:border-foreground/50"
         >
-          <Share2Icon className="size-4" /> Plus d’options
+          <Share2Icon className="size-4" /> More options
         </button>
       )}
     </div>

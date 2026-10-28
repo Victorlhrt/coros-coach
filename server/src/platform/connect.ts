@@ -95,16 +95,16 @@ class ServerCorosProvider implements OAuthClientProvider {
 connectRoutes.post('/coros/start', async (c) => {
   const body = (await c.req.json().catch(() => null)) as { sessionId?: string } | null
   const sessionId = body?.sessionId
-  if (!sessionId) return c.json({ error: 'Parcours manquant' }, 400)
+  if (!sessionId) return c.json({ error: 'Missing onboarding session' }, 400)
   const [session] = await db`select 1 from onboarding_sessions where id = ${sessionId} and completed_at is null`
-  if (!session) return c.json({ error: 'Parcours introuvable ou terminé' }, 404)
+  if (!session) return c.json({ error: 'Onboarding session not found or already finished' }, 404)
   const provider = await new ServerCorosProvider().load()
   try {
     const result = await auth(provider, { serverUrl: COROS_MCP, scope: COROS_SCOPES })
     if (result !== 'REDIRECT' || !provider.authorizationUrl) throw new Error('COROS n’a pas renvoyé de page de connexion')
   } catch (e) {
     console.error('[coros] démarrage OAuth', e)
-    return c.json({ error: 'COROS ne répond pas, réessaie dans un instant.' }, 502)
+    return c.json({ error: 'COROS isn’t responding, try again in a moment.' }, 502)
   }
   await db`insert into oauth_pending (state, provider, onboarding_session_id, verifier)
            values (${provider.state()}, 'coros', ${sessionId}, ${provider.getVerifier()})`
@@ -112,7 +112,7 @@ connectRoutes.post('/coros/start', async (c) => {
 })
 
 const page = (title: string, text: string) =>
-  `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0a0a;color:#fafafa;font:15px/1.5 Inter,system-ui,sans-serif;text-align:center;padding:24px}p{color:#a1a1a1;max-width:340px}</style></head>
 <body><div><h1 style="font-size:20px;font-weight:600">${title}</h1><p>${text}</p></div><script>setTimeout(function(){window.close()},1200)</script></body></html>`
 
@@ -122,21 +122,21 @@ connectRoutes.get('/coros/callback', async (c) => {
   const code = c.req.query('code')
   const [pending] = await db<{ onboarding_session_id: string; verifier: string | null }[]>`
     delete from oauth_pending where state = ${state} and provider = 'coros' returning onboarding_session_id, verifier`
-  if (!pending || !code) return c.html(page('Connexion interrompue', 'Reviens sur Raice.run et relance la connexion COROS.'), 400)
+  if (!pending || !code) return c.html(page('Connection interrupted', 'Go back to Raice.run and start the COROS connection again.'), 400)
   const provider = await new ServerCorosProvider(state, pending.verifier).load()
   try {
     const result = await auth(provider, { serverUrl: COROS_MCP, authorizationCode: code, scope: COROS_SCOPES })
     if (result !== 'AUTHORIZED' || !provider.tokensValue) throw new Error('Autorisation non obtenue')
   } catch (e) {
     console.error('[coros] échange du code', e)
-    return c.html(page('Connexion refusée', 'COROS n’a pas validé la connexion. Reviens sur Raice.run pour réessayer.'), 502)
+    return c.html(page('Connection declined', 'COROS didn’t approve the connection. Go back to Raice.run to try again.'), 502)
   }
   const [session] = await db<{ user_id: string | null }[]>`select user_id from onboarding_sessions where id = ${pending.onboarding_session_id}`
   await db`
     insert into wearable_connections (provider, onboarding_session_id, user_id, tokens)
     values ('coros', ${pending.onboarding_session_id}, ${session?.user_id ?? null}, ${db.json(provider.tokensValue as never)})
     on conflict (provider, onboarding_session_id) do update set tokens = excluded.tokens, updated_at = now()`
-  return c.html(page('COROS connecté', 'Tu peux fermer cette fenêtre et revenir à ta conversation avec Pacer.'))
+  return c.html(page('COROS connected', 'You can close this window and go back to your chat with Pacer.'))
 })
 
 /** État des connexions d'un parcours (interrogé pendant que la fenêtre COROS est ouverte). */

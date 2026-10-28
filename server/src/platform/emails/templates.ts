@@ -2,63 +2,63 @@ import { render, type Email } from './layout.js'
 
 /** Modèles d'e-mails transactionnels de Raice.run. `app` est l'origine publique de l'application. */
 
-const first = (name: string) => name.trim().split(/\s+/)[0] || 'toi'
+const first = (name: string) => name.trim().split(/\s+/)[0] || 'there'
 
 /** Libellés courts : ils tiennent sur une ligne dans les cases de métrique, même sur mobile. */
-const DISTANCES: Record<string, string> = { '5k': '5 km', '10k': '10 km', half: 'Semi', marathon: 'Marathon', trail: 'Trail' }
-const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const DISTANCES: Record<string, string> = { '5k': '5 km', '10k': '10 km', half: 'Half', marathon: 'Marathon', trail: 'Trail' }
+const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 export function welcome(p: { name: string; app: string }): Email {
   return render({
-    subject: 'Bienvenue sur Raice.run',
-    preheader: 'Ton compte est prêt. Ton plan est en préparation.',
+    subject: 'Welcome to Raice.run',
+    preheader: 'Your account is ready. Your plan is on its way.',
     blocks: [
-      { kind: 'eyebrow', text: 'Bienvenue' },
-      { kind: 'title', text: `Bienvenue, ${first(p.name)}.` },
-      { kind: 'paragraph', text: 'Ton compte est prêt. On prépare ton plan à partir de tes réponses : objectif, date de course, niveau et disponibilités.' },
-      { kind: 'paragraph', text: 'Connecte ta montre COROS dès que possible : le plan se cale sur tes allures réelles et tes séances arrivent directement au poignet.' },
-      { kind: 'button', label: 'Ouvrir mon espace', href: `${p.app}/account` },
+      { kind: 'eyebrow', text: 'Welcome' },
+      { kind: 'title', text: `Welcome, ${first(p.name)}.` },
+      { kind: 'paragraph', text: 'Your account is ready. We’re building your plan from your answers: goal, race date, level and availability.' },
+      { kind: 'paragraph', text: 'Connect your COROS watch as soon as you can: your plan adapts to your real paces and your sessions go straight to your wrist.' },
+      { kind: 'button', label: 'Open my account', href: `${p.app}/account` },
     ],
   })
 }
 
 export function waitlist(p: { name: string }): Email {
   return render({
-    subject: 'Tu es sur la liste Raice.run',
-    preheader: 'Les places de la bêta sont limitées : on t’écrit dès que ton compte est ouvert.',
+    subject: 'You’re on the Raice.run list',
+    preheader: 'Beta spots are limited: we’ll email you as soon as your account is open.',
     blocks: [
-      { kind: 'eyebrow', text: 'Liste d’attente' },
-      { kind: 'title', text: `C’est noté, ${first(p.name)}.` },
-      { kind: 'paragraph', text: 'Les places de la bêta sont limitées pour qu’on puisse suivre chaque plan de près. Ton inscription est enregistrée, avec tes réponses.' },
-      { kind: 'paragraph', text: 'On t’écrit dès que ton compte est ouvert. Il n’y a rien d’autre à faire d’ici là.' },
+      { kind: 'eyebrow', text: 'Waitlist' },
+      { kind: 'title', text: `You’re in line, ${first(p.name)}.` },
+      { kind: 'paragraph', text: 'Beta spots are limited so we can follow every plan closely. Your sign-up is saved, along with your answers.' },
+      { kind: 'paragraph', text: 'We’ll email you as soon as your account is open. There’s nothing else to do until then.' },
     ],
   })
 }
 
 export function accountApproved(p: { name: string; app: string }): Email {
   return render({
-    subject: 'Ton compte Raice.run est ouvert',
-    preheader: 'Ta place dans la bêta est prête. Connecte-toi pour lancer ton plan.',
+    subject: 'Your Raice.run account is open',
+    preheader: 'Your beta spot is ready. Log in to start your plan.',
     blocks: [
-      { kind: 'eyebrow', text: 'Compte ouvert' },
-      { kind: 'title', text: `C’est ton tour, ${first(p.name)}.` },
-      { kind: 'paragraph', text: 'Ta place dans la bêta est prête. Connecte-toi avec l’e-mail et le mot de passe choisis à l’inscription : ton plan démarre à partir de tes réponses.' },
-      { kind: 'button', label: 'Me connecter', href: `${p.app}/connexion` },
+      { kind: 'eyebrow', text: 'Account open' },
+      { kind: 'title', text: `It’s your turn, ${first(p.name)}.` },
+      { kind: 'paragraph', text: 'Your beta spot is ready. Log in with the email and password you chose when you signed up: your plan starts from your answers.' },
+      { kind: 'button', label: 'Log in', href: `${p.app}/login` },
     ],
   })
 }
 
 export function passwordReset(p: { name: string; url: string; minutes: number }): Email {
   return render({
-    subject: 'Réinitialise ton mot de passe Raice.run',
-    preheader: `Lien valable ${p.minutes} minutes.`,
-    footer: 'Tu reçois cet e-mail parce qu’une réinitialisation a été demandée pour ton compte. Si ce n’est pas toi, ignore-le : ton mot de passe ne change pas.',
+    subject: 'Reset your Raice.run password',
+    preheader: `Link valid for ${p.minutes} minutes.`,
+    footer: 'You’re receiving this email because a password reset was requested for your account. If it wasn’t you, ignore it: your password won’t change.',
     blocks: [
-      { kind: 'eyebrow', text: 'Mot de passe' },
-      { kind: 'title', text: 'Nouveau mot de passe' },
-      { kind: 'paragraph', text: `Bonjour ${first(p.name)}, voici le lien pour choisir un nouveau mot de passe. Il est valable ${p.minutes} minutes et ne sert qu’une fois.` },
-      { kind: 'button', label: 'Choisir un mot de passe', href: p.url },
-      { kind: 'note', text: 'Le bouton ne marche pas ? Copie ce lien dans ton navigateur :' },
+      { kind: 'eyebrow', text: 'Password' },
+      { kind: 'title', text: 'New password' },
+      { kind: 'paragraph', text: `Hi ${first(p.name)}, here’s the link to choose a new password. It’s valid for ${p.minutes} minutes and can only be used once.` },
+      { kind: 'button', label: 'Choose a password', href: p.url },
+      { kind: 'note', text: 'Button not working? Copy this link into your browser:' },
       { kind: 'code', text: p.url },
     ],
   })
@@ -66,19 +66,19 @@ export function passwordReset(p: { name: string; url: string; minutes: number })
 
 export function planReady(p: { name: string; app: string; title: string; distance: string; goalDate: string | null; weeks: number | null }): Email {
   const metrics = [
-    { label: 'Objectif', value: DISTANCES[p.distance] ?? p.distance },
-    ...(p.weeks ? [{ label: 'Durée', value: `${p.weeks} sem.` }] : []),
-    ...(p.goalDate ? [{ label: 'Course', value: dateFmt.format(new Date(`${p.goalDate}T00:00:00Z`)) }] : []),
+    { label: 'Goal', value: DISTANCES[p.distance] ?? p.distance },
+    ...(p.weeks ? [{ label: 'Length', value: `${p.weeks} wks` }] : []),
+    ...(p.goalDate ? [{ label: 'Race', value: dateFmt.format(new Date(`${p.goalDate}T00:00:00Z`)) }] : []),
   ]
   return render({
-    subject: 'Ton plan est prêt',
-    preheader: `${p.title} : la première semaine t’attend.`,
+    subject: 'Your plan is ready',
+    preheader: `${p.title}: your first week is waiting.`,
     blocks: [
-      { kind: 'eyebrow', text: 'Plan prêt' },
+      { kind: 'eyebrow', text: 'Plan ready' },
       { kind: 'title', text: p.title },
       { kind: 'metrics', items: metrics },
-      { kind: 'paragraph', text: `${first(p.name)}, ton plan est construit semaine par semaine jusqu’au jour J. Chaque séance a ses allures et ses récupérations ; il s’ajuste ensuite selon tes sensations.` },
-      { kind: 'button', label: 'Voir mon plan', href: `${p.app}/account` },
+      { kind: 'paragraph', text: `${first(p.name)}, your plan is built week by week all the way to race day. Every session has its paces and recoveries, and it adjusts to how you feel.` },
+      { kind: 'button', label: 'View my plan', href: `${p.app}/account` },
     ],
   })
 }
@@ -86,26 +86,26 @@ export function planReady(p: { name: string; app: string; title: string; distanc
 /** Catalogue pour l'aperçu du back office, avec des données d'exemple. */
 export function waitlistJoined(p: { name: string; position: number; shareUrl: string }): Email {
   return render({
-    subject: `Tu es n° ${p.position} sur la liste Raice.run`,
-    preheader: 'Fais passer ton lien : chaque ami inscrit te fait remonter.',
+    subject: `You’re #${p.position} on the Raice.run list`,
+    preheader: 'Share your link: every friend who signs up moves you up.',
     blocks: [
-      { kind: 'eyebrow', text: 'Liste d’attente' },
-      { kind: 'title', text: `Bien reçu, ${first(p.name)} !` },
-      { kind: 'paragraph', text: `Tu es n° ${p.position} sur la liste. Raice.run ouvre sur invitation, par petites vagues. Chaque ami qui s’inscrit avec ton lien te fait remonter.` },
-      { kind: 'button', label: 'Partager mon lien', href: p.shareUrl },
+      { kind: 'eyebrow', text: 'Waitlist' },
+      { kind: 'title', text: `Got it, ${first(p.name)}!` },
+      { kind: 'paragraph', text: `You’re #${p.position} on the list. Raice.run is invite-only, opening in small waves. Every friend who signs up with your link moves you up.` },
+      { kind: 'button', label: 'Share my link', href: p.shareUrl },
     ],
   })
 }
 
 export function invited(p: { name: string; app: string; code: string }): Email {
   return render({
-    subject: 'Ton invitation Raice.run est arrivée',
-    preheader: `Ton code : ${p.code}. Crée ton plan dès maintenant.`,
+    subject: 'Your Raice.run invite is here',
+    preheader: `Your code: ${p.code}. Create your plan now.`,
     blocks: [
-      { kind: 'eyebrow', text: 'Invitation' },
-      { kind: 'title', text: `C’est ton tour, ${first(p.name)}.` },
-      { kind: 'paragraph', text: `Ton code d’accès : ${p.code}. Réponds aux questions de Pacer, ton coach, et ton plan est prêt en quelques minutes.` },
-      { kind: 'button', label: 'Créer mon plan', href: `${p.app}/onboarding?code=${encodeURIComponent(p.code)}` },
+      { kind: 'eyebrow', text: 'Invite' },
+      { kind: 'title', text: `It’s your turn, ${first(p.name)}.` },
+      { kind: 'paragraph', text: `Your access code: ${p.code}. Answer a few questions from Pacer, your coach, and your plan is ready in minutes.` },
+      { kind: 'button', label: 'Create my plan', href: `${p.app}/onboarding?code=${encodeURIComponent(p.code)}` },
     ],
   })
 }
@@ -127,12 +127,12 @@ export const CATALOG = {
   'password-reset': {
     label: 'Mot de passe oublié',
     when: 'Demande de réinitialisation',
-    sample: (app: string) => passwordReset({ name: 'Camille Martin', url: `${app}/reinitialiser?token=exemple`, minutes: 60 }),
+    sample: (app: string) => passwordReset({ name: 'Camille Martin', url: `${app}/reset-password?token=exemple`, minutes: 60 }),
   },
   'plan-ready': {
     label: 'Plan prêt',
     when: 'Un plan passe au statut « Actif »',
-    sample: (app: string) => planReady({ name: 'Camille Martin', app, title: 'Préparation Semi-marathon', distance: 'half', goalDate: '2027-04-11', weeks: 23 }),
+    sample: (app: string) => planReady({ name: 'Camille Martin', app, title: 'Half marathon build', distance: 'half', goalDate: '2027-04-11', weeks: 23 }),
   },
 } as const
 

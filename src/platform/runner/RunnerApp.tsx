@@ -1,10 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PlusIcon, SettingsIcon, ShieldIcon, UserIcon } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, UserIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
+import { Combobox } from '@/components/arc/combobox/combobox'
+import { Input } from '@/components/arc/input/input'
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
 import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Button as LinkButton } from '@/components/shadcn/button'
@@ -41,7 +44,6 @@ import { startStateSync } from '@/lib/server/state-sync'
 import { usePlan, usePlanRepair } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
-import { AdjustPage } from '@/pages/AdjustPage'
 import { DebugPage } from '@/pages/DebugPage'
 import { OnboardingPage as GoalPage } from '@/pages/OnboardingPage'
 import { PlanPage as CoachPlanPage } from '@/pages/PlanPage'
@@ -141,7 +143,7 @@ export default function RunnerApp() {
   }, [me.data, active])
 
   if (me.isPending) return <div className="min-h-dvh" />
-  if (!me.data) return <Navigate to={`/connexion?next=${encodeURIComponent(location.pathname)}`} replace />
+  if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
   if (locked) return <LockScreen />
 
   return (
@@ -208,7 +210,7 @@ function AnalyticsTab() {
 function SettingsTab() {
   const { data } = useOverview()
   return (
-    <div className="flex w-full flex-col gap-10">
+    <div className="flex w-full flex-col gap-4">
       <CoachSettingsPage>
         <Integrations stravaRuns={data?.answers?.strava?.runs} />
       </CoachSettingsPage>
@@ -437,22 +439,12 @@ function OnboardingAnalytics() {
 
 // ---------- Coach ----------
 
-/** Chat avec Pacer (bientôt) et, une fois le plan prêt, le bilan de la semaine. */
+/** Pacer : une seule carte, le bilan de la semaine se fait dans la conversation. */
 function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
-  const hasPlan = usePlan((st) => !!st.plan)
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
-  return (
-    <div className="grid w-full items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <CoachChat firstName={first} className="xl:sticky xl:top-20" />
-      {hasPlan ? (
-        <div className="[&>div>header]:pt-0">
-          <AdjustPage />
-        </div>
-      ) : null}
-    </div>
-  )
+  return <CoachChat firstName={first} className="mx-auto w-full max-w-3xl" />
 }
 
 // ---------- Equipment ----------
@@ -464,27 +456,32 @@ type Shoe = { brand: string; model: string; km: number; rotation: boolean }
 
 function EquipmentPage() {
   const { data, isPending } = useOverview()
+  const [editing, setEditing] = useState<number | 'new' | null>(null)
   if (isPending) return null
-  const a = data?.answers
+  const a = data?.answers as (CompleteAnswers & { shoes?: Shoe[] }) | null | undefined
   if (!a) return <NoOnboarding />
   const g = a.gear
-  const shoes: Shoe[] = g?.brand ? [{ brand: g.brand, model: g.model, km: g.shoeKm, rotation: g.rotation }] : []
+  const shoes: Shoe[] = a.shoes ?? (g?.brand ? [{ brand: g.brand, model: g.model, km: g.shoeKm, rotation: g.rotation }] : [])
   const watches = (a.wearables ?? []).filter((w) => w !== 'none')
   return (
     <>
-      <PageTitle title="Equipment">Your shoes and the devices that track your runs.</PageTitle>
+      <PageTitle title="Equipment">Your shoes and the devices that track your runs. Tap a pair to edit it.</PageTitle>
       <h2 className="mb-3 font-medium text-sm">Shoes</h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {shoes.map((s, i) => (
-          <ShoeCard key={i} shoe={s} />
+          <ShoeCard key={i} shoe={s} onEdit={() => setEditing(i)} />
         ))}
-        <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-[28px] border border-dashed p-6 text-center">
+        <button
+          type="button"
+          onClick={() => setEditing('new')}
+          className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-[28px] border border-dashed p-6 text-center transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02]"
+        >
           <span className="flex size-10 items-center justify-center rounded-full border text-muted-foreground">
             <PlusIcon className="size-4" />
           </span>
-          <p className="font-medium text-sm">Add a pair</p>
-          <p className="max-w-56 text-muted-foreground text-xs">Track the mileage of every pair in your rotation. Coming soon.</p>
-        </div>
+          <span className="font-medium text-sm">Add a pair</span>
+          <span className="max-w-56 text-muted-foreground text-xs">Track the mileage of every pair in your rotation.</span>
+        </button>
       </div>
 
       <h2 className="mt-8 mb-3 font-medium text-sm">Devices</h2>
@@ -506,28 +503,119 @@ function EquipmentPage() {
           </div>
         )}
       </div>
+      <ShoeSheet
+        shoes={shoes}
+        index={editing}
+        onClose={() => setEditing(null)}
+      />
     </>
   )
 }
 
+/** Fiche d'une paire : marque (liste des marques connues), modèle, kilométrage, rotation ; ajout et suppression. */
+function ShoeSheet({ shoes, index, onClose }: { shoes: Shoe[]; index: number | 'new' | null; onClose: () => void }) {
+  const qc = useQueryClient()
+  const open = index !== null
+  const current = typeof index === 'number' ? shoes[index] : undefined
+  const [draft, setDraft] = useState<Shoe>({ brand: '', model: '', km: 0, rotation: false })
+  const [shown, setShown] = useState<number | 'new' | null>(null)
+  // Recharge le brouillon à chaque ouverture sur une autre paire.
+  if (open && shown !== index) {
+    setShown(index)
+    setDraft(current ?? { brand: '', model: '', km: 0, rotation: false })
+  }
+  if (!open && shown !== null) setShown(null)
+  const brands = useQuery({ queryKey: ['shoe-brands'], queryFn: () => api<string[]>('/lookup/shoe-brands'), enabled: open, staleTime: Infinity })
+  const models = useQuery({ queryKey: ['shoes'], queryFn: () => api<{ brand: string; model: string }[]>('/lookup/shoes'), enabled: open, staleTime: Infinity })
+  const save = useMutation({
+    mutationFn: (next: Shoe[]) => api<{ shoes: Shoe[] }>('/account/shoes', { method: 'PUT', body: { shoes: next } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['account', 'overview'] })
+      onClose()
+    },
+  })
+  const commit = () => save.mutate(typeof index === 'number' ? shoes.map((s, i) => (i === index ? draft : s)) : [...shoes, draft])
+  const remove = () => typeof index === 'number' && save.mutate(shoes.filter((_, i) => i !== index))
+  const modelOptions = (models.data ?? []).filter((m) => m.brand === draft.brand).map((m) => m.model)
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full gap-0 sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <SheetHeader className="border-b p-6">
+          <SheetTitle>{current ? 'Edit pair' : 'Add a pair'}</SheetTitle>
+          <SheetDescription>Brand, model and the distance already on the shoes.</SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
+          <div className="flex h-24 items-center justify-center rounded-2xl border bg-card">
+            {draft.brand ? <BrandLogo brand={draft.brand} className="max-h-12 max-w-[60%] text-3xl" /> : <span className="text-muted-foreground text-sm">Pick a brand</span>}
+          </div>
+          <Combobox
+            label="Brand"
+            placeholder="Search a brand"
+            options={(brands.data ?? []).map((b) => ({ value: b, label: b }))}
+            value={draft.brand || undefined}
+            onValueChange={(brand) => setDraft((d) => ({ ...d, brand, model: d.brand === brand ? d.model : '' }))}
+          />
+          <Input label="Model" placeholder="e.g. Speedgoat 6" list="shoe-models" value={draft.model} onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value }))} />
+          <datalist id="shoe-models">
+            {modelOptions.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+          <Input
+            label="Distance (km)"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={10000}
+            value={String(draft.km)}
+            onChange={(e) => setDraft((d) => ({ ...d, km: Math.max(0, Number(e.target.value) || 0) }))}
+          />
+          <label className="flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm">
+            <span>
+              <span className="block font-medium">In rotation</span>
+              <span className="block text-muted-foreground text-xs">You currently run in this pair.</span>
+            </span>
+            <input type="checkbox" className="size-5 accent-[var(--accent)]" checked={draft.rotation} onChange={(e) => setDraft((d) => ({ ...d, rotation: e.target.checked }))} />
+          </label>
+          {save.error && <p className="text-destructive text-sm">{save.error.message}</p>}
+        </div>
+        <SheetFooter className="flex-row gap-2 border-t p-6">
+          {current && (
+            <Button variant="secondary" onClick={remove} disabled={save.isPending}>
+              Remove
+            </Button>
+          )}
+          <Button className="flex-1" onClick={commit} loading={save.isPending} disabled={!draft.brand}>
+            Save
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 /** Carte d'une paire, façon profil UTMB : logo de la marque en grand, modèle, kilométrage et usure. */
-function ShoeCard({ shoe: s }: { shoe: Shoe }) {
+function ShoeCard({ shoe: s, onEdit }: { shoe: Shoe; onEdit: () => void }) {
   const wear = Math.min(1, s.km / SHOE_LIFE_KM)
   const color = wear >= 0.85 ? '#ef4444' : wear >= 0.6 ? '#f2a33a' : '#43b581'
   return (
-    <article className="flex flex-col overflow-hidden rounded-[28px] border bg-card">
-      <div className="relative flex h-40 items-center justify-center bg-[radial-gradient(80%_90%_at_50%_100%,--theme(--color-foreground/.09),transparent)]">
-        <BrandLogo brand={s.brand} className="max-h-14 max-w-[55%] text-4xl" />
+    <button type="button" onClick={onEdit} aria-label={`Edit ${s.brand} ${s.model}`} className="flex flex-col overflow-hidden rounded-[28px] border bg-card text-left transition-colors hover:border-foreground/30">
+      <div className="relative flex h-32 w-full items-center justify-center sm:h-40 bg-[radial-gradient(80%_90%_at_50%_100%,--theme(--color-foreground/.09),transparent)]">
+        <BrandLogo brand={s.brand} className="max-h-12 max-w-[55%] text-4xl" />
         {s.rotation && (
           <Badge size="sm" tone="info" className="absolute top-4 right-4">
             In rotation
           </Badge>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-4 border-t p-6">
-        <div>
+      <div className="flex w-full flex-1 flex-col gap-4 border-t p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
           <p className="text-muted-foreground text-xs uppercase tracking-wider">{s.brand}</p>
-          <p className="mt-0.5 font-medium text-xl tracking-tight">{s.model || 'Unknown model'}</p>
+          <p className="mt-0.5 truncate font-medium text-xl tracking-tight">{s.model || 'Unknown model'}</p>
+          </div>
+          <PencilIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
         </div>
         <div className="mt-auto">
           <div className="flex items-baseline justify-between">
@@ -542,7 +630,7 @@ function ShoeCard({ shoe: s }: { shoe: Shoe }) {
           </div>
         </div>
       </div>
-    </article>
+    </button>
   )
 }
 
@@ -592,23 +680,31 @@ function ProfilePage() {
 function AccountSettings() {
   const logout = useLogout()
   const navigate = useNavigate()
+  const me = useMe().data
   return (
-    <>
-      <PageTitle title="Account" />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Password">
-          <p className="text-muted-foreground text-sm">Get an email link to choose a new one.</p>
-          <LinkButton asChild variant="secondary" className="self-start">
-            <Link to="/mot-de-passe-oublie">Change password</Link>
+    <RPanel>
+      <RPanelHeader title="Account" subtitle={me?.email} />
+      <div className="divide-y border-t">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+          <div className="min-w-0">
+            <p className="font-medium text-sm">Password</p>
+            <p className="text-muted-foreground text-xs">Get an email link to choose a new one.</p>
+          </div>
+          <LinkButton asChild variant="secondary" size="sm">
+            <Link to="/forgot-password">Change password</Link>
           </LinkButton>
-        </Panel>
-        <Panel title="Session">
-          <Button variant="secondary" className="self-start" onClick={() => void logout().then(() => navigate('/'))}>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+          <div className="min-w-0">
+            <p className="font-medium text-sm">Session</p>
+            <p className="text-muted-foreground text-xs">Sign out of {BRAND.name} on this device.</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => void logout().then(() => navigate('/'))}>
             <LogOutIcon className="size-4" /> Log out
           </Button>
-        </Panel>
+        </div>
       </div>
-    </>
+    </RPanel>
   )
 }
 

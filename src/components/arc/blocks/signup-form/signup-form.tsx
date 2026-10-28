@@ -57,9 +57,9 @@ const monoMarks: Record<Exclude<Provider, "Google">, string> = {
 
 function getErrors(name: string, email: string, password: string) {
   return {
-    name: name.trim().length < 2 ? "Indique ton prénom et ton nom." : "",
-    email: !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()) ? "Saisis une adresse complète, comme nom@exemple.fr." : "",
-    password: password.length < 8 ? "8 caractères minimum." : "",
+    name: name.trim().length < 2 ? "Enter your first and last name." : "",
+    email: !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()) ? "Enter a full address, like name@example.com." : "",
+    password: password.length < 8 ? "At least 8 characters." : "",
   };
 }
 
@@ -67,7 +67,7 @@ function passwordScore(password: string) {
   if (!password) return 0;
   return [password.length >= 8, password.length >= 12, /[a-z]/.test(password) && /[A-Z]/.test(password), /\d|[^\w\s]/.test(password)].filter(Boolean).length;
 }
-const strengthLabel = ["", "faible", "moyen", "bon", "solide"];
+const strengthLabel = ["", "weak", "fair", "good", "strong"];
 
 /** Steps cross over sideways out of a small blur; going back, they return from the other side. */
 const stepMotion: Variants = {
@@ -144,7 +144,7 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
   const passwordError = visibleError("password");
   const custom: StepCustom = { direction, reduce };
   const shownError = submitError || serverError || "";
-  const feedback = passwordError ? { key: "error", text: passwordError } : password ? { key: `s${score}`, text: `Mot de passe ${strengthLabel[Math.max(score, 1)]}` } : { key: "hint", text: "8 caractères ou plus." };
+  const feedback = passwordError ? { key: "error", text: passwordError } : password ? { key: `s${score}`, text: `Password ${strengthLabel[Math.max(score, 1)]}` } : { key: "hint", text: "8 characters or more." };
 
   useEffect(() => { const pending = timers.current; return () => pending.forEach(window.clearTimeout); }, []);
   useEffect(() => { if (step === "done") doneRef.current?.focus(); }, [step]);
@@ -158,7 +158,7 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
     setMethod(how);
     setDirection(1);
     setStep("done");
-    setStatus(`Compte créé avec ${how === "Email" ? "ton e-mail" : how}`);
+    setStatus(`Account created with ${how === "Email" ? "your email" : how}`);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -173,14 +173,14 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
       return;
     }
     setBusy("form");
-    setStatus("Création du compte");
+    setStatus("Creating account");
     try {
       await Promise.all([onSubmit?.({ name: name.trim(), email: email.trim(), password, productUpdates }), new Promise(resolve => window.setTimeout(resolve, 400))]);
       finish("Email");
     } catch (error) {
       setBusy(null);
-      setSubmitError(error instanceof Error && error.message ? error.message : "Impossible de créer le compte. Réessaie.");
-      setStatus("Compte non créé");
+      setSubmitError(error instanceof Error && error.message ? error.message : "Couldn’t create the account. Try again.");
+      setStatus("Account not created");
     }
   }
 
@@ -213,24 +213,24 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
   const firstName = name.trim().split(/\s+/)[0] || "";
 
   return (
-    <section className={styles.block} aria-label={`Créer un compte ${brand}`}>
+    <section className={styles.block} aria-label={`Create a ${brand} account`}>
       <motion.div className={styles.viewport} style={{ height }}>
         <div ref={track} className={styles.track}>
           <AnimatePresence mode="popLayout" initial={false} custom={custom}>
             {step === "form" ? (
               <motion.div key="form" className={styles.step} custom={custom} variants={stepMotion} initial="enter" animate="center" exit="exit">
-                <div className={styles.heading}><h2>Crée ton compte</h2><p>Ton plan est prêt à être généré : il ne manque que toi.</p></div>
-                {providers.length > 0 && <><div className={styles.sso} role="group" aria-label="S’inscrire avec">
-                  {providers.map(provider => <Button key={provider} type="button" variant="secondary" className={styles.ssoButton} aria-label={`S’inscrire avec ${provider}`} loading={busy === provider} aria-disabled={(!!busy && busy !== provider) || undefined} onClick={() => continueWith(provider)}>
+                <div className={styles.heading}><h2>Create your account</h2><p>Your plan is ready to be built. All we need is you.</p></div>
+                {providers.length > 0 && <><div className={styles.sso} role="group" aria-label="Sign up with">
+                  {providers.map(provider => <Button key={provider} type="button" variant="secondary" className={styles.ssoButton} aria-label={`Sign up with ${provider}`} loading={busy === provider} aria-disabled={(!!busy && busy !== provider) || undefined} onClick={() => continueWith(provider)}>
                     {provider === "Google" ? <GoogleLogo /> : <svg className={styles.providerMark} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={monoMarks[provider]} /></svg>}{provider}
                   </Button>)}
                 </div>
                 <div className={styles.divider}>ou</div></>}
                 <form onSubmit={event => void submit(event)} noValidate className={styles.form}>
-                  <Input ref={nameRef} label="Prénom et nom" name="name" autoComplete="name" placeholder="Camille Martin" value={name} onChange={event => setName(event.target.value)} onBlur={() => { if (name) markTouched("name"); }} error={visibleError("name")} readOnly={!!busy} />
-                  <Input ref={emailRef} label="E-mail" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="nom@exemple.fr" value={email} onChange={event => setEmail(event.target.value)} onBlur={() => { if (email) markTouched("email"); }} error={visibleError("email")} readOnly={!!busy} />
+                  <Input ref={nameRef} label="Full name" name="name" autoComplete="name" placeholder="Alex Martin" value={name} onChange={event => setName(event.target.value)} onBlur={() => { if (name) markTouched("name"); }} error={visibleError("name")} readOnly={!!busy} />
+                  <Input ref={emailRef} label="Email" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="name@example.com" value={email} onChange={event => setEmail(event.target.value)} onBlur={() => { if (email) markTouched("email"); }} error={visibleError("email")} readOnly={!!busy} />
                   <div className={styles.passwordGroup}>
-                    <PasswordField ref={passwordRef} label="Mot de passe" messages={{ showPassword: "Afficher le mot de passe", hidePassword: "Masquer le mot de passe" }} name="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} onBlur={() => { if (password) markTouched("password"); }} aria-invalid={passwordError ? true : undefined} aria-describedby={feedbackId} readOnly={!!busy} />
+                    <PasswordField ref={passwordRef} label="Password" messages={{ showPassword: "Show password", hidePassword: "Hide password" }} name="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} onBlur={() => { if (password) markTouched("password"); }} aria-invalid={passwordError ? true : undefined} aria-describedby={feedbackId} readOnly={!!busy} />
                     <div className={styles.feedback}>
                       <span id={feedbackId} className={styles.feedbackText} data-error={passwordError ? true : undefined} role={passwordError ? "alert" : undefined}>
                         <AnimatePresence mode="popLayout" initial={false}><motion.span key={feedback.key} {...swap(reduce)}>{feedback.text}</motion.span></AnimatePresence>
@@ -238,15 +238,15 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
                       <span className={styles.meter} data-level={score} aria-hidden="true">{[1, 2, 3, 4].map(bar => <span key={bar} data-on={bar <= score || undefined} />)}</span>
                     </div>
                   </div>
-                  <div className={styles.updates}><Checkbox label="Recevoir les nouveautés par e-mail" checked={productUpdates} onCheckedChange={checked => setProductUpdates(checked === true)} disabled={!!busy} /></div>
+                  <div className={styles.updates}><Checkbox label="Get product updates by email" checked={productUpdates} onCheckedChange={checked => setProductUpdates(checked === true)} disabled={!!busy} /></div>
                   <AnimatePresence initial={false}>
                     {shownError && <motion.div key="error" className={styles.row} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={reduce ? { duration: 0 } : { height: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.fast } }}>
                       <p className={styles.submitError} role="alert">{shownError}</p>
                     </motion.div>}
                   </AnimatePresence>
-                  <Button className={styles.wide} type="submit" loading={busy === "form"}>Créer mon compte</Button>
+                  <Button className={styles.wide} type="submit" loading={busy === "form"}>Create my account</Button>
                 </form>
-                <p className={styles.legal}>En créant un compte, tu acceptes les conditions d’utilisation et la politique de confidentialité.</p>
+                <p className={styles.legal}>By creating an account, you agree to the terms of use and the privacy policy.</p>
               </motion.div>
             ) : (
               <motion.div key="done" className={styles.step} custom={custom} variants={stepMotion} initial="enter" animate="center" exit="exit">
@@ -254,10 +254,10 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
                   <g transform="rotate(-90 24 24)"><motion.circle cx="24" cy="24" r="22.25" fill="none" stroke="currentColor" strokeWidth="1.5" initial={reduce ? false : { pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { duration: motionTokens.duration.considered, ease: motionTokens.ease.inOut, delay: .16 }, opacity: { duration: motionTokens.duration.instant, delay: .16 } }} /></g>
                   <motion.path d="M15.5 24.5l5.5 5.5 11.5-12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { duration: motionTokens.duration.standard + .08, ease: motionTokens.ease.enter, delay: .5 }, opacity: { duration: motionTokens.duration.instant, delay: .5 } }} />
                 </svg>
-                <div className={styles.heading}><h2 ref={doneRef} tabIndex={-1}>{done?.title ?? `Bienvenue${firstName ? `, ${firstName}` : ""}`}</h2><p>{done?.text ?? "Ton compte est prêt."} <span className={styles.address}>{email.trim()}</span></p></div>
+                <div className={styles.heading}><h2 ref={doneRef} tabIndex={-1}>{done?.title ?? `Welcome${firstName ? `, ${firstName}` : ""}`}</h2><p>{done?.text ?? "Your account is ready."} <span className={styles.address}>{email.trim()}</span></p></div>
                 <dl className={styles.details}>
-                  <div><dt>Inscription</dt><dd>{method === "Email" ? "E-mail" : method}</dd></div>
-                  <div><dt>Nouveautés</dt><dd>{productUpdates ? "Oui" : "Non"}</dd></div>
+                  <div><dt>Signed up with</dt><dd>{method}</dd></div>
+                  <div><dt>Product updates</dt><dd>{productUpdates ? "Yes" : "No"}</dd></div>
                 </dl>
                 {done?.onAction ? <Button type="button" className={styles.wide} onClick={done.onAction}>{done.action ?? "Continuer"}</Button> : <Button type="button" variant="secondary" className={styles.wide} onClick={reset}>Recommencer</Button>}
               </motion.div>
@@ -269,7 +269,7 @@ export function SignupForm({ onSubmit, serverError, onProvider, providers = [], 
       <footer className={styles.footer}>
         <p className={styles.srOnly} role="status" aria-live="polite">{status}</p>
         <span className={styles.status} aria-hidden="true"><AnimatePresence mode="popLayout" initial={false}><motion.span key={status} {...swap(reduce)}>{status}</motion.span></AnimatePresence></span>
-        <span className={styles.switch}>Déjà un compte ? <button type="button" className={styles.textButton} onClick={() => onSignIn ? onSignIn() : setStatus("Connexion")}>Se connecter</button></span>
+        <span className={styles.switch}>Have an account? <button type="button" className={styles.textButton} onClick={() => onSignIn ? onSignIn() : setStatus("Sign in")}>Sign in</button></span>
       </footer>
     </section>
   );

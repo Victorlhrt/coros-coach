@@ -73,7 +73,7 @@ export function WeekPicker({
       <PanelHeader title={title} subtitle={subtitle} actions={actions} />
 
       <div className="pb-5 sm:px-6">
-        <div role="radiogroup" aria-label="Days of the week" onKeyDown={onKeyDown} className="no-scrollbar flex snap-x snap-mandatory scroll-px-6 gap-2 overflow-x-auto px-6 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
+        <div role="radiogroup" aria-label="Days of the week" onKeyDown={onKeyDown} className="no-scrollbar -my-1 flex snap-x snap-mandatory scroll-px-6 gap-2 overflow-x-auto px-6 py-1 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
           {days.map((d, i) => {
             const isSel = i === selIndex
             // Tuile teintée de la couleur de la première séance du jour : on lit le type d'un coup d'œil.

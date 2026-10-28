@@ -1,7 +1,7 @@
 /** Identité de la plateforme. */
 export const BRAND = {
   name: 'Raice.run',
-  tagline: 'Ton plan de course, écrit par l’IA, synchronisé sur ta montre.',
+  tagline: 'Your race plan, written by AI, synced to your watch.',
 }
 
 /**

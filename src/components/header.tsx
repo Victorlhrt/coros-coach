@@ -58,7 +58,7 @@ export function Header() {
 						))}
 					</div>
 					<Button asChild size="sm" variant="outline">
-						<a href={appHref("/connexion")}>Sign in</a>
+						<a href={appHref("/login")}>Sign in</a>
 					</Button>
 					<Button asChild size="sm">
 						<a href={appHref("/onboarding")}>Build my plan</a>

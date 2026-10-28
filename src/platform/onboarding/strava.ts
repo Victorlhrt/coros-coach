@@ -67,7 +67,7 @@ const num = (s: string | undefined) => {
 const TARGETS = [
   { km: 5, label: '5 km' },
   { km: 10, label: '10 km' },
-  { km: 21.0975, label: 'Semi' },
+  { km: 21.0975, label: 'Half marathon' },
   { km: 42.195, label: 'Marathon' },
 ]
 
@@ -76,7 +76,7 @@ export async function readStravaExport(file: File, onProgress?: (percent: number
   try {
     const entries = await zip.getEntries()
     const csv = entries.find((e) => !e.directory && /(^|\/)activities\.csv$/i.test(e.filename))
-    if (!csv || csv.directory) throw new Error('Pas de fichier activities.csv : est-ce bien l’export de ton compte Strava ?')
+    if (!csv || csv.directory) throw new Error('No activities.csv file found: is this really your Strava account export?')
     const text = await csv.getData(new TextWriter(), { onprogress: async (done, total) => onProgress?.(Math.round((done / total) * 90)) })
     return summarize(parseCsv(text))
   } finally {
@@ -86,7 +86,7 @@ export async function readStravaExport(file: File, onProgress?: (percent: number
 
 function summarize(rows: string[][]): StravaSummary {
   const [head, ...data] = rows
-  if (!head) throw new Error('Le fichier activities.csv est vide.')
+  if (!head) throw new Error('The activities.csv file is empty.')
   const col = (name: string, nth = 0) => head.map((h, i) => [h.trim(), i] as const).filter(([h]) => h === name)[nth]?.[1] ?? -1
   const iDate = col('Activity Date')
   const iType = col('Activity Type')
@@ -94,7 +94,7 @@ function summarize(rows: string[][]): StravaSummary {
   const iKm = col('Distance')
   const iMeters = col('Distance', 1)
   const iElev = col('Elevation Gain')
-  if (iDate < 0 || iType < 0 || iKm < 0) throw new Error('Format de activities.csv non reconnu.')
+  if (iDate < 0 || iType < 0 || iKm < 0) throw new Error('Unrecognised activities.csv format.')
 
   const runs = data
     .filter((r) => r.length > iType && /run|course/i.test(r[iType]))

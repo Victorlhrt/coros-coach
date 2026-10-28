@@ -20,7 +20,7 @@ export const ONBOARDING_KEY = 'platform.onboardingSession'
 /** Nom et e-mail saisis pendant le parcours, repris par l'inscription. */
 export const SIGNUP_PREFILL_KEY = 'platform.signupPrefill'
 
-const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((label, i) => ({ value: String(i), label }))
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, i) => ({ value: String(i), label }))
 
 type Answers = Record<string, unknown>
 
@@ -109,7 +109,7 @@ export function OnboardingRunPage() {
   if (variant.data.id === 'complet') {
     const v = variant.data
     return (
-      <Frame banner={preview ? `Aperçu du parcours « ${v.name} » : non compté dans les statistiques` : undefined}>
+      <Frame banner={preview ? `Preview of the “${v.name}” flow: not counted in stats` : undefined}>
         <CompleteOnboarding
           variant={v}
           sessionId={sessionId}
@@ -128,7 +128,7 @@ export function OnboardingRunPage() {
             } catch {
               /* sans stockage, l'inscription démarre vide */
             }
-            window.setTimeout(() => navigate(res.needsAccount ? '/inscription' : '/account'), 1200)
+            window.setTimeout(() => navigate(res.needsAccount ? '/signup' : '/account'), 1200)
           }}
         />
       </Frame>
@@ -154,7 +154,7 @@ export function OnboardingRunPage() {
       }
       const res = await api<{ needsAccount: boolean }>(`/onboarding/sessions/${sessionId}/complete`, { method: 'POST' })
       if (preview) setFinished(true)
-      else navigate(res.needsAccount ? '/inscription' : '/account')
+      else navigate(res.needsAccount ? '/signup' : '/account')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -165,19 +165,19 @@ export function OnboardingRunPage() {
   if (finished) {
     return (
       <Frame>
-        <h1 className="font-heading text-2xl">Aperçu terminé</h1>
-        <p className="text-muted-foreground text-sm">Ce parcours de test n’est pas compté dans les statistiques.</p>
+        <h1 className="font-heading text-2xl">Preview finished</h1>
+        <p className="text-muted-foreground text-sm">This test flow isn’t counted in stats.</p>
         <pre className="max-h-64 overflow-auto rounded-lg border bg-card p-3 text-xs">{JSON.stringify(answers, null, 2)}</pre>
         <Button asChild>
-          <Link to={`/admin/onboardings/${variant.data.id}`}>Retour au back office</Link>
+          <Link to={`/admin/onboardings/${variant.data.id}`}>Back to the back office</Link>
         </Button>
       </Frame>
     )
   }
 
   return (
-    <Frame banner={preview ? `Aperçu du parcours « ${variant.data.name} » : non compté dans les statistiques` : undefined}>
-      <Progress value={index + 1} max={steps.length} label={`Étape ${index + 1} sur ${steps.length}`} />
+    <Frame banner={preview ? `Preview of the “${variant.data.name}” flow: not counted in stats` : undefined}>
+      <Progress value={index + 1} max={steps.length} label={`Step ${index + 1} of ${steps.length}`} />
       <div className="flex flex-col gap-1">
         <h1 className="font-heading text-balance text-2xl md:text-3xl">{step.title}</h1>
         {step.help && <p className="text-muted-foreground text-sm">{step.help}</p>}
@@ -199,10 +199,10 @@ export function OnboardingRunPage() {
         )}
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="ghost" disabled={index === 0 || busy} onClick={() => setIndex(index - 1)}>
-            <ArrowLeftIcon /> Retour
+            <ArrowLeftIcon /> Back
           </Button>
           <Button type="submit" disabled={!sessionId || busy || !isAnswered(step, value)}>
-            {step.kind === 'coros' && value === undefined ? 'Plus tard' : last ? (me.data ? 'Générer mon plan' : 'Continuer') : 'Suivant'}
+            {step.kind === 'coros' && value === undefined ? 'Later' : last ? (me.data ? 'Generate my plan' : 'Continue') : 'Next'}
             <ArrowRightIcon data-icon="inline-end" />
           </Button>
         </div>
@@ -243,7 +243,7 @@ function StepInput({ step, value, onChange }: { step: OnboardingStep; value: unk
           min={step.min ?? 0}
           max={step.max ?? 1000}
           suffix={step.unit ? ` ${step.unit}` : undefined}
-          locale="fr-FR"
+          locale="en-GB"
           size="lg"
         />
       )
@@ -258,7 +258,7 @@ function StepInput({ step, value, onChange }: { step: OnboardingStep; value: unk
         />
       )
     case 'text':
-      return <Input label="Réponse" value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />
+      return <Input label="Answer" value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />
     case 'coros':
       // La connexion COROS des comptes de la plateforme n'est pas encore branchée : on enregistre l'intention.
       return (
@@ -266,14 +266,14 @@ function StepInput({ step, value, onChange }: { step: OnboardingStep; value: unk
           <WatchIcon className="mt-0.5 size-5 shrink-0 text-primary" />
           <div className="flex flex-col gap-3">
             <p className="text-sm">
-              La connexion COROS arrive dans l’espace coureur. Dis-nous si tu as une montre COROS : on te prévient dès que c’est prêt.
+              COROS sync is coming to your runner space. Tell us if you have a COROS watch: we’ll let you know as soon as it’s ready.
             </p>
             <div className="flex gap-2">
               <Button type="button" size="sm" variant={value === true ? 'default' : 'outline'} onClick={() => onChange(true)}>
-                J’ai une COROS
+                I have a COROS
               </Button>
               <Button type="button" size="sm" variant={value === false ? 'default' : 'outline'} onClick={() => onChange(false)}>
-                Pas de COROS
+                No COROS
               </Button>
             </div>
           </div>
@@ -290,8 +290,8 @@ function Frame({ children, banner }: { children?: React.ReactNode; banner?: stri
         <a href={siteHref()}>
           <Logo />
         </a>
-        <Link to="/connexion" className="text-muted-foreground text-sm hover:text-foreground">
-          Se connecter
+        <Link to="/login" className="text-muted-foreground text-sm hover:text-foreground">
+          Log in
         </Link>
       </header>
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-8 px-4 pt-6 pb-12">{children}</main>

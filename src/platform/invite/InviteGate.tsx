@@ -53,7 +53,7 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
       if (res.valid && res.code) {
         store.set(INVITE_KEY, res.code)
         onValid(res.code)
-      } else setCodeError('Ce code n’est pas valide ou a déjà été utilisé.')
+      } else setCodeError('This code isn’t valid or has already been used.')
     } catch (e) {
       setCodeError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -89,14 +89,14 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
       <div className="relative h-44 overflow-hidden rounded-[26px] border sm:h-56">
         <img src="/visuals/invite.webp" alt="" className="absolute inset-0 size-full object-cover object-[50%_40%]" />
         <div className="absolute inset-0 bg-linear-to-t from-background/90 via-background/10 to-transparent" />
-        <p className="absolute bottom-4 left-5 font-medium text-lg">On court mieux à plusieurs.</p>
+        <p className="absolute bottom-4 left-5 font-medium text-lg">Running is better together.</p>
       </div>
       <div className="flex items-start gap-3">
         <CoachAvatar className="size-11" />
         <div className="flex flex-col gap-2">
-          <p className="w-fit rounded-2xl border bg-card px-4 py-2.5 text-sm">Salut ! Raice.run ouvre sur invitation, par petites vagues.</p>
+          <p className="w-fit rounded-2xl border bg-card px-4 py-2.5 text-sm">Hi! Raice.run is invite-only for now, opening in small waves.</p>
           <p className="w-fit rounded-2xl border bg-card px-4 py-2.5 text-sm">
-            {referrer ? 'Un ami t’a envoyé ici. Tu as un code ? Sinon, inscris-toi sur la liste : ça le fait remonter aussi.' : 'Tu as un code ? Sinon, inscris-toi sur la liste d’attente.'}
+            {referrer ? 'A friend sent you here. Got a code? If not, join the list: it moves them up too.' : 'Got a code? If not, join the waitlist.'}
           </p>
         </div>
       </div>
@@ -109,14 +109,14 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
         }}
       >
         <div className="flex items-center gap-2 font-medium text-sm">
-          <TicketIcon className="size-4 text-muted-foreground" /> J’ai un code
+          <TicketIcon className="size-4 text-muted-foreground" /> I have a code
         </div>
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <Input label="Code d’invitation" placeholder="Ex. victor43" autoCapitalize="none" autoCorrect="off" value={code} onChange={(e) => setCode(e.target.value)} />
+            <Input label="Invite code" placeholder="E.g. victor43" autoCapitalize="none" autoCorrect="off" value={code} onChange={(e) => setCode(e.target.value)} />
           </div>
           <Button type="submit" loading={checking} disabled={!code.trim()}>
-            Continuer
+            Continue
           </Button>
         </div>
         {codeError && (
@@ -129,24 +129,24 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
       {status ? (
         <section className="flex flex-col gap-4 rounded-[26px] border bg-card p-5">
           <div className="flex items-center gap-2 font-medium text-sm">
-            <UsersIcon className="size-4 text-muted-foreground" /> Liste d’attente
+            <UsersIcon className="size-4 text-muted-foreground" /> Waitlist
           </div>
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="font-semibold text-5xl tabular-nums tracking-tight">n° {status.position}</p>
-              <p className="mt-1 text-muted-foreground text-sm">sur {status.total} inscrits</p>
+              <p className="font-semibold text-5xl tabular-nums tracking-tight">#{status.position}</p>
+              <p className="mt-1 text-muted-foreground text-sm">out of {status.total} on the list</p>
             </div>
             <p className="text-right text-sm">
               <span className="font-semibold text-xl tabular-nums">{status.referrals}</span>
               <br />
-              <span className="text-muted-foreground">ami{status.referrals > 1 ? 's' : ''} parrainé{status.referrals > 1 ? 's' : ''}</span>
+              <span className="text-muted-foreground">friend{status.referrals !== 1 ? 's' : ''} referred</span>
             </p>
           </div>
-          <p className="text-sm">Chaque ami qui s’inscrit avec ton lien te fait remonter. Partage-le :</p>
+          <p className="text-sm">Every friend who signs up with your link moves you up. Share it:</p>
           <ShareButtons
             url={shareUrl}
-            subject="Rejoins-moi sur Raice.run"
-            text="Je viens de m’inscrire sur Raice.run, un coach running qui construit ton plan sur mesure. Inscris-toi avec mon lien, ça nous fait remonter tous les deux :"
+            subject="Join me on Raice.run"
+            text="I just signed up for Raice.run, a running coach that builds a plan tailored to you. Sign up with my link and we both move up the list:"
           />
         </section>
       ) : (
@@ -158,11 +158,11 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
           }}
         >
           <div className="flex items-center gap-2 font-medium text-sm">
-            <UsersIcon className="size-4 text-muted-foreground" /> Pas de code ? Rejoins la liste d’attente
+            <UsersIcon className="size-4 text-muted-foreground" /> No code? Join the waitlist
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Prénom" autoComplete="given-name" value={join.firstName} onChange={(e) => setJoin({ ...join, firstName: e.target.value })} />
-            <Input label="E-mail" type="email" autoComplete="email" placeholder="nom@exemple.fr" value={join.email} onChange={(e) => setJoin({ ...join, email: e.target.value })} />
+            <Input label="First name" autoComplete="given-name" value={join.firstName} onChange={(e) => setJoin({ ...join, firstName: e.target.value })} />
+            <Input label="Email" type="email" autoComplete="email" placeholder="name@example.com" value={join.email} onChange={(e) => setJoin({ ...join, email: e.target.value })} />
           </div>
           {joinError && (
             <p role="alert" className="text-destructive text-sm">
@@ -170,7 +170,7 @@ export function InviteGate({ initialCode, referrer, onValid }: { initialCode: st
             </p>
           )}
           <Button type="submit" variant="secondary" loading={joining} disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(join.email.trim())}>
-            Rejoindre la liste
+            Join the list
           </Button>
         </form>
       )}

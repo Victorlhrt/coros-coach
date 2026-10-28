@@ -25,7 +25,7 @@ app.use('*', secureHeaders({ crossOriginEmbedderPolicy: false, contentSecurityPo
 app.use('/api/*', async (c, next) => {
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
     const origin = c.req.header('origin')
-    if (origin && origin !== config.origin) return c.json({ error: 'Origine refusée.' }, 403)
+    if (origin && origin !== config.origin) return c.json({ error: 'Origin not allowed.' }, 403)
   }
   await next()
 })
@@ -49,7 +49,7 @@ app.route('/api/platform/connect', connectRoutes)
 app.route('/api/platform/admin', adminRoutes)
 app.route('/api/platform/account', accountRoutes)
 
-app.all('/api/*', (c) => c.json({ error: 'Introuvable' }, 404))
+app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 
 // Sur l'app, la racine mène à l'espace connecté : la landing vit sur son propre service (SITE_ROLE=landing).
 app.get('/', (c) => c.redirect('/account'))

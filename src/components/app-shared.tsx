@@ -21,7 +21,7 @@ export const navGroups: SidebarNavGroup[] = [
 		label: "Overview",
 		items: [
 			{ title: "Dashboard", path: "/admin", icon: <LayoutGridIcon /> },
-			{ title: "Sign-ups", path: "/admin/inscriptions", icon: <UsersIcon /> },
+			{ title: "Sign-ups", path: "/admin/signups", icon: <UsersIcon /> },
 			{ title: "Invitations", path: "/admin/invitations", icon: <TicketIcon /> },
 			{ title: "Onboardings", path: "/admin/onboardings", icon: <RouteIcon /> },
 			{ title: "Testing", path: "/admin/testing", icon: <FlaskConicalIcon /> },

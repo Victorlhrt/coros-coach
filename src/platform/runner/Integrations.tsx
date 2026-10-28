@@ -30,7 +30,7 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
   return (
     <Panel>
       <PanelHeader title="Watches & apps" subtitle="Connect your watch so Pacer reads your runs and sends sessions to your wrist." />
-      <ul className="grid gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-3">
         <Tile brand="COROS" detail={connected ? 'Connected · activities, sleep, HRV' : 'Activities, sleep, HRV, workouts to watch'} live>
           {connected ? (
             <Button variant="outline" size="sm" onClick={() => logout.mutate()} disabled={logout.isPending}>
@@ -64,8 +64,8 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
 
 function Tile({ brand, name, detail, live, children }: { brand: string; name?: string; detail: string; live?: boolean; children: React.ReactNode }) {
   return (
-    <li className="flex items-center gap-4 bg-card px-6 py-4">
-      <span className={`flex h-12 w-20 shrink-0 items-center justify-center rounded-2xl border bg-background px-2.5 ${live ? '' : 'opacity-70'}`}>
+    <li className="flex min-w-0 items-center gap-3 bg-card px-4 py-4 sm:gap-4 sm:px-6">
+      <span className={`flex h-11 w-16 shrink-0 items-center sm:h-12 sm:w-20 justify-center rounded-2xl border bg-background px-2.5 ${live ? '' : 'opacity-70'}`}>
         <BrandLogo brand={brand} className="max-h-6 max-w-full" />
       </span>
       <span className="min-w-0 flex-1">

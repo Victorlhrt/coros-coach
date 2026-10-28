@@ -43,18 +43,18 @@ export function SignupPage() {
   return (
     <AuthSplit>
     <div className="flex min-h-dvh flex-col items-center gap-8 px-4 py-8">
-      <a href={siteHref()} aria-label={`Accueil ${BRAND.name}`}>
+      <a href={siteHref()} aria-label={`${BRAND.name} home`}>
         <Logo />
       </a>
       <SignupForm
         brand={BRAND.name}
         onSubmit={submit}
         defaultValues={prefill}
-        onSignIn={() => navigate('/connexion')}
+        onSignIn={() => navigate('/login')}
         done={
           result === 'waitlist'
-            ? { title: 'Tu es sur la liste', text: 'Les places de la bêta sont limitées : on t’écrit dès que ton compte est ouvert, à l’adresse' }
-            : { title: 'Bienvenue !', text: 'Ton compte est prêt et ton plan est en préparation. Compte :', action: 'Voir mon plan', onAction: () => navigate('/account') }
+            ? { title: 'You’re on the list', text: 'Beta spots are limited. We’ll email you as soon as your account opens, at' }
+            : { title: 'Welcome!', text: 'Your account is ready and your plan is being built. Account:', action: 'See my plan', onAction: () => navigate('/account') }
         }
       />
     </div>

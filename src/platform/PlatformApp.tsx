@@ -15,8 +15,8 @@ export function PlatformApp() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/connexion" element={<LoginPage />} />
-        <Route path="/inscription" element={<SignupPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/onboarding" element={<OnboardingRunPage />} />
         <Route
           path="/account/*"
@@ -27,8 +27,13 @@ export function PlatformApp() {
           }
         />
         <Route path="/compte/*" element={<LegacyAccountRedirect />} />
-        <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
-        <Route path="/reinitialiser" element={<ResetPasswordPage />} />
+        {/* Anciennes adresses en français (liens d'e-mails déjà envoyés) */}
+        <Route path="/connexion" element={<LegacyRedirect to="/login" />} />
+        <Route path="/inscription" element={<LegacyRedirect to="/signup" />} />
+        <Route path="/mot-de-passe-oublie" element={<LegacyRedirect to="/forgot-password" />} />
+        <Route path="/reinitialiser" element={<LegacyRedirect to="/reset-password" />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/admin/*"
           element={
@@ -49,4 +54,10 @@ function LegacyAccountRedirect() {
   const { pathname, search, hash } = useLocation()
   const rest = pathname.replace(/^\/compte\/?/, '').replace(/^(profil|seance|objectif)\b/, (m) => LEGACY_PAGES[m])
   return <Navigate to={`/account/${rest}${search}${hash}`} replace />
+}
+
+/** Redirige en gardant la requête (jeton de réinitialisation, `next`…). */
+function LegacyRedirect({ to }: { to: string }) {
+  const { search, hash } = useLocation()
+  return <Navigate to={`${to}${search}${hash}`} replace />
 }

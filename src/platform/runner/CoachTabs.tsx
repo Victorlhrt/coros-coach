@@ -186,7 +186,7 @@ function ThisWeek({ week, now }: { week: Week; now: string }) {
         ))}
       </div>
       <PanelSection divided>
-        <div className="no-scrollbar -mx-6 flex gap-2 overflow-x-auto px-6 sm:mx-0 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
+        <div className="no-scrollbar -mx-6 -my-1 flex gap-2 overflow-x-auto px-6 py-1 sm:mx-0 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
           {days.map((d, i) => {
             const sessions = week.sessions.filter((s) => s.date === d)
             const main = sessions[0]
@@ -549,9 +549,9 @@ export function PlanTab() {
             {plan.raceStrategy && (
               <PanelSection divided className="flex gap-4">
                 <CoachAvatar className="size-10 shrink-0" />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm">Pacer</p>
-                  <p className="mt-1 max-w-3xl whitespace-pre-line text-muted-foreground text-sm leading-relaxed">{plan.raceStrategy}</p>
+                  <RaceStrategy text={plan.raceStrategy} />
                 </div>
               </PanelSection>
             )}
@@ -737,3 +737,69 @@ function ActivityLog() {
     </Panel>
   )
 }
+
+// ---------- Stratégie de course ----------
+
+const PACE_RE = /(\d:\d{2}(?:\s*[-–]\s*\d:\d{2})?\s*\/\s*km)/g
+const SEGMENT_RE = /^km\s*(\d+(?:[.,]\d+)?)\s*[-–à]\s*(\d+(?:[.,]\d+)?)\s*[:：]\s*(.+)$/i
+const GOAL_RE = /^(objectif|goal|target)\s*:\s*(.+)$/i
+
+/** Met les allures (4:15-4:20 /km) en valeur dans une phrase. */
+function withPaces(text: string) {
+  return text.split(PACE_RE).map((part, i) =>
+    i % 2 ? (
+      <span key={i} className="whitespace-nowrap font-medium text-foreground tabular-nums">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  )
+}
+
+/**
+ * Stratégie de course rédigée par Pacer, mise en forme : phrase d'intro, puis un segment par tronçon
+ * (« km 2-5 : … ») sous forme de frise, et l'objectif final en encadré. Retombe sur le texte brut sinon.
+ */
+function RaceStrategy({ text }: { text: string }) {
+  const parts = text
+    .split(/;|\.\s+(?=[A-ZÀ-Ýa-z])|\n+/)
+    .map((p) => p.trim().replace(/\.$/, ''))
+    .filter(Boolean)
+  const intro: string[] = []
+  const segments: { from: string; to: string; text: string }[] = []
+  const goals: string[] = []
+  for (const p of parts) {
+    const seg = p.match(SEGMENT_RE)
+    const goal = p.match(GOAL_RE)
+    if (seg) segments.push({ from: seg[1], to: seg[2], text: seg[3] })
+    else if (goal) goals.push(goal[2])
+    else if (segments.length === 0) intro.push(p)
+    else segments[segments.length - 1].text += `. ${p}`
+  }
+  if (!segments.length) return <p className="mt-1 max-w-3xl whitespace-pre-line text-muted-foreground text-sm leading-relaxed">{withPaces(text)}</p>
+  return (
+    <div className="mt-2 flex max-w-3xl flex-col gap-4">
+      {intro.length > 0 && <p className="text-muted-foreground text-sm leading-relaxed">{withPaces(intro.join('. ') + '.')}</p>}
+      <ol className="relative flex flex-col gap-3 border-l pl-5">
+        {segments.map((sg, i) => (
+          <li key={i} className="relative">
+            <span aria-hidden className="absolute top-1.5 -left-[25px] size-2.5 rounded-full border-2 border-card" style={{ background: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }} />
+            <p className="font-medium text-xs uppercase tracking-wider" style={{ color: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }}>
+              Km {sg.from}–{sg.to}
+            </p>
+            <p className="mt-0.5 text-muted-foreground text-sm leading-relaxed first-letter:uppercase">{withPaces(sg.text)}</p>
+          </li>
+        ))}
+      </ol>
+      {goals.map((g, i) => (
+        <p key={i} className="rounded-2xl border bg-foreground/[0.03] px-4 py-3 text-sm">
+          <span className="mr-2 text-muted-foreground text-xs uppercase tracking-wider">Goal</span>
+          <span className="font-medium tabular-nums">{g}</span>
+        </p>
+      ))}
+    </div>
+  )
+}
+
+const SEGMENT_COLORS = ['var(--session-easy)', 'var(--session-tempo)', 'var(--session-long)', 'var(--session-interval)']

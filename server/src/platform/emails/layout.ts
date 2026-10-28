@@ -84,9 +84,9 @@ function blockText(b: Block): string {
 }
 
 export function render({ subject, preheader, blocks, footer }: { subject: string; preheader: string; blocks: Block[]; footer?: string }): Email {
-  const foot = footer ?? 'Tu reçois cet e-mail parce que tu as un compte Raice.run.'
+  const foot = footer ?? 'You’re receiving this email because you have a Raice.run account.'
   const html = `<!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -110,7 +110,7 @@ export function render({ subject, preheader, blocks, footer }: { subject: string
 ${blocks.map(block).join('\n')}
       </table>
     </td></tr>
-    <tr><td style="padding:24px 8px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted};">${escape(foot)}<br>Raice.run · ton plan de course, écrit par l’IA, synchronisé sur ta montre.</td></tr>
+    <tr><td style="padding:24px 8px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted};">${escape(foot)}<br>Raice.run · your running plan, written by AI, synced to your watch.</td></tr>
   </table>
 </td></tr>
 </table>

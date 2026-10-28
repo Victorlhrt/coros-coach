@@ -44,22 +44,22 @@ export function ForgotPasswordPage() {
 
   if (state === 'sent') {
     return (
-      <Card title="Regarde tes e-mails" text={`Si un compte existe pour ${email}, un lien vient d’y être envoyé. Il est valable une heure.`}>
-        <Link to="/connexion" className="text-muted-foreground text-sm hover:text-foreground">
-          Retour à la connexion
+      <Card title="Check your email" text={`If an account exists for ${email}, we’ve just sent a link to it. It’s valid for one hour.`}>
+        <Link to="/login" className="text-muted-foreground text-sm hover:text-foreground">
+          Back to sign in
         </Link>
       </Card>
     )
   }
   return (
-    <Card title="Mot de passe oublié" text="Saisis l’e-mail de ton compte : on t’envoie un lien pour en choisir un nouveau.">
+    <Card title="Forgot password" text="Enter your account’s email and we’ll send you a link to choose a new one.">
       <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
-        <Input label="E-mail" type="email" autoComplete="email" placeholder="nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} error={error || undefined} />
+        <Input label="Email" type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={error || undefined} />
         <Button type="submit" loading={state === 'busy'} disabled={!email}>
-          Envoyer le lien
+          Send link
         </Button>
-        <Link to="/connexion" className="text-center text-muted-foreground text-sm hover:text-foreground">
-          Retour à la connexion
+        <Link to="/login" className="text-center text-muted-foreground text-sm hover:text-foreground">
+          Back to sign in
         </Link>
       </form>
     </Card>
@@ -77,13 +77,13 @@ export function ResetPasswordPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (password.length < 8) return setError('8 caractères minimum.')
+    if (password.length < 8) return setError('At least 8 characters.')
     setBusy(true)
     setError('')
     try {
       const res = await api<{ status: string }>('/auth/reset', { body: { token, password } })
       await qc.invalidateQueries({ queryKey: ['me'] })
-      navigate(res.status === 'active' ? '/account' : '/connexion', { replace: true })
+      navigate(res.status === 'active' ? '/account' : '/login', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setBusy(false)
@@ -91,14 +91,14 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <Card title="Nouveau mot de passe" text="Choisis un mot de passe d’au moins 8 caractères. Tes autres sessions seront déconnectées.">
+    <Card title="New password" text="Choose a password of at least 8 characters. Your other sessions will be signed out.">
       <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
         <PasswordField
-          label="Nouveau mot de passe"
+          label="New password"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          messages={{ showPassword: 'Afficher le mot de passe', hidePassword: 'Masquer le mot de passe' }}
+          messages={{ showPassword: 'Show password', hidePassword: 'Hide password' }}
         />
         {error && (
           <p role="alert" className="text-destructive text-xs">
@@ -106,7 +106,7 @@ export function ResetPasswordPage() {
           </p>
         )}
         <Button type="submit" loading={busy} disabled={!token}>
-          Enregistrer
+          Save
         </Button>
       </form>
     </Card>

@@ -40,7 +40,7 @@ const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 type UtmbSearch = { runners: { id: number; fullname: string; uri: string; ageGroup: string; nationality: string; ip: number; picture: string | null }[] }
 
 lookupRoutes.get('/utmb/runners', async (c) => {
-  if (limited(c)) return c.json({ error: 'Trop de recherches, patiente une minute.' }, 429)
+  if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
   const q = (c.req.query('q') ?? '').trim()
   if (q.length < 3) return c.json([])
   try {
@@ -60,7 +60,7 @@ lookupRoutes.get('/utmb/runners', async (c) => {
       })),
     )
   } catch {
-    return c.json({ error: 'Recherche UTMB indisponible pour le moment.' }, 502)
+    return c.json({ error: 'UTMB search is unavailable right now.' }, 502)
   }
 })
 
@@ -68,9 +68,9 @@ type UtmbResult = { dateIso: string; race: string; distance: string; elevationGa
 
 /** Profil public UTMB : résultats (date, course, distance, D+, temps) et indices de performance. */
 lookupRoutes.get('/utmb/runner/:uri', async (c) => {
-  if (limited(c)) return c.json({ error: 'Trop de recherches, patiente une minute.' }, 429)
+  if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
   const uri = c.req.param('uri')
-  if (!/^\d+\.[a-z0-9.-]+$/i.test(uri)) return c.json({ error: 'Profil invalide' }, 400)
+  if (!/^\d+\.[a-z0-9.-]+$/i.test(uri)) return c.json({ error: 'Invalid profile' }, 400)
   try {
     const profile = await cached(`utmb:runner:${uri}`, async () => {
       const res = await fetch(`https://utmb.world/fr/runner/${uri}`, { headers: { 'user-agent': UA } })
@@ -96,7 +96,7 @@ lookupRoutes.get('/utmb/runner/:uri', async (c) => {
     })
     return c.json(profile)
   } catch {
-    return c.json({ error: 'Profil UTMB indisponible pour le moment.' }, 502)
+    return c.json({ error: 'UTMB profile is unavailable right now.' }, 502)
   }
 })
 
@@ -121,7 +121,7 @@ const DIST: Record<string, (km: number) => boolean> = {
 type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb' }
 
 lookupRoutes.get('/races', async (c) => {
-  if (limited(c)) return c.json({ error: 'Trop de recherches, patiente une minute.' }, 429)
+  if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
   const q = normalize((c.req.query('q') ?? '').trim())
   const type = c.req.query('type') === 'trail' ? 'trail' : 'road'
   const inDist = DIST[c.req.query('dist') ?? ''] ?? (() => true)

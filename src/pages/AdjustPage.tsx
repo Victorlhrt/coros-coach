@@ -176,7 +176,7 @@ export function AdjustPage() {
   )
 }
 
-function ChangeCard({
+export function ChangeCard({
   change,
   checked,
   disabled,

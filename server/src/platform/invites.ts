@@ -58,7 +58,7 @@ const JoinBody = z.object({ email: z.string().trim().toLowerCase().email().max(2
 
 inviteRoutes.post('/waitlist', async (c) => {
   const parsed = JoinBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Adresse e-mail invalide' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid email address' }, 400)
   const { email, firstName, ref } = parsed.data
   const [existing] = await db<{ ref_code: string }[]>`select ref_code from waitlist where email = ${email}`
   let refCode = existing?.ref_code
@@ -77,5 +77,5 @@ inviteRoutes.post('/waitlist', async (c) => {
 
 inviteRoutes.get('/waitlist/:ref', async (c) => {
   const st = await status(normalizeCode(c.req.param('ref')))
-  return st ? c.json({ refCode: st.ref_code, ...st }) : c.json({ error: 'Lien inconnu' }, 404)
+  return st ? c.json({ refCode: st.ref_code, ...st }) : c.json({ error: 'Unknown link' }, 404)
 })

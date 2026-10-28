@@ -52,7 +52,7 @@ export function MobileNav() {
 						</div>
 						<div className="mt-12 flex flex-col gap-2">
 							<Button asChild className="w-full" variant="outline">
-								<a href={appHref("/connexion")}>Sign in</a>
+								<a href={appHref("/login")}>Sign in</a>
 							</Button>
 							<Button asChild className="w-full">
 								<a href={appHref("/onboarding")}>Build my plan</a>
