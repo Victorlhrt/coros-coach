@@ -98,13 +98,13 @@ export function HomeTab() {
           </div>
         )}
 
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-          <Panel>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <Panel className="flex flex-col">
             <PanelHeader title="Séance du jour" subtitle={todays.length ? `${todays.length} séance${todays.length > 1 ? 's' : ''} prévue${todays.length > 1 ? 's' : ''}` : 'Repos'} />
             {todays.length ? (
               todays.map((s, i) => <TodaySession key={s.id} session={s} divided={i > 0} />)
             ) : (
-              <PanelSection className="flex items-center gap-4">
+              <PanelSection className="flex flex-1 items-center gap-4">
                 <span className="flex size-12 items-center justify-center rounded-2xl border">
                   <Moon className="size-5 text-muted-foreground" />
                 </span>
@@ -115,7 +115,7 @@ export function HomeTab() {
               </PanelSection>
             )}
             {next && (
-              <PanelFooter>
+              <PanelFooter className="mt-auto">
                 <div className="min-w-0">
                   <p className="text-muted-foreground text-xs">Prochaine séance · {formatDay(next.date, { weekday: 'long', day: 'numeric', month: 'short' })}</p>
                   <p className="truncate font-medium text-sm">{next.title}</p>
@@ -223,7 +223,7 @@ function GoalPanel() {
   const current = currentWeek(plan, now)?.number ?? (now > plan.raceDate ? plan.weeks.length : 0)
   const pct = Math.round((current / plan.weeks.length) * 100)
   return (
-    <Panel>
+    <Panel className="flex flex-col">
       <PanelHeader
         title="Objectif"
         subtitle={formatDay(plan.raceDate, { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -236,14 +236,14 @@ function GoalPanel() {
       <PanelSection className="pt-0">
         <p className="font-heading font-medium text-xl leading-snug tracking-tight">{plan.name}</p>
       </PanelSection>
-      <div className="grid grid-cols-2 divide-x border-t">
+      <div className="grid flex-1 grid-cols-2 items-center divide-x border-t">
         <div className="px-6 py-5">
           <p className="text-muted-foreground text-xs">Jour J</p>
-          <p className="mt-1 font-medium text-4xl tabular-nums tracking-tight">{daysLeft === 0 ? 'J' : `J-${daysLeft}`}</p>
+          <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl">{daysLeft === 0 ? 'J' : `J-${daysLeft}`}</p>
         </div>
         <div className="px-6 py-5">
           <p className="text-muted-foreground text-xs">Temps visé</p>
-          <p className="mt-1 font-medium text-4xl tabular-nums tracking-tight">{goal?.targetTime ? formatDuration(goal.targetTime) : '—'}</p>
+          <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl">{goal?.targetTime ? formatDuration(goal.targetTime) : '—'}</p>
         </div>
       </div>
       <PanelFooter>
@@ -365,8 +365,8 @@ export function PlanTab() {
           }
         />
 
-        <div className="grid items-start gap-4 xl:grid-cols-2">
-          <Panel>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Panel className="flex flex-col">
             <PanelHeader title="Volume du plan" subtitle="Kilomètres prévus semaine par semaine" />
             <PanelSection divided>
               <BarChart
@@ -378,7 +378,7 @@ export function PlanTab() {
                 valueLabel="Volume prévu"
                 categoryLabel="Semaine"
                 showAverage={false}
-                height={200}
+                height={300}
                 formatValue={formatNumber}
               />
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -398,7 +398,7 @@ export function PlanTab() {
               </div>
             </PanelSection>
             {(goal?.course || plan.raceStrategy) && (
-              <PanelFooter>
+              <PanelFooter className="mt-auto">
                 <p className="text-muted-foreground text-sm">{plan.raceStrategy ?? `${goal?.course?.distanceKm} km · ${goal?.course?.gain} m D+`}</p>
               </PanelFooter>
             )}

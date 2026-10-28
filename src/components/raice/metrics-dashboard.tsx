@@ -71,7 +71,7 @@ export function MetricsDashboard({
       <PanelHeader title={title} subtitle={subtitle} actions={headerActions} />
 
       {kpis.length > 0 && (
-        <div role="tablist" aria-label="Indicateurs" className="grid border-t" style={{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
+        <div role="tablist" aria-label="Indicateurs" className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto border-t sm:grid" style={{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
           {kpis.map((k, i) => (
             <KpiTab key={k.id} kpi={k} active={k.id === active?.id} first={i === 0} onClick={() => setActiveId(k.id)} />
           ))}
@@ -129,7 +129,7 @@ function KpiTab({ kpi, active, first, onClick }: { kpi: Kpi; active: boolean; fi
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        'relative min-w-0 px-6 py-4 text-left transition-colors',
+        'relative w-[42%] shrink-0 snap-start px-6 py-4 text-left transition-colors sm:w-auto sm:min-w-0',
         !first && 'border-l',
         active ? 'bg-foreground/[0.04]' : 'hover:bg-foreground/[0.02]',
       )}
@@ -250,8 +250,8 @@ function LineChart({ kpi, showCompare, emptyLabel }: { kpi: Kpi; showCompare: bo
     const line = monotonePath(main)
     const area = main.length > 1 ? `${line}L${main[main.length - 1][0]},${PAD.top + ih}L${main[0][0]},${PAD.top + ih}Z` : ''
     const cmpLine = cmp ? monotonePath(cmp.map((p, i) => [sx(i), sy(p.y)])) : ''
-    // Éclaircissement des étiquettes X : ~6 au maximum
-    const every = Math.max(1, Math.ceil(points.length / 6))
+    // Éclaircissement des étiquettes X : ~6 au maximum, moins sur un écran étroit (une tous les 70 px)
+    const every = Math.max(1, Math.ceil(points.length / Math.min(6, Math.max(2, Math.floor(iw / 70)))))
     return { ticks, sx, sy, main, line, area, cmpLine, every, n, ih }
   }, [points, cmp, width])
 
@@ -308,7 +308,7 @@ function LineChart({ kpi, showCompare, emptyLabel }: { kpi: Kpi; showCompare: bo
         {points.map((p, i) => {
           const last = points.length - 1
           // Dernière étiquette ajoutée seulement si elle ne chevauche pas la précédente
-          const show = i % geo.every === 0 || (i === last && last % geo.every >= Math.ceil(geo.every / 2))
+          const show = i % geo.every === 0 || (i === last && last % geo.every >= geo.every * 0.75)
           if (!show) return null
           const anchor = points.length > 1 && i === 0 ? 'start' : points.length > 1 && i === last ? 'end' : 'middle'
           return (

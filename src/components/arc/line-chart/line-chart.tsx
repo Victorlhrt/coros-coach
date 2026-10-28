@@ -39,6 +39,8 @@ export interface LineChartProps {
   unit?: string;
   /** Plot height in pixels. The width follows the container. */
   height?: number;
+  /** Keeps the value axis at least this high, so a flat series does not fill the plot. */
+  max?: number;
   /** Formats values in the tooltip and data table. */
   formatValue?: (value: number, series: LineChartSeries) => string;
   /** Formats the value axis. Defaults to a compact number, such as 1.2K. */
@@ -173,7 +175,7 @@ function axisPicks(data: LineChartDatum[], width: number) {
   return labeled.reverse().filter((_, rank) => rank % stride === 0).reverse();
 }
 
-export function LineChart({ data, series, label, unit = "", height = 220, formatValue, formatTick = value => compact.format(value), hiddenSeries, defaultHiddenSeries, onHiddenSeriesChange, onActiveChange, loading = false, emptyLabel = "No data for this range", legend, categoryLabel = "Date", curve = "smooth", ref, className }: LineChartProps) {
+export function LineChart({ data, series, label, unit = "", height = 220, max, formatValue, formatTick = value => compact.format(value), hiddenSeries, defaultHiddenSeries, onHiddenSeriesChange, onActiveChange, loading = false, emptyLabel = "No data for this range", legend, categoryLabel = "Date", curve = "smooth", ref, className }: LineChartProps) {
   const reduced = useReducedMotionSafe();
   const figure = useRef<HTMLElement>(null);
   const plot = useRef<HTMLDivElement>(null);
@@ -206,6 +208,7 @@ export function LineChart({ data, series, label, unit = "", height = 220, format
   const targets = useMemo(() => new Map(series.map(line => [line.key, curveFor(data.map(item => item.values[line.key] ?? 0), curve === "smooth")])), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
   let low = Infinity, high = -Infinity;
   for (const line of visible) for (const item of data) { const value = item.values[line.key] ?? 0; low = Math.min(low, value); high = Math.max(high, value); }
+  if (max !== undefined && Number.isFinite(high)) high = Math.max(high, max);
   const range = Number.isFinite(low) ? niceScale(low, high) : null;
   const [steady, setSteady] = useState(() => range ?? niceScale(0, 100));
   if (range && (range.min !== steady.min || range.max !== steady.max)) setSteady(range);

@@ -72,8 +72,8 @@ export function WeekPicker({
     <Panel className={className}>
       <PanelHeader title={title} subtitle={subtitle} actions={actions} />
 
-      <div className="px-6 pb-5">
-        <div role="radiogroup" aria-label="Jours de la semaine" onKeyDown={onKeyDown} className="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <div className="pb-5 sm:px-6">
+        <div role="radiogroup" aria-label="Jours de la semaine" onKeyDown={onKeyDown} className="no-scrollbar flex snap-x snap-mandatory scroll-px-6 gap-2 overflow-x-auto px-6 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
           {days.map((d, i) => {
             const isSel = i === selIndex
             return (
@@ -89,15 +89,15 @@ export function WeekPicker({
                 tabIndex={isSel ? 0 : -1}
                 onClick={() => onSelect(d.key)}
                 className={cn(
-                  'relative flex min-w-0 flex-col items-center overflow-hidden rounded-2xl border px-1 pt-2.5 pb-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pt-3',
+                  'relative flex w-[4.75rem] shrink-0 snap-start flex-col items-center overflow-hidden rounded-2xl border px-1 pt-3 pb-3 sm:w-auto sm:min-w-0 sm:shrink text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pt-3',
                   isSel ? 'border-foreground/40 bg-foreground/[0.12]' : 'hover:bg-foreground/[0.04]',
                   d.outside && !isSel && 'opacity-45',
                 )}
               >
                 {d.isToday && <span aria-hidden className="absolute top-2 right-2 size-1.5 rounded-full bg-foreground" />}
                 <span className={cn('text-xs', isSel ? 'text-foreground' : 'text-muted-foreground')}>{d.weekday}</span>
-                <span className="mt-0.5 font-medium text-xl tabular-nums tracking-tight sm:text-2xl">{d.day}</span>
-                <span className="mt-0.5 hidden max-w-full truncate text-[11px] text-muted-foreground sm:block">{d.caption}</span>
+                <span className="mt-0.5 font-medium text-2xl tabular-nums tracking-tight">{d.day}</span>
+                <span className="mt-0.5 block max-w-full truncate text-[11px] text-muted-foreground">{d.caption}</span>
                 <span aria-hidden className="mt-2 flex h-1 w-full justify-center gap-1 px-1.5">
                   {d.sessions.map((s) => (
                     <span key={s.id} className="h-full max-w-6 flex-1 rounded-full" style={{ background: s.color }} />

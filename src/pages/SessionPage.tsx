@@ -7,15 +7,15 @@ import { EmptyState } from '@/components/EmptyState'
 import { FeedbackCard } from '@/components/FeedbackCard'
 import { SyncBadge } from '@/components/SyncBadge'
 import { TypeBadge } from '@/components/TypeBadge'
-import { WorkoutChart } from '@/components/WorkoutChart'
+import { SessionProfileChart } from '@/components/SessionProfileChart'
 import { Card } from '@/components/ui/card'
 import { Panel, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { Button as LinkButton } from '@/components/shadcn/button'
 import { INTENSITY } from '@/platform/runner/coach-data'
 import { formatDay, today } from '@/lib/coach/dates'
 import { formatDistance, formatDuration, formatPace, paceUnit, type Units } from '@/lib/coach/format'
-import { sessionTotals } from '@/lib/coach/metrics'
-import type { Step, Zone } from '@/lib/coach/schema'
+import { flatten, sessionTotals } from '@/lib/coach/metrics'
+import type { Block, Step, Zone } from '@/lib/coach/schema'
 import { STEP_LABEL, zoneColor } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
 import { syncStatus } from '@/lib/coros/sync'
@@ -73,10 +73,10 @@ export function SessionPage() {
         </LinkButton>
       </header>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Panel>
           <PanelHeader title="Structure" subtitle={session.blocks.length ? `${steps} étape${steps > 1 ? 's' : ''} · ${formatDuration(seconds)}${meters > 0 ? ` · ${formatDistance(meters, units)}` : ''}` : 'Renforcement'} />
-          <div className="grid grid-cols-2 divide-x border-t sm:grid-cols-4 sm:divide-y-0">
+          <div className="no-scrollbar flex snap-x snap-mandatory divide-x overflow-x-auto border-t sm:grid sm:grid-cols-4">
             <Kpi label="Durée" value={formatDuration(seconds)} />
             <Kpi label="Distance estimée" value={meters > 0 ? formatDistance(meters, units) : '—'} />
             <Kpi label={`Allure moyenne ${paceUnit(units)}`} value={pace > 0 ? formatPace(pace, units) : '—'} />
@@ -84,14 +84,7 @@ export function SessionPage() {
           </div>
           {session.blocks.length > 0 && (
             <PanelSection divided>
-              <WorkoutChart blocks={session.blocks} zones={zones} className="h-20" />
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-                {[1, 2, 3, 4, 5, 6].map((z) => (
-                  <span key={z} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span className="size-2 rounded-full" style={{ backgroundColor: zoneColor(z) }} />Z{z} {ZONE_NAMES[z]}
-                  </span>
-                ))}
-              </div>
+              <SessionProfileChart blocks={session.blocks} zones={zones} units={units} />
             </PanelSection>
           )}
           {session.blocks.length > 0 && (
@@ -121,22 +114,52 @@ export function SessionPage() {
           )}
         </Panel>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 xl:[&>*:last-child]:flex-1">
           <Panel>
             <PanelHeader title="Montre" subtitle={status === 'app-only' ? 'Le renforcement se suit depuis l’app.' : 'Envoi de la séance sur ta montre COROS'} actions={<SyncBadge status={status} />} />
           </Panel>
+          {session.blocks.length > 0 && <ZoneSplit blocks={session.blocks} zones={zones} />}
           {session.type !== 'strength' && <ActivityLinkCard session={session} />}
-          {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
         </div>
       </div>
+      {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
     </div>
+  )
+}
+
+/** Temps passé dans chaque zone, en barres aux couleurs des zones. */
+function ZoneSplit({ blocks, zones }: { blocks: Block[]; zones: Zone[] }) {
+  const steps = flatten(blocks, zones)
+  const total = steps.reduce((a, s) => a + s.seconds, 0) || 1
+  const byZone = [1, 2, 3, 4, 5, 6].map((z) => ({ z, seconds: steps.filter((s) => s.zone === z).reduce((a, s) => a + s.seconds, 0) })).filter((r) => r.seconds > 0)
+  return (
+    <Panel>
+      <PanelHeader title="Temps par zone" subtitle={`${byZone.length} zone${byZone.length > 1 ? 's' : ''} travaillée${byZone.length > 1 ? 's' : ''}`} />
+      <ul className="space-y-3 border-t px-6 py-5">
+        {byZone.map(({ z, seconds }) => (
+          <li key={z}>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span>
+                Z{z} <span className="text-muted-foreground">{ZONE_NAMES[z]}</span>
+              </span>
+              <span className="tabular-nums">
+                {formatDuration(seconds)} <span className="text-muted-foreground text-xs">· {Math.round((seconds / total) * 100)} %</span>
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-foreground/[0.06]">
+              <div className="h-full rounded-full" style={{ width: `${(seconds / total) * 100}%`, backgroundColor: zoneColor(z) }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   )
 }
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="px-6 py-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
+    <div className="w-[44%] shrink-0 snap-start px-6 py-4 sm:w-auto">
+      <p className="truncate text-xs text-muted-foreground">{label}</p>
       <SlotText value={value} className="mt-1 text-2xl font-medium tracking-tight tabular-nums" />
     </div>
   )

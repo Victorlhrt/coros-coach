@@ -27,7 +27,7 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Réglages" />
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <div className="flex items-center gap-3">
             <img src="/coros-logo.png" alt="" className="size-11 rounded-2xl" />

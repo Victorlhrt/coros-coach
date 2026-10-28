@@ -127,7 +127,7 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="grid items-start gap-4 pb-6 lg:grid-cols-2">
+    <div className="grid gap-4 pb-6 lg:grid-cols-2">
       <header className="flex items-center gap-2 pt-4 lg:col-span-2">
         <Link to={ROUTES.today} aria-label="Retour" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
@@ -135,7 +135,7 @@ export function OnboardingPage() {
         <h1 className="font-heading text-2xl font-medium tracking-tight">Mon objectif</h1>
       </header>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:[&>*:last-child]:flex-1">
       <Card>
         <div className="flex items-center gap-3">
           <Activity className="size-6 text-accent" />

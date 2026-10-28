@@ -285,7 +285,7 @@ function PageTitle({ title, children, action }: { title: string; children?: Reac
 
 function Panel({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={cn('flex flex-col gap-4 rounded-[24px] border bg-card p-6', className)}>
+    <section className={cn('flex min-w-0 flex-col gap-4 rounded-[24px] border bg-card p-6', className)}>
       {title && <h2 className="font-medium text-sm">{title}</h2>}
       {children}
     </section>
@@ -535,7 +535,7 @@ function ProfilePage() {
           <p className="text-muted-foreground text-sm">Coureur sur {BRAND.name}</p>
         </div>
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
       <Panel>
         <dl className="divide-y">
           {rows.map(([k, v]) => (
@@ -545,7 +545,7 @@ function ProfilePage() {
             </div>
           ))}
         </dl>
-        <LinkButton asChild variant="secondary" className="self-start">
+        <LinkButton asChild variant="secondary" className="mt-auto self-start">
           <Link to="/onboarding">Refaire l’onboarding</Link>
         </LinkButton>
       </Panel>
@@ -561,7 +561,7 @@ function AccountSettings() {
   return (
     <>
       <PageTitle title="Compte" />
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Mot de passe">
           <p className="text-muted-foreground text-sm">Reçois un lien par e-mail pour en choisir un nouveau.</p>
           <LinkButton asChild variant="secondary" className="self-start">
@@ -586,10 +586,10 @@ function InvitePanel() {
   const left = d.max_uses === null ? null : Math.max(0, d.max_uses - d.uses)
   return (
     <Panel title="Invite tes potes">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
           <p className="text-muted-foreground text-xs">Ton code</p>
-          <p className="font-mono font-semibold text-2xl tracking-wide">{d.code}</p>
+          <p className="whitespace-nowrap font-mono font-semibold text-2xl tracking-wide">{d.code}</p>
         </div>
         <Badge tone={left === 0 ? 'warning' : 'neutral'}>{left === null ? 'Illimité' : `${left} invitation${left > 1 ? 's' : ''} restante${left > 1 ? 's' : ''}`}</Badge>
       </div>
