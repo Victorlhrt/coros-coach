@@ -7,28 +7,28 @@ import { ErrorNote, PageTitle } from './ui'
 type Entry = { id: string; action: string; target: string | null; details: Record<string, unknown>; created_at: string; actor: string | null }
 
 const ACTIONS: Record<string, string> = {
-  'user.signup': 'Inscription',
-  'user.update': 'Compte modifié',
-  'user.delete': 'Compte supprimé',
-  'users.export': 'Export CSV',
-  'onboarding.create': 'Parcours créé',
-  'onboarding.update': 'Parcours modifié',
-  'plan.update': 'Plan modifié',
-  'settings.signup_mode': 'Mode d’inscription',
-  'user.password_reset': 'Mot de passe réinitialisé',
-  'invite.create': 'Code créé',
-  'invite.update': 'Code modifié',
-  'waitlist.invite': 'Invitation envoyée',
+  'user.signup': 'Sign-up',
+  'user.update': 'Account updated',
+  'user.delete': 'Account deleted',
+  'users.export': 'CSV export',
+  'onboarding.create': 'Flow created',
+  'onboarding.update': 'Flow updated',
+  'plan.update': 'Plan updated',
+  'settings.signup_mode': 'Sign-up mode',
+  'user.password_reset': 'Password reset',
+  'invite.create': 'Code created',
+  'invite.update': 'Code updated',
+  'waitlist.invite': 'Invite sent',
 }
 
 const columns: DataColumn<Entry>[] = [
   { key: 'created_at', label: 'Date', sortable: true, render: (v) => formatDateTime(v as string) },
   { key: 'action', label: 'Action', sortable: true, render: (v) => ACTIONS[v as string] ?? (v as string) },
-  { key: 'target', label: 'Cible', sortable: true, render: (v) => (v as string | null) ?? '—' },
-  { key: 'actor', label: 'Par', sortable: true, render: (v) => (v as string | null) ?? 'système' },
+  { key: 'target', label: 'Target', sortable: true, render: (v) => (v as string | null) ?? '—' },
+  { key: 'actor', label: 'By', sortable: true, render: (v) => (v as string | null) ?? 'system' },
   {
     key: 'details',
-    label: 'Détails',
+    label: 'Details',
     render: (v) => (
       <code className="block max-w-sm truncate text-xs">
         {Object.entries(v as Record<string, unknown>)
@@ -44,14 +44,14 @@ export function AuditPage() {
   const entries = useQuery({ queryKey: ['admin', 'audit'], queryFn: () => api<Entry[]>('/admin/audit') })
   return (
     <>
-      <PageTitle title="Journal" description="Les 200 dernières actions : inscriptions et modifications faites dans le back office." />
+      <PageTitle title="Audit log" description="The last 200 actions: sign-ups and changes made in the back office." />
       <ErrorNote error={entries.error} />
       <SortableDataTable
         rows={entries.data ?? []}
         columns={columns}
         rowKey="id"
-        caption="Journal des actions"
-        emptyMessage={entries.isPending ? 'Chargement…' : 'Rien pour l’instant'}
+        caption="Audit log"
+        emptyMessage={entries.isPending ? 'Loading…' : 'Nothing yet'}
         defaultSort={{ key: 'created_at', direction: 'desc' }}
         itemName={{ one: 'action', other: 'actions' }}
       />

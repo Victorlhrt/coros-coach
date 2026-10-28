@@ -30,7 +30,7 @@ export function AppHeader() {
 			<div className="flex items-center gap-3">
 				<Button asChild size="sm" variant="outline">
 					<Link to="/onboarding">
-						<EyeIcon /> <span className="hidden sm:inline">Parcours public</span>
+						<EyeIcon /> <span className="hidden sm:inline">Public onboarding</span>
 					</Link>
 				</Button>
 				<Separator

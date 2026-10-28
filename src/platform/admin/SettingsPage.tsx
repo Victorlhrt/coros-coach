@@ -7,9 +7,9 @@ import { ErrorNote, PageTitle, Panel } from './ui'
 type Settings = { signupMode: 'open' | 'waitlist' | 'closed'; admins: { id: string; email: string; name: string; last_login_at: string | null }[] }
 
 const MODES = [
-  { value: 'open', label: 'Ouvertes', description: 'Chaque inscription crée un compte actif.' },
-  { value: 'waitlist', label: 'Liste d’attente', description: 'Les comptes attendent ta validation dans Inscriptions.' },
-  { value: 'closed', label: 'Fermées', description: 'Plus personne ne peut s’inscrire (sauf les e-mails ADMIN_EMAILS).' },
+  { value: 'open', label: 'Open', description: 'Every sign-up creates an active account.' },
+  { value: 'waitlist', label: 'Waitlist', description: 'Accounts wait for your approval in Sign-ups.' },
+  { value: 'closed', label: 'Closed', description: 'Nobody can sign up anymore (except ADMIN_EMAILS addresses).' },
 ]
 
 export function SettingsPage() {
@@ -22,15 +22,15 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageTitle title="Accès et réglages" description="Ouverture des inscriptions et équipe d’administration." />
+      <PageTitle title="Access & settings" description="Sign-up availability and the admin team." />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ErrorNote error={settings.error ?? setMode.error} />
-        <Panel title="Inscriptions">
+        <Panel title="Sign-ups">
           {settings.data && (
-            <RadioCards aria-label="Mode d’inscription" layout="list" options={MODES} value={settings.data.signupMode} onValueChange={(v) => setMode.mutate(v)} />
+            <RadioCards aria-label="Sign-up mode" layout="list" options={MODES} value={settings.data.signupMode} onValueChange={(v) => setMode.mutate(v)} />
           )}
         </Panel>
-        <Panel title="Administrateurs" description="Donne ou retire les droits depuis la page Inscriptions. Les e-mails de ADMIN_EMAILS sont toujours administrateurs.">
+        <Panel title="Admins" description="Grant or revoke admin rights from the Sign-ups page. ADMIN_EMAILS addresses are always admins.">
           <ul className="divide-y">
             {settings.data?.admins.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -38,7 +38,7 @@ export function SettingsPage() {
                   <div className="font-medium">{a.name}</div>
                   <div className="truncate text-muted-foreground text-xs">{a.email}</div>
                 </div>
-                <span className="shrink-0 text-muted-foreground text-xs">vu {formatDateTime(a.last_login_at)}</span>
+                <span className="shrink-0 text-muted-foreground text-xs">seen {formatDateTime(a.last_login_at)}</span>
               </li>
             ))}
           </ul>

@@ -22,9 +22,9 @@ type Detail = {
 type SessionRow = Detail['sessions'][number]
 
 const STATUSES = [
-  { value: 'live', label: 'En ligne' },
-  { value: 'draft', label: 'Brouillon' },
-  { value: 'archived', label: 'Archivé' },
+  { value: 'live', label: 'Live' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'archived', label: 'Archived' },
 ]
 
 export function OnboardingDetailPage() {
@@ -45,8 +45,8 @@ export function OnboardingDetailPage() {
       try {
         steps = JSON.parse(form!.steps)
       } catch {
-        setJsonError('Les étapes ne sont pas un JSON valide.')
-        return Promise.reject(new Error('JSON invalide'))
+        setJsonError('The steps are not valid JSON.')
+        return Promise.reject(new Error('Invalid JSON'))
       }
       setJsonError('')
       return api(`/admin/onboardings/${id}`, { method: 'PUT', body: { ...form, steps } })
@@ -60,13 +60,13 @@ export function OnboardingDetailPage() {
   const funnel = steps.map((s, i) => ({ step: s, n: (d?.reached ?? []).filter((r) => r.step >= i + 1).reduce((sum, r) => sum + r.n, 0) }))
 
   const columns: DataColumn<SessionRow>[] = [
-    { key: 'created_at', label: 'Début', sortable: true, render: (v) => formatDateTime(v as string) },
-    { key: 'email', label: 'Compte', render: (v, s) => (s.is_preview ? <span className="text-muted-foreground">aperçu</span> : ((v as string | null) ?? 'anonyme')) },
-    { key: 'step_reached', label: 'Étapes', sortable: true, numeric: true, render: (v) => `${v as number}/${steps.length}` },
-    { key: 'completed_at', label: 'Terminé', sortable: true, render: (v) => formatDateTime(v as string | null) },
+    { key: 'created_at', label: 'Started', sortable: true, render: (v) => formatDateTime(v as string) },
+    { key: 'email', label: 'Account', render: (v, s) => (s.is_preview ? <span className="text-muted-foreground">preview</span> : ((v as string | null) ?? 'anonymous')) },
+    { key: 'step_reached', label: 'Steps', sortable: true, numeric: true, render: (v) => `${v as number}/${steps.length}` },
+    { key: 'completed_at', label: 'Completed', sortable: true, render: (v) => formatDateTime(v as string | null) },
     {
       key: 'answers',
-      label: 'Réponses',
+      label: 'Answers',
       render: (v) => (
         <code className="block max-w-md truncate text-xs" title={JSON.stringify(v)}>
           {Object.entries(v as Record<string, unknown>)
@@ -80,18 +80,18 @@ export function OnboardingDetailPage() {
   return (
     <>
       <PageTitle
-        title={d ? `Parcours « ${d.variant.name} »` : 'Parcours'}
+        title={d ? `Flow “${d.variant.name}”` : 'Flow'}
         description={id}
         actions={
           <>
             <Button asChild size="sm" variant="ghost">
               <Link to="/admin/onboardings">
-                <ArrowLeftIcon /> Tous les parcours
+                <ArrowLeftIcon /> All flows
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
               <a href={`/onboarding?variant=${id}&preview=1`} target="_blank" rel="noreferrer">
-                <EyeIcon /> Tester
+                <EyeIcon /> Test
               </a>
             </Button>
           </>
@@ -100,7 +100,7 @@ export function OnboardingDetailPage() {
       <ErrorNote error={detail.error} />
       {d && form && (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <Panel title="Entonnoir" description={`${d.totals.started} commencés · ${d.totals.completed} terminés (${percent(d.totals.completed, d.totals.started)} %), hors aperçus.`}>
+          <Panel title="Funnel" description={`${d.totals.started} started · ${d.totals.completed} completed (${percent(d.totals.completed, d.totals.started)}%), excluding previews.`}>
             <ol className="flex flex-col gap-4">
               {funnel.map(({ step, n }, i) => (
                 <li key={step.id}>
@@ -110,7 +110,7 @@ export function OnboardingDetailPage() {
             </ol>
           </Panel>
 
-          <Panel title="Réglages du parcours">
+          <Panel title="Flow settings">
             <form
               className="flex flex-col gap-4"
               onSubmit={(e) => {
@@ -118,15 +118,15 @@ export function OnboardingDetailPage() {
                 save.mutate()
               }}
             >
-              <Input label="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <div className="flex flex-wrap items-end gap-4">
-                <SegmentedControl label="Statut" options={STATUSES} value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Variant['status'] })} />
-                <NumberField label="Poids du trafic" value={form.weight} min={0} max={100} onValueChange={(w) => setForm({ ...form, weight: w })} locale="fr-FR" size="sm" />
+                <SegmentedControl label="Status" options={STATUSES} value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Variant['status'] })} />
+                <NumberField label="Traffic weight" value={form.weight} min={0} max={100} onValueChange={(w) => setForm({ ...form, weight: w })} locale="en-GB" size="sm" />
               </div>
               <Textarea
-                label="Étapes (JSON)"
-                description="kind : choice, multi, number, date, text, days ou coros. field : distance, race_date, level, weekly_km et days alimentent la demande de plan."
+                label="Steps (JSON)"
+                description="kind: choice, multi, number, date, text, days or coros. field: distance, race_date, level, weekly_km and days feed the plan request."
                 className="font-mono text-xs"
                 rows={16}
                 spellCheck={false}
@@ -137,21 +137,21 @@ export function OnboardingDetailPage() {
               <ErrorNote error={save.error && !jsonError ? save.error : null} />
               <div className="flex items-center gap-3">
                 <Button type="submit" disabled={save.isPending}>
-                  Enregistrer
+                  Save
                 </Button>
-                {save.isSuccess && <span className="text-muted-foreground text-sm">Enregistré.</span>}
+                {save.isSuccess && <span className="text-muted-foreground text-sm">Saved.</span>}
               </div>
             </form>
           </Panel>
 
-          <Panel title="Derniers parcours" className="xl:col-span-2">
+          <Panel title="Recent sessions" className="xl:col-span-2">
             <SortableDataTable
               rows={d.sessions}
               columns={columns}
               rowKey="id"
-              caption="Derniers parcours"
-              emptyMessage="Aucun parcours pour l’instant"
-              itemName={{ one: 'parcours', other: 'parcours' }}
+              caption="Recent sessions"
+              emptyMessage="No sessions yet"
+              itemName={{ one: 'session', other: 'sessions' }}
             />
           </Panel>
         </div>

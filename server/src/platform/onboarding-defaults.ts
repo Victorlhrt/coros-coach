@@ -31,12 +31,12 @@ export type VariantSeed = {
 const distance: OnboardingStep = {
   id: 'distance',
   kind: 'choice',
-  title: 'Quelle course prépares-tu ?',
+  title: 'What race are you training for?',
   field: 'distance',
   options: [
     { value: '5k', label: '5 km' },
     { value: '10k', label: '10 km' },
-    { value: 'half', label: 'Semi-marathon' },
+    { value: 'half', label: 'Half marathon' },
     { value: 'marathon', label: 'Marathon' },
     { value: 'trail', label: 'Trail' },
   ],
@@ -45,28 +45,28 @@ const distance: OnboardingStep = {
 const raceDate: OnboardingStep = {
   id: 'race_date',
   kind: 'date',
-  title: 'Quand a lieu la course ?',
-  help: 'Le plan remonte le temps depuis cette date.',
+  title: 'When is the race?',
+  help: 'The plan counts back from this date.',
   field: 'race_date',
 }
 
 const level: OnboardingStep = {
   id: 'level',
   kind: 'choice',
-  title: 'Comment décrirais-tu ton niveau ?',
+  title: 'How would you describe your level?',
   field: 'level',
   options: [
-    { value: 'beginner', label: 'Je débute', hint: 'Moins d’un an de course régulière' },
-    { value: 'intermediate', label: 'Intermédiaire', hint: 'Quelques courses au compteur' },
-    { value: 'advanced', label: 'Confirmé', hint: 'Entraînement structuré, objectifs chrono' },
+    { value: 'beginner', label: 'Beginner', hint: 'Less than a year of regular running' },
+    { value: 'intermediate', label: 'Intermediate', hint: 'A few races under your belt' },
+    { value: 'advanced', label: 'Advanced', hint: 'Structured training, time goals' },
   ],
 }
 
 const weeklyKm: OnboardingStep = {
   id: 'weekly_km',
   kind: 'number',
-  title: 'Combien de kilomètres cours-tu par semaine ?',
-  help: 'Moyenne des quatre dernières semaines.',
+  title: 'How many kilometres do you run per week?',
+  help: 'Average over the last four weeks.',
   field: 'weekly_km',
   min: 0,
   max: 200,
@@ -76,15 +76,15 @@ const weeklyKm: OnboardingStep = {
 const days: OnboardingStep = {
   id: 'days',
   kind: 'days',
-  title: 'Quels jours peux-tu courir ?',
+  title: 'Which days can you run?',
   field: 'days',
 }
 
 const coros: OnboardingStep = {
   id: 'coros',
   kind: 'coros',
-  title: 'Connecte ta montre COROS',
-  help: 'On lit ton historique pour calibrer les allures, puis on envoie les séances sur ta montre.',
+  title: 'Connect your COROS watch',
+  help: 'We read your history to calibrate your paces, then send sessions to your watch.',
   field: 'coros_connected',
   optional: true,
 }
@@ -92,8 +92,8 @@ const coros: OnboardingStep = {
 export const DEFAULT_VARIANTS: VariantSeed[] = [
   {
     id: 'classique',
-    name: 'Classique',
-    description: 'Objectif, niveau, volume et disponibilités : le parcours complet.',
+    name: 'Classic',
+    description: 'Goal, level, volume and availability: the full flow.',
     status: 'live',
     weight: 50,
     steps: [distance, raceDate, level, weeklyKm, days],
@@ -101,34 +101,34 @@ export const DEFAULT_VARIANTS: VariantSeed[] = [
   {
     id: 'express',
     name: 'Express',
-    description: 'Trois questions puis le plan : on affine ensuite avec les données de la montre.',
+    description: 'Three questions, then the plan: we refine it later with watch data.',
     status: 'live',
     weight: 50,
     steps: [distance, raceDate, level],
   },
   {
     id: 'coros-first',
-    name: 'COROS d’abord',
-    description: 'On connecte la montre avant tout pour pré-remplir niveau et volume.',
+    name: 'COROS first',
+    description: 'Connect the watch first to pre-fill level and volume.',
     status: 'draft',
     weight: 0,
     steps: [coros, distance, raceDate, days],
   },
   {
     id: 'complet',
-    name: 'Complet (test)',
-    description: 'Motivation, montre, profil UTMB, objectif et course, estimation de temps, santé, chaussures, puis génération du plan.',
+    name: 'Complete (test)',
+    description: 'Motivation, watch, UTMB profile, goal and race, time estimate, health, shoes, then plan generation.',
     status: 'draft',
     weight: 0,
     steps: [
-      { id: 'reason', kind: 'reason', title: 'Qu’est-ce qui t’amène sur Raice.run ?', field: 'reason' },
-      { id: 'wearables', kind: 'wearables', title: 'Avec quoi cours-tu ?', field: 'wearables' },
-      { id: 'identity', kind: 'identity', title: 'Faisons connaissance', field: 'identity' },
-      { id: 'goal', kind: 'goal', title: 'Quel est ton objectif ?', field: 'goal' },
-      { id: 'estimate', kind: 'estimate', title: 'Ton temps estimé', field: 'estimate' },
-      { id: 'health', kind: 'health', title: 'Comment va ton corps ?', field: 'health' },
-      { id: 'gear', kind: 'gear', title: 'Tes chaussures', field: 'gear' },
-      { id: 'generate', kind: 'generate', title: 'On construit ton plan', field: 'generated', optional: true },
+      { id: 'reason', kind: 'reason', title: 'What brings you to Raice.run?', field: 'reason' },
+      { id: 'wearables', kind: 'wearables', title: 'What do you run with?', field: 'wearables' },
+      { id: 'identity', kind: 'identity', title: 'Let’s get to know you', field: 'identity' },
+      { id: 'goal', kind: 'goal', title: 'What’s your goal?', field: 'goal' },
+      { id: 'estimate', kind: 'estimate', title: 'Your estimated time', field: 'estimate' },
+      { id: 'health', kind: 'health', title: 'How’s your body feeling?', field: 'health' },
+      { id: 'gear', kind: 'gear', title: 'Your shoes', field: 'gear' },
+      { id: 'generate', kind: 'generate', title: 'Building your plan', field: 'generated', optional: true },
     ],
   },
 ]

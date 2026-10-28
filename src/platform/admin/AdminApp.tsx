@@ -33,15 +33,19 @@ export default function AdminApp() {
     <AppShell>
       <Routes>
         <Route index element={<OverviewPage />} />
-        <Route path="inscriptions" element={<SignupsPage />} />
+        <Route path="signups" element={<SignupsPage />} />
         <Route path="invitations" element={<InvitesPage />} />
         <Route path="onboardings" element={<OnboardingsPage />} />
         <Route path="testing" element={<TestingPage />} />
         <Route path="onboardings/:id" element={<OnboardingDetailPage />} />
         <Route path="plans" element={<PlansPage />} />
         <Route path="plans/:id" element={<PlanDetailPage />} />
-        <Route path="administration" element={<SettingsPage />} />
-        <Route path="journal" element={<AuditPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="log" element={<AuditPage />} />
+        {/* Anciennes adresses en français */}
+        <Route path="inscriptions" element={<Navigate to="/admin/signups" replace />} />
+        <Route path="administration" element={<Navigate to="/admin/settings" replace />} />
+        <Route path="journal" element={<Navigate to="/admin/log" replace />} />
         <Route path="emails" element={<EmailsPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>

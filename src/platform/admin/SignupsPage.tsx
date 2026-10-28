@@ -26,10 +26,10 @@ type UserRow = {
 }
 
 const FILTERS = [
-  { value: 'all', label: 'Tous' },
-  { value: 'waitlist', label: 'Liste d’attente' },
-  { value: 'active', label: 'Actifs' },
-  { value: 'suspended', label: 'Suspendus' },
+  { value: 'all', label: 'All' },
+  { value: 'waitlist', label: 'Waitlist' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
 ]
 
 export function SignupsPage() {
@@ -58,7 +58,7 @@ export function SignupsPage() {
   const columns: DataColumn<UserRow>[] = [
     {
       key: 'name',
-      label: 'Coureur',
+      label: 'Runner',
       sortable: true,
       render: (_, u) => (
         <div className="min-w-0">
@@ -69,42 +69,42 @@ export function SignupsPage() {
         </div>
       ),
     },
-    { key: 'status', label: 'Statut', sortable: true, render: (_, u) => <Badge tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].label}</Badge> },
+    { key: 'status', label: 'Status', sortable: true, render: (_, u) => <Badge tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].label}</Badge> },
     { key: 'source', label: 'Source', sortable: true },
-    { key: 'onboarding_variant', label: 'Parcours', sortable: true, render: (v) => (v as string | null) ?? '—' },
+    { key: 'onboarding_variant', label: 'Flow', sortable: true, render: (v) => (v as string | null) ?? '—' },
     { key: 'plans', label: 'Plans', sortable: true, numeric: true },
-    { key: 'created_at', label: 'Inscription', sortable: true, render: (v) => formatDateTime(v as string) },
-    { key: 'last_login_at', label: 'Dernière connexion', sortable: true, render: (v) => formatDateTime(v as string | null) },
+    { key: 'created_at', label: 'Signed up', sortable: true, render: (v) => formatDateTime(v as string) },
+    { key: 'last_login_at', label: 'Last login', sortable: true, render: (v) => formatDateTime(v as string | null) },
     {
       key: 'actions',
       label: 'Actions',
       render: (_, u) =>
         u.id === me.data?.id ? (
-          <span className="text-muted-foreground text-xs">toi</span>
+          <span className="text-muted-foreground text-xs">you</span>
         ) : (
           <div className="flex flex-wrap gap-1">
             {u.status !== 'active' && (
               <Button size="xs" onClick={() => update.mutate({ id: u.id, status: 'active' })}>
-                {u.status === 'waitlist' ? 'Valider' : 'Réactiver'}
+                {u.status === 'waitlist' ? 'Approve' : 'Reactivate'}
               </Button>
             )}
             {u.status === 'active' && (
               <Button size="xs" variant="outline" onClick={() => update.mutate({ id: u.id, status: 'suspended' })}>
-                Suspendre
+                Suspend
               </Button>
             )}
             <Button size="xs" variant="ghost" onClick={() => update.mutate({ id: u.id, role: u.role === 'admin' ? 'runner' : 'admin' })}>
-              {u.role === 'admin' ? 'Retirer admin' : 'Rendre admin'}
+              {u.role === 'admin' ? 'Remove admin' : 'Make admin'}
             </Button>
             <Button
               size="xs"
               variant="ghost"
               className="text-destructive"
               onClick={() => {
-                if (window.confirm(`Supprimer définitivement le compte ${u.email} et ses plans ?`)) remove.mutate(u.id)
+                if (window.confirm(`Permanently delete the account ${u.email} and its plans?`)) remove.mutate(u.id)
               }}
             >
-              Supprimer
+              Delete
             </Button>
           </div>
         ),
@@ -114,20 +114,20 @@ export function SignupsPage() {
   return (
     <>
       <PageTitle
-        title="Inscriptions"
-        description="Valide la liste d’attente, suspends ou supprime un compte, donne les droits d’administration."
+        title="Sign-ups"
+        description="Approve the waitlist, suspend or delete accounts, grant admin rights."
         actions={
           <Button asChild size="sm" variant="outline">
             <a href="/api/platform/admin/export/users.csv" download>
-              <DownloadIcon /> Exporter en CSV
+              <DownloadIcon /> Export CSV
             </a>
           </Button>
         }
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <SegmentedControl label="Filtrer par statut" options={FILTERS} value={status} onValueChange={(v) => setParams(v === 'all' ? {} : { status: v })} />
+        <SegmentedControl label="Filter by status" options={FILTERS} value={status} onValueChange={(v) => setParams(v === 'all' ? {} : { status: v })} />
         <div className="w-full sm:w-72">
-          <SearchField label="Rechercher" placeholder="Nom ou e-mail" value={query} onValueChange={setQuery} />
+          <SearchField label="Search" placeholder="Name or email" value={query} onValueChange={setQuery} />
         </div>
       </div>
       <div className="flex flex-col gap-3">
@@ -136,10 +136,10 @@ export function SignupsPage() {
           rows={rows}
           columns={columns}
           rowKey="id"
-          caption="Comptes inscrits"
-          emptyMessage={users.isPending ? 'Chargement…' : 'Aucun compte'}
+          caption="Registered accounts"
+          emptyMessage={users.isPending ? 'Loading…' : 'No accounts'}
           defaultSort={{ key: 'created_at', direction: 'desc' }}
-          itemName={{ one: 'compte', other: 'comptes' }}
+          itemName={{ one: 'account', other: 'accounts' }}
         />
       </div>
     </>

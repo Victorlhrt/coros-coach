@@ -44,7 +44,7 @@ export function PlanDetailPage() {
         actions={
           <Button asChild size="sm" variant="ghost">
             <Link to="/admin/plans">
-              <ArrowLeftIcon /> Tous les plans
+              <ArrowLeftIcon /> All plans
             </Link>
           </Button>
         }
@@ -52,28 +52,28 @@ export function PlanDetailPage() {
       <ErrorNote error={plan.error ?? setStatus.error} />
       {p && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-          <Panel title="Objectif">
+          <Panel title="Goal">
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <Item label="Distance" value={DISTANCE_LABELS[p.goal_distance] ?? p.goal_distance} />
-              <Item label="Course" value={formatDate(p.goal_date)} />
-              <Item label="Niveau" value={p.level ? (LEVEL_LABELS[p.level] ?? p.level) : '—'} />
-              <Item label="Semaines" value={p.weeks ?? '—'} />
-              <Item label="Jours / semaine" value={p.sessions_per_week ?? '—'} />
-              <Item label="Parcours" value={p.variant_id ?? '—'} />
-              <Item label="Modèle" value={p.model ?? '—'} />
-              <Item label="Créé" value={formatDateTime(p.created_at)} />
+              <Item label="Race" value={formatDate(p.goal_date)} />
+              <Item label="Level" value={p.level ? (LEVEL_LABELS[p.level] ?? p.level) : '—'} />
+              <Item label="Weeks" value={p.weeks ?? '—'} />
+              <Item label="Days / week" value={p.sessions_per_week ?? '—'} />
+              <Item label="Flow" value={p.variant_id ?? '—'} />
+              <Item label="Model" value={p.model ?? '—'} />
+              <Item label="Created" value={formatDateTime(p.created_at)} />
             </dl>
             <div className="mt-5">
               <Select
-                label="Statut"
+                label="Status"
                 value={p.status}
                 onValueChange={(v) => setStatus.mutate(v)}
                 options={Object.entries(PLAN_STATUS).map(([value, s]) => ({ value, label: s.label }))}
               />
             </div>
           </Panel>
-          <Panel title="Données du plan" description="Réponses d’onboarding et, une fois généré, semaines et séances.">
-            <JsonViewer data={p.data ?? {}} rootName="plan" defaultExpandDepth={2} searchable copyable maxHeight={560} label="Données du plan" />
+          <Panel title="Plan data" description="Onboarding answers and, once generated, weeks and sessions.">
+            <JsonViewer data={p.data ?? {}} rootName="plan" defaultExpandDepth={2} searchable copyable maxHeight={560} label="Plan data" />
           </Panel>
         </div>
       )}

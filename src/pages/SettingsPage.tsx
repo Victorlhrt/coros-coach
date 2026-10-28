@@ -1,6 +1,5 @@
-import { Bug, Download, Upload } from 'lucide-react'
+import { Download, Upload } from 'lucide-react'
 import { useRef, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { RecordsCard } from '@/components/RecordsCard'
 import { SecurityCard } from '@/components/SecurityCard'
@@ -11,7 +10,6 @@ import { useVault } from '@/lib/lock/vault'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
-import { ROUTES } from '@/lib/coach/routes'
 
 /** `children` s'affiche sous le titre, avant les réglages du coach (intégrations de l'espace coureur). */
 export function SettingsPage({ children }: { children?: ReactNode }) {
@@ -72,9 +70,6 @@ export function SettingsPage({ children }: { children?: ReactNode }) {
 
         <PlanData />
 
-        <Link to={ROUTES.debug} className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground lg:col-span-2">
-          <Bug className="size-4" /> Debug MCP
-        </Link>
       </div>
     </>
   )

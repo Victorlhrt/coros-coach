@@ -86,10 +86,10 @@ adminRoutes.patch('/users/:id', async (c) => {
   const me = c.get('user')
   const id = c.req.param('id')
   const parsed = UserPatch.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Requête invalide' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid request' }, 400)
   const patch = parsed.data
   if (id === me.id && (patch.role === 'runner' || (patch.status && patch.status !== 'active'))) {
-    return c.json({ error: 'Tu ne peux pas retirer tes propres droits.' }, 400)
+    return c.json({ error: 'You can’t remove your own admin rights.' }, 400)
   }
   const [before] = await db<{ status: string }[]>`select status from users where id = ${id}`
   const [row] = await db`
@@ -99,7 +99,7 @@ adminRoutes.patch('/users/:id', async (c) => {
       notes = case when ${patch.notes !== undefined} then ${patch.notes ?? null} else notes end
     where id = ${id}
     returning id, email, name, status, role`
-  if (!row) return c.json({ error: 'Compte introuvable' }, 404)
+  if (!row) return c.json({ error: 'Account not found' }, 404)
   if (before?.status === 'waitlist' && row.status === 'active') {
     sendEmailLater(row.email as string, 'account-approved', accountApproved({ name: row.name as string, app: config.origin }))
   }
@@ -112,9 +112,9 @@ adminRoutes.patch('/users/:id', async (c) => {
 adminRoutes.delete('/users/:id', async (c) => {
   const me = c.get('user')
   const id = c.req.param('id')
-  if (id === me.id) return c.json({ error: 'Tu ne peux pas supprimer ton propre compte ici.' }, 400)
+  if (id === me.id) return c.json({ error: 'You can’t delete your own account here.' }, 400)
   const [row] = await db<{ email: string }[]>`delete from users where id = ${id} returning email`
-  if (!row) return c.json({ error: 'Compte introuvable' }, 404)
+  if (!row) return c.json({ error: 'Account not found' }, 404)
   await audit(me.id, 'user.delete', row.email)
   return c.json({ ok: true })
 })
@@ -131,7 +131,7 @@ adminRoutes.get('/export/users.csv', async (c) => {
   const csv = [cols.join(','), ...rows.map((r) => cols.map((k) => cell(r[k])).join(','))].join('\n')
   await audit(c.get('user').id, 'users.export', null, { rows: rows.length })
   c.header('content-type', 'text/csv; charset=utf-8')
-  c.header('content-disposition', `attachment; filename="inscrits-${new Date().toISOString().slice(0, 10)}.csv"`)
+  c.header('content-disposition', `attachment; filename="users-${new Date().toISOString().slice(0, 10)}.csv"`)
   return c.body(csv)
 })
 
@@ -175,7 +175,7 @@ adminRoutes.get('/onboardings', async (c) => {
 adminRoutes.get('/onboardings/:id', async (c) => {
   const id = c.req.param('id')
   const [variant] = await db`select * from onboarding_variants where id = ${id}`
-  if (!variant) return c.json({ error: 'Parcours introuvable' }, 404)
+  if (!variant) return c.json({ error: 'Flow not found' }, 404)
   // Entonnoir : nombre de parcours ayant atteint au moins chaque étape.
   const reached = await db<{ step: number; n: number }[]>`
     select step_reached step, count(*)::int n from onboarding_sessions
@@ -194,16 +194,16 @@ adminRoutes.post('/onboardings', async (c) => {
   const body = z
     .object({ id: z.string().regex(/^[a-z0-9-]{2,40}$/), from: z.string().optional() })
     .safeParse(await c.req.json().catch(() => null))
-  if (!body.success) return c.json({ error: 'Identifiant invalide (minuscules, chiffres et tirets).' }, 400)
+  if (!body.success) return c.json({ error: 'Invalid ID (lowercase letters, digits and hyphens).' }, 400)
   const { id, from } = body.data
   const [source] = from ? await db<{ name: string; description: string; steps: unknown }[]>`select name, description, steps from onboarding_variants where id = ${from}` : []
   const [row] = await db`
     insert into onboarding_variants (id, name, description, status, weight, steps)
-    values (${id}, ${source ? `${source.name} (copie)` : 'Nouveau parcours'}, ${source?.description ?? ''}, 'draft', 0,
-            ${db.json((source?.steps ?? [{ id: 'distance', kind: 'text', title: 'Quel est ton objectif ?', field: 'goal' }]) as never)})
+    values (${id}, ${source ? `${source.name} (copy)` : 'New flow'}, ${source?.description ?? ''}, 'draft', 0,
+            ${db.json((source?.steps ?? [{ id: 'distance', kind: 'text', title: 'What’s your goal?', field: 'goal' }]) as never)})
     on conflict (id) do nothing
     returning id`
-  if (!row) return c.json({ error: 'Cet identifiant existe déjà.' }, 409)
+  if (!row) return c.json({ error: 'This ID already exists.' }, 409)
   await audit(c.get('user').id, 'onboarding.create', id, { from: from ?? null })
   return c.json(row)
 })
@@ -211,14 +211,14 @@ adminRoutes.post('/onboardings', async (c) => {
 adminRoutes.put('/onboardings/:id', async (c) => {
   const id = c.req.param('id')
   const parsed = VariantBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => `${i.path.join('.')} : ${i.message}`).join(' · ') }, 400)
+  if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · ') }, 400)
   const v = parsed.data
   const [row] = await db`
     update onboarding_variants
     set name = ${v.name}, description = ${v.description}, status = ${v.status}, weight = ${v.weight},
         steps = ${db.json(v.steps as never)}, updated_at = now()
     where id = ${id} returning id`
-  if (!row) return c.json({ error: 'Parcours introuvable' }, 404)
+  if (!row) return c.json({ error: 'Flow not found' }, 404)
   await audit(c.get('user').id, 'onboarding.update', id, { status: v.status, weight: v.weight, steps: v.steps.length })
   return c.json({ ok: true })
 })
@@ -243,20 +243,20 @@ adminRoutes.get('/plans/:id', async (c) => {
     from plans p join users u on u.id = p.user_id
     left join onboarding_sessions os on os.id = p.onboarding_session_id
     where p.id = ${c.req.param('id')}`
-  return plan ? c.json(plan) : c.json({ error: 'Plan introuvable' }, 404)
+  return plan ? c.json(plan) : c.json({ error: 'Plan not found' }, 404)
 })
 
 adminRoutes.patch('/plans/:id', async (c) => {
   const parsed = z
     .object({ status: z.enum(['requested', 'generating', 'active', 'completed', 'archived', 'failed']) })
     .safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Statut invalide' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid status' }, 400)
   const [prev] = await db<{ status: string }[]>`select status from plans where id = ${c.req.param('id')}`
   const [row] = await db<{ title: string; goal_distance: string; goal_date: string | null; weeks: number | null; email: string; name: string }[]>`
     update plans p set status = ${parsed.data.status}, updated_at = now()
     from users u where p.id = ${c.req.param('id')} and u.id = p.user_id
     returning p.title, p.goal_distance, to_char(p.goal_date, 'YYYY-MM-DD') goal_date, p.weeks, u.email, u.name`
-  if (!row) return c.json({ error: 'Plan introuvable' }, 404)
+  if (!row) return c.json({ error: 'Plan not found' }, 404)
   if (parsed.data.status === 'active' && prev?.status !== 'active') {
     sendEmailLater(row.email, 'plan-ready', planReady({ name: row.name, app: config.origin, title: row.title, distance: row.goal_distance, goalDate: row.goal_date, weeks: row.weeks }))
   }
@@ -273,7 +273,7 @@ adminRoutes.get('/settings', async (c) => {
 
 adminRoutes.put('/settings', async (c) => {
   const parsed = z.object({ signupMode: z.enum(['open', 'waitlist', 'closed']) }).safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Réglage invalide' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid setting' }, 400)
   await db`
     insert into app_settings (key, value, updated_at) values ('signup_mode', ${db.json(parsed.data.signupMode)}, now())
     on conflict (key) do update set value = excluded.value, updated_at = now()`
@@ -305,7 +305,7 @@ adminRoutes.get('/emails', async (c) => {
 
 adminRoutes.get('/emails/:id/preview', (c) => {
   const t = CATALOG[c.req.param('id') as TemplateId]
-  if (!t) return c.json({ error: 'Modèle introuvable' }, 404)
+  if (!t) return c.json({ error: 'Template not found' }, 404)
   return c.html(t.sample(config.origin).html)
 })
 
@@ -313,8 +313,8 @@ adminRoutes.get('/emails/:id/preview', (c) => {
 adminRoutes.post('/emails/:id/test', async (c) => {
   const id = c.req.param('id') as TemplateId
   const t = CATALOG[id]
-  if (!t) return c.json({ error: 'Modèle introuvable' }, 404)
-  if (!config.resendApiKey) return c.json({ error: 'RESEND_API_KEY n’est pas configurée sur le serveur.' }, 400)
+  if (!t) return c.json({ error: 'Template not found' }, 404)
+  if (!config.resendApiKey) return c.json({ error: 'RESEND_API_KEY is not configured on the server.' }, 400)
   const me = c.get('user')
   const res = await sendEmail(me.email, `test:${id}`, t.sample(config.origin))
   return res.ok ? c.json({ ok: true, to: me.email }) : c.json({ error: res.error }, 502)
@@ -337,17 +337,17 @@ const CodeBody = z.object({ code: z.string().trim().min(3).max(40).regex(/^[a-zA
 
 adminRoutes.post('/invites', async (c) => {
   const parsed = CodeBody.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return c.json({ error: 'Code invalide (lettres, chiffres et tirets)' }, 400)
+  if (!parsed.success) return c.json({ error: 'Invalid code (letters, digits and hyphens)' }, 400)
   const code = normalizeCode(parsed.data.code)
   const [row] = await db`insert into invite_codes (code, label, max_uses) values (${code}, ${parsed.data.label}, ${parsed.data.maxUses}) on conflict do nothing returning code`
-  if (!row) return c.json({ error: 'Ce code existe déjà' }, 409)
+  if (!row) return c.json({ error: 'This code already exists' }, 409)
   await audit(c.get('user').id, 'invite.create', code, { maxUses: parsed.data.maxUses })
   return c.json({ ok: true })
 })
 
 adminRoutes.patch('/invites/:code', async (c) => {
   const body = (await c.req.json().catch(() => null)) as { active?: boolean } | null
-  if (typeof body?.active !== 'boolean') return c.json({ error: 'Requête invalide' }, 400)
+  if (typeof body?.active !== 'boolean') return c.json({ error: 'Invalid request' }, 400)
   await db`update invite_codes set active = ${body.active} where code = ${c.req.param('code')}`
   await audit(c.get('user').id, 'invite.update', c.req.param('code'), { active: body.active })
   return c.json({ ok: true })
@@ -356,10 +356,10 @@ adminRoutes.patch('/invites/:code', async (c) => {
 /** Invite une personne de la liste : code à usage unique, envoyé par e-mail. */
 adminRoutes.post('/waitlist/:id/invite', async (c) => {
   const [w] = await db<{ email: string; first_name: string; invite_code: string | null }[]>`select email, first_name, invite_code from waitlist where id = ${c.req.param('id')}`
-  if (!w) return c.json({ error: 'Introuvable' }, 404)
+  if (!w) return c.json({ error: 'Not found' }, 404)
   const code = w.invite_code ?? makeCode(w.first_name)
   if (!w.invite_code) {
-    await db`insert into invite_codes (code, label, max_uses) values (${code}, ${`Liste d’attente · ${w.email}`}, 1)`
+    await db`insert into invite_codes (code, label, max_uses) values (${code}, ${`Waitlist · ${w.email}`}, 1)`
     await db`update waitlist set invite_code = ${code}, invited_at = now() where id = ${c.req.param('id')}`
   }
   sendEmailLater(w.email, 'invited', invited({ name: w.first_name, app: config.origin, code }))

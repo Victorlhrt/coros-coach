@@ -31,9 +31,9 @@ export const navGroups: SidebarNavGroup[] = [
 	{
 		label: "Administration",
 		items: [
-			{ title: "Access & settings", path: "/admin/administration", icon: <ShieldIcon /> },
+			{ title: "Access & settings", path: "/admin/settings", icon: <ShieldIcon /> },
 			{ title: "Emails", path: "/admin/emails", icon: <MailIcon /> },
-			{ title: "Log", path: "/admin/journal", icon: <ScrollTextIcon /> },
+			{ title: "Log", path: "/admin/log", icon: <ScrollTextIcon /> },
 		],
 	},
 ];

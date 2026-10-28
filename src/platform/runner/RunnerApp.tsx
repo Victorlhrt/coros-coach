@@ -444,7 +444,7 @@ function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
-  return <CoachChat firstName={first} className="mx-auto w-full max-w-3xl" />
+  return <CoachChat firstName={first} className="mx-auto h-[calc(100dvh-7.5rem)] w-full max-w-4xl md:h-[calc(100dvh-8.5rem)]" />
 }
 
 // ---------- Equipment ----------

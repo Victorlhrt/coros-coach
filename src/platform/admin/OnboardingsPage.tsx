@@ -45,21 +45,21 @@ export function OnboardingsPage() {
     <>
       <PageTitle
         title="Onboardings"
-        description="Chaque visiteur reçoit un parcours en ligne tiré au sort selon son poids. Teste un parcours sans fausser les chiffres avec l’aperçu."
+        description="Each visitor gets a live flow picked at random according to its weight. Use the preview to test a flow without skewing the numbers."
       />
       <div className="flex flex-col gap-4">
         <ErrorNote error={variants.error ?? create.error} />
 
         {rows.some((v) => v.started > 0) && (
-          <Panel title="Taux de complétion par parcours" description="Parcours terminés sur parcours commencés, hors aperçus.">
+          <Panel title="Completion rate by flow" description="Completed flows out of started flows, excluding previews.">
             <BarChart
               data={rows.filter((v) => v.status !== 'archived').map((v) => ({ key: v.id, label: v.name, axisLabel: v.name, value: percent(v.completed, v.started) }))}
-              label="Taux de complétion"
-              period="depuis le lancement"
+              label="Completion rate"
+              period="since launch"
               unit="%"
-              averageLabel="Moyenne"
-              valueLabel="Complétion"
-              categoryLabel="Parcours"
+              averageLabel="Average"
+              valueLabel="Completion"
+              categoryLabel="Flow"
             />
           </Panel>
         )}
@@ -73,33 +73,33 @@ export function OnboardingsPage() {
               actions={<Badge tone={VARIANT_STATUS[v.status].tone}>{VARIANT_STATUS[v.status].label}</Badge>}
             >
               <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                <Stat label="Commencés" value={v.started} />
-                <Stat label="Terminés" value={`${percent(v.completed, v.started)} %`} />
-                <Stat label="Inscriptions" value={v.signups} />
+                <Stat label="Started" value={v.started} />
+                <Stat label="Completed" value={`${percent(v.completed, v.started)}%`} />
+                <Stat label="Sign-ups" value={v.signups} />
                 <Stat label="Plans" value={v.plans} />
               </dl>
               <p className="mt-3 text-muted-foreground text-xs">
-                {v.steps} étape{v.steps > 1 ? 's' : ''} ·{' '}
-                {v.status === 'live' ? `${percent(v.weight, totalWeight)} % du trafic (poids ${v.weight})` : 'hors trafic'} · modifié {formatDateTime(v.updated_at)}
+                {v.steps} step{v.steps > 1 ? 's' : ''} ·{' '}
+                {v.status === 'live' ? `${percent(v.weight, totalWeight)}% of traffic (weight ${v.weight})` : 'no traffic'} · updated {formatDateTime(v.updated_at)}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="sm">
-                  <Link to={`/admin/onboardings/${v.id}`}>Ouvrir</Link>
+                  <Link to={`/admin/onboardings/${v.id}`}>Open</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline">
                   <a href={`/onboarding?variant=${v.id}&preview=1`} target="_blank" rel="noreferrer">
-                    <EyeIcon /> Tester
+                    <EyeIcon /> Test
                   </a>
                 </Button>
                 <Button size="sm" variant="ghost" disabled={create.isPending} onClick={() => create.mutate({ id: `${v.id}-b`, from: v.id })}>
-                  Dupliquer
+                  Duplicate
                 </Button>
               </div>
             </Panel>
           ))}
         </div>
 
-        <Panel title="Nouveau parcours" description="Identifiant en minuscules, chiffres et tirets : il apparaît dans l’URL de test.">
+        <Panel title="New flow" description="ID in lowercase letters, digits and hyphens: it appears in the test URL.">
           <form
             className="flex flex-wrap items-end gap-3"
             onSubmit={(e) => {
@@ -108,10 +108,10 @@ export function OnboardingsPage() {
             }}
           >
             <div className="w-full sm:w-72">
-              <Input label="Identifiant" placeholder="ex. objectif-chrono" value={newId} onChange={(e) => setNewId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
+              <Input label="ID" placeholder="e.g. time-goal" value={newId} onChange={(e) => setNewId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
             </div>
             <Button type="submit" disabled={!newId || create.isPending}>
-              <PlusIcon /> Créer
+              <PlusIcon /> Create
             </Button>
           </form>
         </Panel>

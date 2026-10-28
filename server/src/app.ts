@@ -5,6 +5,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { secureHeaders } from 'hono/secure-headers'
 import { authRoutes } from './auth.js'
 import { claudeRoutes } from './claude.js'
+import { aiUsageRoutes, migrateAiUsage } from './platform/ai-usage.js'
 import { config } from './config.js'
 import { migrate } from './db.js'
 import { accountRoutes } from './platform/account.js'
@@ -46,6 +47,7 @@ app.route('/api/platform/onboarding', onboardingRoutes)
 app.route('/api/platform/lookup', lookupRoutes)
 app.route('/api/platform/invites', inviteRoutes)
 app.route('/api/platform/connect', connectRoutes)
+app.route('/api/platform/admin/ai-usage', aiUsageRoutes)
 app.route('/api/platform/admin', adminRoutes)
 app.route('/api/platform/account', accountRoutes)
 
@@ -60,6 +62,7 @@ app.get('*', serveStatic({ path: './dist/index.html' }))
 
 await migrate()
 await migratePlatform()
+await migrateAiUsage()
 serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`Coach COROS sur :${info.port} (origine ${config.origin}, rpID ${config.rpID})`)
 })

@@ -14,18 +14,18 @@ type LogRow = { id: string; recipient: string; template: string; subject: string
 type Data = { configured: boolean; from: string; templates: Template[]; log: LogRow[] }
 
 const STATUS = {
-  sent: { label: 'Envoyé', tone: 'success' },
-  failed: { label: 'Échec', tone: 'danger' },
-  skipped: { label: 'Non envoyé', tone: 'warning' },
+  sent: { label: 'Sent', tone: 'success' },
+  failed: { label: 'Failed', tone: 'danger' },
+  skipped: { label: 'Not sent', tone: 'warning' },
 } as const
 
 const columns: DataColumn<LogRow>[] = [
   { key: 'created_at', label: 'Date', sortable: true, render: (v) => formatDateTime(v as string) },
-  { key: 'recipient', label: 'Destinataire', sortable: true },
-  { key: 'template', label: 'Modèle', sortable: true },
+  { key: 'recipient', label: 'Recipient', sortable: true },
+  { key: 'template', label: 'Template', sortable: true },
   {
     key: 'status',
-    label: 'Statut',
+    label: 'Status',
     sortable: true,
     render: (_, r) => (
       <span title={r.error ?? undefined}>
@@ -49,11 +49,11 @@ export function EmailsPage() {
   return (
     <>
       <PageTitle
-        title="E-mails"
-        description={data.data ? `Envoyés par Resend depuis ${data.data.from}.` : undefined}
+        title="Emails"
+        description={data.data ? `Sent by Resend from ${data.data.from}.` : undefined}
         actions={
           data.data && (
-            <Badge tone={data.data.configured ? 'success' : 'warning'}>{data.data.configured ? 'Resend connecté' : 'RESEND_API_KEY manquante'}</Badge>
+            <Badge tone={data.data.configured ? 'success' : 'warning'}>{data.data.configured ? 'Resend connected' : 'RESEND_API_KEY missing'}</Badge>
           )
         }
       />
@@ -61,7 +61,7 @@ export function EmailsPage() {
         <ErrorNote error={data.error ?? test.error} />
         {data.data && (
           <SegmentedControl
-            label="Modèle"
+            label="Template"
             options={data.data.templates.map((t) => ({ value: t.id, label: t.label }))}
             value={selected}
             onValueChange={(v) => {
@@ -73,33 +73,33 @@ export function EmailsPage() {
         {current && (
           <Panel
             title={current.subject}
-            description={`Envoyé quand : ${current.when}.`}
+            description={`Sent when: ${current.when}.`}
             actions={
               <div className="flex items-center gap-3">
-                {test.isSuccess && <span className="text-muted-foreground text-xs">Envoyé à {test.data.to}</span>}
+                {test.isSuccess && <span className="text-muted-foreground text-xs">Sent to {test.data.to}</span>}
                 <Button size="sm" variant="outline" disabled={!data.data?.configured || test.isPending} onClick={() => test.mutate(current.id)}>
-                  <SendIcon /> M’envoyer un test
+                  <SendIcon /> Send me a test
                 </Button>
               </div>
             }
           >
             <iframe
               key={current.id}
-              title={`Aperçu : ${current.label}`}
+              title={`Preview: ${current.label}`}
               src={`/api/platform/admin/emails/${current.id}/preview`}
               className="h-[640px] w-full rounded-lg border bg-black"
             />
           </Panel>
         )}
-        <Panel title="Derniers envois" description="Les 100 derniers e-mails, avec leur statut chez Resend.">
+        <Panel title="Recent sends" description="The last 100 emails, with their Resend status.">
           <SortableDataTable
             rows={data.data?.log ?? []}
             columns={columns}
             rowKey="id"
-            caption="Derniers envois"
-            emptyMessage="Aucun e-mail envoyé pour l’instant"
+            caption="Recent sends"
+            emptyMessage="No emails sent yet"
             defaultSort={{ key: 'created_at', direction: 'desc' }}
-            itemName={{ one: 'e-mail', other: 'e-mails' }}
+            itemName={{ one: 'email', other: 'emails' }}
           />
         </Panel>
       </div>

@@ -112,26 +112,26 @@ export function invited(p: { name: string; app: string; code: string }): Email {
 
 export const CATALOG = {
   'waitlist-joined': {
-    label: 'Liste d’attente (parrainage)',
-    when: 'Inscription sur la liste d’attente sans code',
+    label: 'Waitlist (referral)',
+    when: 'Someone joins the waitlist without a code',
     sample: (app: string) => waitlistJoined({ name: 'Camille Martin', position: 128, shareUrl: `${app}/onboarding?ref=camille7` }),
   },
-  invited: { label: 'Invitation', when: 'Un admin invite une personne de la liste', sample: (app: string) => invited({ name: 'Camille Martin', app, code: 'camille-x7' }) },
-  welcome: { label: 'Bienvenue', when: 'Inscription avec compte actif', sample: (app: string) => welcome({ name: 'Camille Martin', app }) },
-  waitlist: { label: 'Liste d’attente', when: 'Inscription en mode liste d’attente', sample: () => waitlist({ name: 'Camille Martin' }) },
+  invited: { label: 'Invite', when: 'An admin invites someone from the waitlist', sample: (app: string) => invited({ name: 'Camille Martin', app, code: 'camille-x7' }) },
+  welcome: { label: 'Welcome', when: 'Sign-up with an active account', sample: (app: string) => welcome({ name: 'Camille Martin', app }) },
+  waitlist: { label: 'Waitlist', when: 'Sign-up while in waitlist mode', sample: () => waitlist({ name: 'Camille Martin' }) },
   'account-approved': {
-    label: 'Compte ouvert',
-    when: 'Un admin valide un compte en liste d’attente',
+    label: 'Account open',
+    when: 'An admin approves a waitlisted account',
     sample: (app: string) => accountApproved({ name: 'Camille Martin', app }),
   },
   'password-reset': {
-    label: 'Mot de passe oublié',
-    when: 'Demande de réinitialisation',
+    label: 'Password reset',
+    when: 'A password reset is requested',
     sample: (app: string) => passwordReset({ name: 'Camille Martin', url: `${app}/reset-password?token=exemple`, minutes: 60 }),
   },
   'plan-ready': {
-    label: 'Plan prêt',
-    when: 'Un plan passe au statut « Actif »',
+    label: 'Plan ready',
+    when: 'A plan moves to “Active” status',
     sample: (app: string) => planReady({ name: 'Camille Martin', app, title: 'Half marathon build', distance: 'half', goalDate: '2027-04-11', weeks: 23 }),
   },
 } as const

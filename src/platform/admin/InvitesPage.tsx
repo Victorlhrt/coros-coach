@@ -41,20 +41,20 @@ export function InvitesPage() {
 
   const codeColumns: DataColumn<Code>[] = [
     { key: 'code', label: 'Code', sortable: true, render: (v) => <code className="font-medium">{v as string}</code> },
-    { key: 'label', label: 'Libellé', render: (v, row) => (v as string) || row.owner || '—' },
-    { key: 'uses', label: 'Utilisations', sortable: true, render: (v, row) => `${v as number}${row.max_uses === null ? ' · illimité' : ` / ${row.max_uses}`}` },
-    { key: 'created_at', label: 'Créé', sortable: true, render: (v) => formatDateTime(v as string) },
-    { key: 'active', label: 'Actif', render: (_, row) => <Switch aria-label={`Activer ${row.code}`} checked={row.active} onCheckedChange={() => toggle.mutate(row)} /> },
+    { key: 'label', label: 'Label', render: (v, row) => (v as string) || row.owner || '—' },
+    { key: 'uses', label: 'Uses', sortable: true, render: (v, row) => `${v as number}${row.max_uses === null ? ' · unlimited' : ` / ${row.max_uses}`}` },
+    { key: 'created_at', label: 'Created', sortable: true, render: (v) => formatDateTime(v as string) },
+    { key: 'active', label: 'Active', render: (_, row) => <Switch aria-label={`Enable ${row.code}`} checked={row.active} onCheckedChange={() => toggle.mutate(row)} /> },
   ]
   const waitColumns: DataColumn<Waiting>[] = [
-    { key: 'position', label: 'Rang', sortable: true },
-    { key: 'email', label: 'Personne', sortable: true, render: (v, row) => `${row.first_name ? `${row.first_name} · ` : ''}${v as string}` },
-    { key: 'referrals', label: 'Parrainages', sortable: true },
-    { key: 'referred_by', label: 'Venu par', render: (v) => (v as string | null) ?? '—' },
-    { key: 'created_at', label: 'Inscrit', sortable: true, render: (v) => formatDateTime(v as string) },
+    { key: 'position', label: 'Rank', sortable: true },
+    { key: 'email', label: 'Person', sortable: true, render: (v, row) => `${row.first_name ? `${row.first_name} · ` : ''}${v as string}` },
+    { key: 'referrals', label: 'Referrals', sortable: true },
+    { key: 'referred_by', label: 'Referred by', render: (v) => (v as string | null) ?? '—' },
+    { key: 'created_at', label: 'Joined', sortable: true, render: (v) => formatDateTime(v as string) },
     {
       key: 'invite_code',
-      label: 'Invitation',
+      label: 'Invite',
       render: (v, row) =>
         v ? (
           <Badge size="sm" tone="success">
@@ -62,7 +62,7 @@ export function InvitesPage() {
           </Badge>
         ) : (
           <Button size="sm" variant="secondary" loading={invite.isPending && invite.variables?.id === row.id} onClick={() => invite.mutate(row)}>
-            Inviter
+            Invite
           </Button>
         ),
     },
@@ -70,10 +70,10 @@ export function InvitesPage() {
 
   return (
     <>
-      <PageTitle title="Invitations" description="L’onboarding demande un code. Sans code, les gens rejoignent la liste d’attente et remontent en parrainant." />
+      <PageTitle title="Invitations" description="Onboarding requires a code. Without one, people join the waitlist and move up by referring friends." />
       <div className="flex flex-col gap-4">
         <ErrorNote error={data.error ?? create.error ?? toggle.error ?? invite.error} />
-        <Panel title="Nouveau code">
+        <Panel title="New code">
           <form
             className="grid items-end gap-3 sm:grid-cols-[1fr_2fr_1fr_auto]"
             onSubmit={(e) => {
@@ -81,16 +81,16 @@ export function InvitesPage() {
               create.mutate()
             }}
           >
-            <Input label="Code" placeholder="ex. club-asm" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-            <Input label="Libellé" placeholder="Pour qui ?" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-            <Input label="Utilisations max" placeholder="Illimité" inputMode="numeric" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value.replace(/\D/g, '') })} />
+            <Input label="Code" placeholder="e.g. club-asm" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Input label="Label" placeholder="Who is it for?" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+            <Input label="Max uses" placeholder="Unlimited" inputMode="numeric" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value.replace(/\D/g, '') })} />
             <Button type="submit" loading={create.isPending} disabled={form.code.trim().length < 3}>
-              Créer
+              Create
             </Button>
           </form>
         </Panel>
         <Panel title={`Codes (${data.data?.codes.length ?? 0})`}>{data.data && <SortableDataTable columns={codeColumns} rows={data.data.codes} rowKey="code" />}</Panel>
-        <Panel title={`Liste d’attente (${data.data?.waitlist.length ?? 0})`}>
+        <Panel title={`Waitlist (${data.data?.waitlist.length ?? 0})`}>
           {data.data && <SortableDataTable columns={waitColumns} rows={data.data.waitlist} rowKey="id" />}
         </Panel>
       </div>

@@ -55,7 +55,7 @@ export function NavUser() {
 						<UserIcon />
 						My runner space
 					</DropdownMenuItem>
-					<DropdownMenuItem onSelect={() => navigate("/admin/administration")}>
+					<DropdownMenuItem onSelect={() => navigate("/admin/settings")}>
 						<ShieldIcon />
 						Access & settings
 					</DropdownMenuItem>
