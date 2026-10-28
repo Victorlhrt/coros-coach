@@ -54,7 +54,7 @@ export function SignupPage() {
         done={
           result === 'waitlist'
             ? { title: 'Tu es sur la liste', text: 'Les places de la bêta sont limitées : on t’écrit dès que ton compte est ouvert, à l’adresse' }
-            : { title: 'Bienvenue !', text: 'Ton compte est prêt et ton plan est en préparation. Compte :', action: 'Voir mon plan', onAction: () => navigate('/compte') }
+            : { title: 'Bienvenue !', text: 'Ton compte est prêt et ton plan est en préparation. Compte :', action: 'Voir mon plan', onAction: () => navigate('/account') }
         }
       />
     </div>

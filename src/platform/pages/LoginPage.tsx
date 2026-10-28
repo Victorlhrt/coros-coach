@@ -18,7 +18,7 @@ export function LoginPage() {
     qc.setQueryData(['me'], user)
     // Laisse l'écran de confirmation du bloc s'afficher un instant avant de partir.
     const next = params.get('next')
-    window.setTimeout(() => navigate(next?.startsWith('/') ? next : user?.role === 'admin' ? '/admin' : '/compte', { replace: true }), 900)
+    window.setTimeout(() => navigate(next?.startsWith('/') ? next : user?.role === 'admin' ? '/admin' : '/account', { replace: true }), 900)
   }
 
   return (

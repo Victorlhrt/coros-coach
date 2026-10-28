@@ -34,7 +34,7 @@ async function getPrf(credentialId: Uint8Array, salt: Uint8Array) {
 
 export class PrfUnsupportedError extends Error {
   constructor() {
-    super('Ce navigateur ne permet pas de chiffrer avec Face ID (extension PRF absente). Le code de secours reste disponible.')
+    super('This browser can’t encrypt with Face ID (PRF extension missing). Your backup PIN still works.')
   }
 }
 
@@ -55,7 +55,7 @@ export async function registerPasskey() {
       extensions: { prf: { eval: { first: salt as BufferSource } } } as AuthenticationExtensionsClientInputs,
     },
   })) as PublicKeyCredential | null
-  if (!cred) throw new Error('Création du passkey annulée.')
+  if (!cred) throw new Error('Passkey creation cancelled.')
   const ext = cred.getClientExtensionResults() as PrfResults
   if (ext.prf?.enabled === false) throw new PrfUnsupportedError()
   const id = new Uint8Array(cred.rawId)

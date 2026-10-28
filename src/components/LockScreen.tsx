@@ -19,12 +19,12 @@ export function LockScreen() {
       <div className="flex size-16 items-center justify-center rounded-3xl bg-accent/15">
         <Lock className="size-8 text-accent" />
       </div>
-      <h1 className="mt-5 text-3xl font-medium tracking-tight">Coach verrouillé</h1>
-      <p className="mt-2 text-muted-foreground">Ta clé API et ta connexion COROS sont chiffrées sur cet appareil.</p>
+      <h1 className="mt-5 text-3xl font-medium tracking-tight">Coach locked</h1>
+      <p className="mt-2 text-muted-foreground">Your API key and COROS connection are encrypted on this device.</p>
 
       {hasPasskey && (
         <Button className="mt-8 w-full" onClick={() => faceId.mutate()} disabled={faceId.isPending}>
-          <ScanFace className="size-5" /> Déverrouiller avec Face ID
+          <ScanFace className="size-5" /> Unlock with Face ID
         </Button>
       )}
 
@@ -36,7 +36,7 @@ export function LockScreen() {
         }}
       >
         <label className="text-sm font-medium text-muted-foreground" htmlFor="pin">
-          {hasPasskey ? 'Ou avec ton code' : 'Code'}
+          {hasPasskey ? 'Or use your code' : 'Code'}
         </label>
         <div className="mt-1.5 flex gap-2">
           <Input
@@ -58,10 +58,10 @@ export function LockScreen() {
       <button
         className="mt-10 text-sm text-muted-foreground underline"
         onClick={() => {
-          if (confirm('Effacer la clé API et la connexion COROS de cet appareil ? Ton plan est conservé.')) resetVault()
+          if (confirm('Erase the API key and COROS connection from this device? Your plan is kept.')) resetVault()
         }}
       >
-        Code oublié ?
+        Forgot your code?
       </button>
     </div>
   )

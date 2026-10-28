@@ -18,10 +18,10 @@ export type SidebarNavGroup = {
 
 export const navGroups: SidebarNavGroup[] = [
 	{
-		label: "Pilotage",
+		label: "Overview",
 		items: [
-			{ title: "Vue d’ensemble", path: "/admin", icon: <LayoutGridIcon /> },
-			{ title: "Inscriptions", path: "/admin/inscriptions", icon: <UsersIcon /> },
+			{ title: "Dashboard", path: "/admin", icon: <LayoutGridIcon /> },
+			{ title: "Sign-ups", path: "/admin/inscriptions", icon: <UsersIcon /> },
 			{ title: "Invitations", path: "/admin/invitations", icon: <TicketIcon /> },
 			{ title: "Onboardings", path: "/admin/onboardings", icon: <RouteIcon /> },
 			{ title: "Testing", path: "/admin/testing", icon: <FlaskConicalIcon /> },
@@ -31,16 +31,16 @@ export const navGroups: SidebarNavGroup[] = [
 	{
 		label: "Administration",
 		items: [
-			{ title: "Accès et réglages", path: "/admin/administration", icon: <ShieldIcon /> },
-			{ title: "E-mails", path: "/admin/emails", icon: <MailIcon /> },
-			{ title: "Journal", path: "/admin/journal", icon: <ScrollTextIcon /> },
+			{ title: "Access & settings", path: "/admin/administration", icon: <ShieldIcon /> },
+			{ title: "Emails", path: "/admin/emails", icon: <MailIcon /> },
+			{ title: "Log", path: "/admin/journal", icon: <ScrollTextIcon /> },
 		],
 	},
 ];
 
 export const footerNavLinks: SidebarNavItem[] = [
-	{ title: "Site public", path: "/", icon: <ExternalLinkIcon />, external: true },
-	{ title: "Espace coureur", path: "/compte/plan", icon: <WatchIcon />, external: true },
+	{ title: "Public site", path: "/", icon: <ExternalLinkIcon />, external: true },
+	{ title: "Runner space", path: "/account/plan", icon: <WatchIcon />, external: true },
 ];
 
 export const navLinks: SidebarNavItem[] = [

@@ -39,15 +39,15 @@ function haversine(a: Point, b: Point) {
 
 function readPoints(xml: string): { name: string; points: Point[] } {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
-  if (doc.querySelector('parsererror')) throw new Error('Fichier GPX illisible.')
+  if (doc.querySelector('parsererror')) throw new Error('Couldn’t read this GPX file.')
   let nodes = Array.from(doc.getElementsByTagName('trkpt'))
   if (nodes.length === 0) nodes = Array.from(doc.getElementsByTagName('rtept'))
-  if (nodes.length < 2) throw new Error('Aucun tracé trouvé dans le GPX.')
+  if (nodes.length < 2) throw new Error('No track found in this GPX file.')
   const points = nodes.map((n) => {
     const ele = n.getElementsByTagName('ele')[0]?.textContent
     return { lat: Number(n.getAttribute('lat')), lon: Number(n.getAttribute('lon')), ele: ele ? Number(ele) : null }
   })
-  const name = doc.getElementsByTagName('name')[0]?.textContent?.trim() || 'Parcours'
+  const name = doc.getElementsByTagName('name')[0]?.textContent?.trim() || 'Course'
   return { name, points }
 }
 
@@ -133,7 +133,7 @@ export function analyzePoints(name: string, points: Point[]): CourseProfile {
   const dist = [0]
   for (let i = 1; i < points.length; i++) dist.push(dist[i - 1] + haversine(points[i - 1], points[i]))
   const total = dist[dist.length - 1]
-  if (total < 500) throw new Error('Tracé trop court pour une course.')
+  if (total < 500) throw new Error('This track is too short for a race.')
 
   const hasEle = points.filter((p) => p.ele !== null).length > points.length / 2
   const rawEle = points.map((p, i) => p.ele ?? points[i - 1]?.ele ?? 0)

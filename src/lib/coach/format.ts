@@ -13,7 +13,7 @@ export function paceUnit(units: Units = 'metric') {
 
 export function formatDistance(meters: number, units: Units = 'metric', digits = 1) {
   const v = units === 'imperial' ? meters / MI : meters / 1000
-  return `${v.toFixed(v >= 100 ? 0 : digits).replace('.', ',')} ${units === 'imperial' ? 'mi' : 'km'}`
+  return `${v.toFixed(v >= 100 ? 0 : digits)} ${units === 'imperial' ? 'mi' : 'km'}`
 }
 
 /** Distance dans l'unité choisie, arrondie au dixième (axes et graphiques). */
@@ -26,13 +26,13 @@ export function distanceUnit(units: Units = 'metric') {
 }
 
 /** Nombre au format français, une décimale au plus. */
-export const formatNumber = (value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })
+export const formatNumber = (value: number) => value.toLocaleString('en-GB', { maximumFractionDigits: 1 })
 
 export function formatDuration(seconds: number) {
   const s = Math.round(seconds)
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
-  if (h > 0) return `${h} h ${String(m).padStart(2, '0')}`
+  if (h > 0) return `${h}h${String(m).padStart(2, '0')}`
   return `${m} min`
 }
 

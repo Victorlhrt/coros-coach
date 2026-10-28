@@ -38,7 +38,7 @@ export function SessionPage() {
   if (!plan || !session) {
     return (
       <Card className="mt-6">
-        <EmptyState icon={RepeatIcon} title="Séance introuvable">Elle a peut-être été retirée du plan.</EmptyState>
+        <EmptyState icon={RepeatIcon} title="Session not found">It may have been removed from the plan.</EmptyState>
       </Card>
     )
   }
@@ -55,7 +55,7 @@ export function SessionPage() {
         <div className="flex min-w-0 items-start gap-3">
           <button
             onClick={() => navigate(-1)}
-            aria-label="Retour"
+            aria-label="Back"
             className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:text-foreground"
           >
             <ChevronLeft className="size-4" />
@@ -69,18 +69,18 @@ export function SessionPage() {
           </div>
         </div>
         <LinkButton asChild variant="outline" size="sm">
-          <Link to={ROUTES.plan}>Voir la semaine</Link>
+          <Link to={ROUTES.plan}>View week</Link>
         </LinkButton>
       </header>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Panel>
-          <PanelHeader title="Structure" subtitle={session.blocks.length ? `${steps} étape${steps > 1 ? 's' : ''} · ${formatDuration(seconds)}${meters > 0 ? ` · ${formatDistance(meters, units)}` : ''}` : 'Renforcement'} />
+          <PanelHeader title="Structure" subtitle={session.blocks.length ? `${steps} step${steps > 1 ? 's' : ''} · ${formatDuration(seconds)}${meters > 0 ? ` · ${formatDistance(meters, units)}` : ''}` : 'Strength'} />
           <div className="no-scrollbar flex snap-x snap-mandatory divide-x overflow-x-auto border-t sm:grid sm:grid-cols-4">
-            <Kpi label="Durée" value={formatDuration(seconds)} />
-            <Kpi label="Distance estimée" value={meters > 0 ? formatDistance(meters, units) : '—'} />
-            <Kpi label={`Allure moyenne ${paceUnit(units)}`} value={pace > 0 ? formatPace(pace, units) : '—'} />
-            <Kpi label="Intensité" value={['', 'Facile', 'Modérée', 'Dure'][INTENSITY[session.type]]} />
+            <Kpi label="Duration" value={formatDuration(seconds)} />
+            <Kpi label="Estimated distance" value={meters > 0 ? formatDistance(meters, units) : '—'} />
+            <Kpi label={`Average pace ${paceUnit(units)}`} value={pace > 0 ? formatPace(pace, units) : '—'} />
+            <Kpi label="Intensity" value={['', 'Easy', 'Moderate', 'Hard'][INTENSITY[session.type]]} />
           </div>
           {session.blocks.length > 0 && (
             <PanelSection divided>
@@ -96,7 +96,7 @@ export function SessionPage() {
                       <span className="flex size-6 items-center justify-center rounded-full border">
                         <RepeatIcon className="size-3" />
                       </span>
-                      {b.repeats} × la série
+                      {b.repeats} × the set
                     </p>
                     <ul className="mt-3 ml-3 space-y-3 border-l pl-5">
                       {b.steps.map((s, j) => (
@@ -116,7 +116,7 @@ export function SessionPage() {
 
         <div className="flex flex-col gap-4 xl:[&>*:last-child]:flex-1">
           <Panel>
-            <PanelHeader title="Montre" subtitle={status === 'app-only' ? 'Le renforcement se suit depuis l’app.' : 'Envoi de la séance sur ta montre COROS'} actions={<SyncBadge status={status} />} />
+            <PanelHeader title="Watch" subtitle={status === 'app-only' ? 'Strength sessions are tracked in the app.' : 'Sending this session to your COROS watch'} actions={<SyncBadge status={status} />} />
           </Panel>
           {session.blocks.length > 0 && <ZoneSplit blocks={session.blocks} zones={zones} />}
           {session.type !== 'strength' && <ActivityLinkCard session={session} />}
@@ -134,7 +134,7 @@ function ZoneSplit({ blocks, zones }: { blocks: Block[]; zones: Zone[] }) {
   const byZone = [1, 2, 3, 4, 5, 6].map((z) => ({ z, seconds: steps.filter((s) => s.zone === z).reduce((a, s) => a + s.seconds, 0) })).filter((r) => r.seconds > 0)
   return (
     <Panel>
-      <PanelHeader title="Temps par zone" subtitle={`${byZone.length} zone${byZone.length > 1 ? 's' : ''} travaillée${byZone.length > 1 ? 's' : ''}`} />
+      <PanelHeader title="Time in zone" subtitle={`${byZone.length} zone${byZone.length > 1 ? 's' : ''} worked`} />
       <ul className="space-y-3 border-t px-6 py-5">
         {byZone.map(({ z, seconds }) => (
           <li key={z}>
@@ -143,7 +143,7 @@ function ZoneSplit({ blocks, zones }: { blocks: Block[]; zones: Zone[] }) {
                 Z{z} <span className="text-muted-foreground">{ZONE_NAMES[z]}</span>
               </span>
               <span className="tabular-nums">
-                {formatDuration(seconds)} <span className="text-muted-foreground text-xs">· {Math.round((seconds / total) * 100)} %</span>
+                {formatDuration(seconds)} <span className="text-muted-foreground text-xs">· {Math.round((seconds / total) * 100)}%</span>
               </span>
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-foreground/[0.06]">
@@ -172,8 +172,8 @@ function StepRow({ step, zones, units }: { step: Step; zones: Zone[]; units: Uni
     step.paceFast && step.paceSlow
       ? `${formatPace(step.paceFast, units)}–${formatPace(step.paceSlow, units)} ${paceUnit(units)}`
       : zone
-        ? `≈ ${formatPace(zone.paceFast, units)}–${formatPace(zone.paceSlow, units)} ${paceUnit(units)} · FC Z${step.zone}`
-        : `FC Z${step.zone}`
+        ? `≈ ${formatPace(zone.paceFast, units)}–${formatPace(zone.paceSlow, units)} ${paceUnit(units)} · HR Z${step.zone}`
+        : `HR Z${step.zone}`
   return (
     <div className="flex items-center gap-4">
       <span className="h-10 w-1 shrink-0 rounded-full" style={{ backgroundColor: zoneColor(step.zone) }} />

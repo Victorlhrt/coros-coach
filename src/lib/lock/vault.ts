@@ -144,7 +144,7 @@ export async function unlockWithPin(pin: string) {
     await openWith(await keyFromPin(pin, fromB64(stored.pin.salt), stored.pin.iterations), stored.pin)
   } catch {
     localStorage.setItem(FAILS_KEY, String(Number(localStorage.getItem(FAILS_KEY) ?? 0) + 1))
-    throw new Error('Code incorrect.')
+    throw new Error('Wrong PIN.')
   }
 }
 
@@ -154,7 +154,7 @@ export async function unlockWithPasskey() {
   try {
     await openWith(await keyFromPrf(output), stored.passkey)
   } catch {
-    throw new Error('Face ID n’a pas pu ouvrir le coffre. Utilise ton code.')
+    throw new Error('Face ID couldn’t unlock your vault. Use your PIN.')
   }
 }
 
@@ -174,14 +174,14 @@ export async function enableLock(pin: string) {
 }
 
 export async function changePin(pin: string) {
-  if (stored?.mode !== 'encrypted' || !dek) throw new Error('Verrou inactif.')
+  if (stored?.mode !== 'encrypted' || !dek) throw new Error('Lock isn’t enabled.')
   stored = { ...stored, pin: await pinWrap(pin, dek) }
   await persist()
 }
 
 /** Ajoute Face ID : la sortie PRF du passkey chiffre aussi la clé de données. */
 export async function addPasskey() {
-  if (stored?.mode !== 'encrypted' || !dek) throw new Error('Active d’abord le verrou avec un code.')
+  if (stored?.mode !== 'encrypted' || !dek) throw new Error('Turn on the lock with a PIN first.')
   const { credentialId, salt, output } = await registerPasskey()
   const sealed = await seal(await keyFromPrf(output), dek)
   stored = { ...stored, passkey: { credentialId, salt, sealed } }

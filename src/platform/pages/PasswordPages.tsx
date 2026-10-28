@@ -83,7 +83,7 @@ export function ResetPasswordPage() {
     try {
       const res = await api<{ status: string }>('/auth/reset', { body: { token, password } })
       await qc.invalidateQueries({ queryKey: ['me'] })
-      navigate(res.status === 'active' ? '/compte' : '/connexion', { replace: true })
+      navigate(res.status === 'active' ? '/account' : '/connexion', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setBusy(false)

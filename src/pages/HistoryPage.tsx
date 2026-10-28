@@ -7,6 +7,7 @@ import { TypeBadge } from '@/components/TypeBadge'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { addDays, formatDay, mondayOf, today } from '@/lib/coach/dates'
+import { FEELING_TAG_LABEL, type FeelingTag } from '@/lib/coach/feedback'
 import { distanceUnit, distanceValue, formatDistance, formatDuration, formatNumber, formatPace, paceUnit, type Units } from '@/lib/coach/format'
 import { isRun, sessionTotals } from '@/lib/coach/metrics'
 import type { Session, Zone } from '@/lib/coach/schema'
@@ -45,10 +46,10 @@ export function HistoryPage() {
 
   return (
     <>
-      <PageHeader title="Historique" subtitle="6 dernières semaines" />
+      <PageHeader title="History" subtitle="Last 6 weeks" />
       {!connected && (
         <Card>
-          <EmptyState icon={History} title="COROS non connecté">Connecte ta montre dans Réglages.</EmptyState>
+          <EmptyState icon={History} title="COROS not connected">Connect your watch in Settings.</EmptyState>
         </Card>
       )}
       {isLoading && (
@@ -66,12 +67,12 @@ export function HistoryPage() {
       )}
       {data && rows.length === 0 && (
         <Card>
-          <EmptyState icon={History} title="Aucune activité">
-            Aucune course trouvée sur les 6 dernières semaines.
+          <EmptyState icon={History} title="No activities">
+            No runs found in the last 6 weeks.
           </EmptyState>
           {data.raw !== undefined && activities.length === 0 && (
             <details className="text-xs text-muted-foreground">
-              <summary>Réponse COROS brute</summary>
+              <summary>Raw COROS response</summary>
               <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap">{JSON.stringify(data.raw, null, 2).slice(0, 4000)}</pre>
             </details>
           )}
@@ -87,8 +88,8 @@ export function HistoryPage() {
 }
 
 const SERIES = [
-  { key: 'done', label: 'Réalisé', area: true },
-  { key: 'planned', label: 'Prévu', dashed: true, area: false },
+  { key: 'done', label: 'Completed', area: true },
+  { key: 'planned', label: 'Planned', dashed: true, area: false },
 ]
 
 /** Volume par semaine sur les 6 dernières semaines : réalisé (activités COROS) contre prévu (plan). */
@@ -101,7 +102,7 @@ function VolumeChart({ activities, planned, zones, units }: { activities: Activi
     const plannedMeters = planned.filter((s) => s.date >= start && s.date <= end).reduce((a, s) => a + sessionTotals(s, zones).meters, 0)
     return {
       key: start,
-      label: n === 0 ? 'Cette semaine' : `Semaine du ${formatDay(start, { day: 'numeric', month: 'short' })}`,
+      label: n === 0 ? 'This week' : `Week of ${formatDay(start, { day: 'numeric', month: 'short' })}`,
       axisLabel: formatDay(start, { day: 'numeric', month: 'short' }),
       values: { done: distanceValue(done, units), planned: planned.length > 0 ? distanceValue(plannedMeters, units) : undefined },
     }
@@ -111,12 +112,12 @@ function VolumeChart({ activities, planned, zones, units }: { activities: Activi
     <LineChart
       data={data}
       series={series}
-      label="Volume par semaine"
+      label="Weekly volume"
       unit={distanceUnit(units)}
       height={220}
       legend={series.length > 1}
-      categoryLabel="Semaine"
-      emptyLabel="Aucune activité"
+      categoryLabel="Week"
+      emptyLabel="No activities"
       formatValue={(v) => `${formatNumber(v)} ${distanceUnit(units)}`}
       formatTick={formatNumber}
     />
@@ -135,27 +136,27 @@ function HistoryRow({ row }: { row: Row }) {
     <Card className="p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-muted-foreground capitalize">{formatDay(row.date, { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-        {planned ? <TypeBadge type={planned.type} /> : <span className="text-xs text-muted-foreground">Hors plan</span>}
+        {planned ? <TypeBadge type={planned.type} /> : <span className="text-xs text-muted-foreground">Off-plan</span>}
       </div>
       <p className="mt-1 font-medium">{planned?.title ?? activity?.name}</p>
 
       {activity ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Metric label="Distance" value={activity.meters ? formatDistance(activity.meters, units) : '—'} />
-          <Metric label="Durée" value={activity.seconds ? formatDuration(activity.seconds) : '—'} />
-          <Metric label={`Allure ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
+          <Metric label="Duration" value={activity.seconds ? formatDuration(activity.seconds) : '—'} />
+          <Metric label={`Pace ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
         </div>
       ) : (
-        <p className="mt-2 text-sm font-medium text-destructive">Séance non réalisée</p>
+        <p className="mt-2 text-sm font-medium text-destructive">Session missed</p>
       )}
 
       {target && activity && (
         <p className="mt-3 text-sm text-muted-foreground">
-          Prévu {target.meters > 0 ? formatDistance(target.meters, units) : ''} en {formatDuration(target.seconds)}
+          Planned {target.meters > 0 ? formatDistance(target.meters, units) : ''} in {formatDuration(target.seconds)}
           {delta !== null && (
             <span className={cn('ml-2 font-medium', Math.abs(delta) <= 0.1 ? 'text-session-easy' : 'text-session-tempo')}>
               {delta > 0 ? '+' : ''}
-              {Math.round(delta * 100)} %
+              {Math.round(delta * 100)}%
             </span>
           )}
         </p>
@@ -163,7 +164,7 @@ function HistoryRow({ row }: { row: Row }) {
       {fb && (
         <p className="mt-1 text-sm text-muted-foreground">
           {'★'.repeat(fb.rating)}
-          {'☆'.repeat(5 - fb.rating)} · RPE {fb.rpe}/10{fb.tags.length > 0 && ` · ${fb.tags.join(', ')}`}
+          {'☆'.repeat(5 - fb.rating)} · RPE {fb.rpe}/10{fb.tags.length > 0 && ` · ${fb.tags.map((t) => FEELING_TAG_LABEL[t as FeelingTag] ?? t).join(', ')}`}
         </p>
       )}
     </Card>

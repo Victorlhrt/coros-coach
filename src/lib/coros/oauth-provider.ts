@@ -106,7 +106,7 @@ class CorosOAuthProvider implements OAuthClientProvider {
 
   codeVerifier() {
     const verifier = localStorage.getItem(VERIFIER_KEY)
-    if (!verifier) throw new Error('Code PKCE introuvable : relance la connexion COROS.')
+    if (!verifier) throw new Error('PKCE code not found: reconnect COROS.')
     return verifier
   }
 

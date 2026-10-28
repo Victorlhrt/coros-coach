@@ -52,7 +52,7 @@ app.route('/api/platform/account', accountRoutes)
 app.all('/api/*', (c) => c.json({ error: 'Introuvable' }, 404))
 
 // Sur l'app, la racine mène à l'espace connecté : la landing vit sur son propre service (SITE_ROLE=landing).
-app.get('/', (c) => c.redirect('/compte'))
+app.get('/', (c) => c.redirect('/account'))
 
 // Front Vite compilé : toute URL hors API sert index.html (site et back office en BrowserRouter, coach sous /app/ en HashRouter).
 app.use('/*', serveStatic({ root: './dist' }))

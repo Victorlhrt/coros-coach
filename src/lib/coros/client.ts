@@ -9,7 +9,7 @@ import { useWriteLog } from './write-log'
 
 export class CorosNotConnectedError extends Error {
   constructor() {
-    super('COROS n’est pas connecté.')
+    super('COROS isn’t connected.')
   }
 }
 
@@ -48,10 +48,10 @@ export async function startCorosLogin() {
 /** Retour de COROS : échange le code contre des tokens. */
 export async function finishCorosLogin(code: string, state: string | null) {
   if (!corosOAuth.consumeState(state)) {
-    throw new Error('Réponse OAuth inattendue (state invalide). Relance la connexion.')
+    throw new Error('Unexpected OAuth response (invalid state). Try connecting again.')
   }
   const result = await auth(corosOAuth, { serverUrl: MCP_URL, authorizationCode: code, scope: SCOPES })
-  if (result !== 'AUTHORIZED') throw new Error('Autorisation COROS non obtenue.')
+  if (result !== 'AUTHORIZED') throw new Error('COROS authorization wasn’t granted.')
   clientPromise = null
 }
 
@@ -80,7 +80,7 @@ function parseResult(result: Awaited<ReturnType<Client['callTool']>>): unknown {
     const text = Array.isArray(result.content)
       ? result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n')
       : ''
-    throw new Error(text || 'Erreur renvoyée par COROS.')
+    throw new Error(text || 'COROS returned an error.')
   }
   if (result.structuredContent) return result.structuredContent
   const texts = Array.isArray(result.content)
@@ -96,7 +96,7 @@ function parseResult(result: Awaited<ReturnType<Client['callTool']>>): unknown {
 
 /** Lecture seule. Les outils d'écriture sont refusés ici : passer par `corosWrite`. */
 export async function corosRead<T = unknown>(tool: string, args: Record<string, unknown> = {}): Promise<T> {
-  if (isWriteTool(tool)) throw new Error(`${tool} modifie COROS : utiliser corosWrite.`)
+  if (isWriteTool(tool)) throw new Error(`${tool} writes to COROS: use corosWrite.`)
   const client = await getClient()
   return parseResult(await client.callTool({ name: tool, arguments: args })) as T
 }
@@ -115,10 +115,10 @@ export async function corosWrite<T = unknown>(
   const base = { id: crypto.randomUUID(), at: new Date().toISOString(), tool, summary, args }
 
   const ok = await useConfirm.getState().ask({
-    title: 'Écrire sur COROS ?',
+    title: 'Write to COROS?',
     description: summary,
-    details: { outil: tool, arguments: args },
-    confirmLabel: 'Envoyer',
+    details: { tool, arguments: args },
+    confirmLabel: 'Send',
   })
   if (!ok) {
     log({ ...base, status: 'cancelled' })

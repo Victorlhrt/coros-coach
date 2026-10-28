@@ -25,4 +25,4 @@ export function zonesFromThreshold(thresholdPace: number): Zone[] {
 /** Allure seuil par défaut (5:15/km) tant que COROS n'a rien fourni. */
 export const DEFAULT_ZONES = zonesFromThreshold(315)
 
-export const ZONE_NAMES = ['', 'Récupération', 'Endurance', 'Tempo', 'Seuil', 'VMA', 'Sprint']
+export const ZONE_NAMES = ['', 'Recovery', 'Easy', 'Tempo', 'Threshold', 'VO2max', 'Sprint']

@@ -22,12 +22,12 @@ export function ElevationChart({ course, className }: { course: CourseProfile; c
       className={className}
       data={data}
       series={SERIES}
-      label={`Profil : ${course.gain} m de dénivelé positif`}
+      label={`Profile: ${course.gain} m elevation gain`}
       unit="m"
       height={120}
       legend={false}
       categoryLabel="Distance"
-      emptyLabel="Profil indisponible"
+      emptyLabel="Profile unavailable"
       formatValue={(v) => `${formatNumber(v)} m`}
       formatTick={formatNumber}
     />

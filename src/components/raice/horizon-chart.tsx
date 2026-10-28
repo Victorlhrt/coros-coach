@@ -137,17 +137,17 @@ export function HorizonChart({ title, subtitle, series, pointLabels, maxAbs, def
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Segmented<SortKey>
-              label="Tri"
+              label="Sort"
               value={sort}
               onChange={setSort}
               options={[
-                { value: 'name', label: 'Nom' },
-                { value: 'peak', label: 'Pic' },
-                { value: 'last', label: 'Dernier' },
+                { value: 'name', label: 'Name' },
+                { value: 'peak', label: 'Peak' },
+                { value: 'last', label: 'Latest' },
               ]}
             />
             <Segmented<BandKey>
-              label="Bandes"
+              label="Bands"
               value={bands}
               onChange={setBands}
               options={(['1', '2', '3', '4'] as const).map((b) => ({ value: b, label: b }))}
@@ -158,7 +158,7 @@ export function HorizonChart({ title, subtitle, series, pointLabels, maxAbs, def
 
       {series.length === 0 || nPoints === 0 ? (
         <PanelSection divided className="py-12 text-center text-muted-foreground text-sm">
-          Aucune donnée à afficher pour l'instant.
+          Nothing to show yet.
         </PanelSection>
       ) : (
         <>
@@ -167,7 +167,7 @@ export function HorizonChart({ title, subtitle, series, pointLabels, maxAbs, def
               <p id={labelId} className="font-medium text-2xl tabular-nums tracking-tight" aria-live="polite">
                 {pointLabels[sel] ?? `Point ${sel + 1}`}
               </p>
-              <p className="mt-1 text-muted-foreground text-sm">Point sélectionné</p>
+              <p className="mt-1 text-muted-foreground text-sm">Selected point</p>
             </div>
             <div className="w-full max-w-[340px]">
               <div className="flex gap-0.5 overflow-hidden rounded-md">
@@ -177,14 +177,14 @@ export function HorizonChart({ title, subtitle, series, pointLabels, maxAbs, def
               </div>
               <div className="mt-1.5 flex justify-between text-muted-foreground text-xs tabular-nums">
                 <span>−{fmtStep(domain)}%</span>
-                <span>Sous</span>
+                <span>Below</span>
                 <span>0</span>
-                <span>Au-dessus</span>
+                <span>Above</span>
                 <span>+{fmtStep(domain)}%</span>
               </div>
               <p className="mt-2 text-muted-foreground text-xs leading-relaxed">
-                Chaque ligne se replie en {bandCount} bande{bandCount > 1 ? 's' : ''} de {fmtStep(step)} %. Plus la couleur est forte, plus on
-                s'éloigne de la référence.
+                Each row folds into {bandCount} band{bandCount > 1 ? 's' : ''} of {fmtStep(step)}%. The stronger the colour, the further
+                from your baseline.
               </p>
             </div>
           </PanelSection>

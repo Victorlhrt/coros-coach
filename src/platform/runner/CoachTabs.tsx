@@ -1,9 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BarChart } from '@/components/arc/bar-chart/bar-chart'
-import { ActivityRings } from '@/components/raice/activity-rings'
 import { ActivityTerrain } from '@/components/raice/activity-terrain'
 import { HorizonChart } from '@/components/raice/horizon-chart'
 import { MetricsDashboard, type Kpi } from '@/components/raice/metrics-dashboard'
@@ -11,13 +10,14 @@ import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raic
 import { RefreshButton, StretchRefresh } from '@/components/raice/stretch-refresh'
 import { WeekPicker, type PickerDay } from '@/components/raice/week-picker'
 import { TypeBadge } from '@/components/TypeBadge'
+import { CoachAvatar } from '../onboarding/CoachAvatar'
 import { WorkoutChart } from '@/components/WorkoutChart'
 import { Button } from '@/components/shadcn/button'
-import { addDays, formatDay, mondayOf, today } from '@/lib/coach/dates'
+import { WEEKDAYS, addDays, formatDay, mondayOf, today } from '@/lib/coach/dates'
 import { distanceUnit, distanceValue, formatDistance, formatDuration, formatNumber, formatPace } from '@/lib/coach/format'
 import { isRun, sessionTotals, weekMeters } from '@/lib/coach/metrics'
 import { ROUTES } from '@/lib/coach/routes'
-import type { Session } from '@/lib/coach/schema'
+import type { Session, Week } from '@/lib/coach/schema'
 import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
 import { useActivities } from '@/lib/coros/activity-hooks'
 import { useCorosAuth } from '@/lib/coros/auth-store'
@@ -32,6 +32,8 @@ import { INTENSITY, WEEKDAY_LABELS, baselineDeviation, currentWeek, isDone, last
  */
 
 const RING_COLORS = { volume: '#6c7cf5', sessions: '#f2a33a', time: '#43b581' }
+/** Couleur de chaque phase du plan (barre de progression de l'objectif). */
+const PHASE_COLORS = { base: 'var(--session-easy)', build: 'var(--session-long)', peak: 'var(--session-interval)', taper: 'var(--session-recovery)', race: 'var(--session-race)' } as const
 
 /** Bouton d'actualisation de l'en-tête : relance la lecture COROS, l'icône tourne le temps du chargement. */
 function RefreshAction({ onRefresh }: { onRefresh: () => Promise<unknown> }) {
@@ -55,11 +57,9 @@ function useRefresh() {
 // ---------- Home ----------
 
 export function HomeTab() {
-  const { plan, zones, reviews, feedback, links } = usePlan()
-  const activities = useActivities()
+  const { plan, reviews, feedback, links } = usePlan()
   const refresh = useRefresh()
   const [now] = useState(today)
-  const [day, setDay] = useState(now)
   if (!plan) return null
 
   const week = currentWeek(plan, now)
@@ -69,16 +69,14 @@ export function HomeTab() {
     .at(-1)
   const todays = allSessions(plan).filter((s) => s.date === now)
   const next = allSessions(plan).find((s) => s.date > now)
-  const acts = activities.data?.activities ?? []
-  const rings = week ? weekRings(week, zones, acts, links, feedback) : null
 
   return (
     <StretchRefresh onRefresh={refresh}>
       <div className="flex w-full flex-col gap-4">
         <header className="flex items-end justify-between gap-4 pb-2">
           <div>
-            <p className="text-muted-foreground text-sm capitalize">{formatDay(now)}</p>
-            <h1 className="font-heading font-medium text-2xl tracking-tight">Aujourd’hui</h1>
+            <p className="text-muted-foreground text-sm">{formatDay(now)}</p>
+            <h1 className="font-heading font-medium text-2xl tracking-tight">Today</h1>
           </div>
           <RefreshAction onRefresh={refresh} />
         </header>
@@ -86,12 +84,12 @@ export function HomeTab() {
         {(review?.status === 'pending' || toRate) && (
           <div className="grid gap-4 md:grid-cols-2">
             {review?.status === 'pending' && (
-              <Notice to={ROUTES.adjust} icon={<Wand2 />} title="Ton bilan de la semaine est prêt">
-                {review.adjustment.changes.length > 0 ? `${review.adjustment.changes.length} ajustement(s) proposé(s)` : 'Rien à changer, consulte l’analyse'}
+              <Notice to={ROUTES.adjust} icon={<Wand2 />} title="Your weekly review is ready" color="var(--session-long)">
+                {review.adjustment.changes.length > 0 ? `${review.adjustment.changes.length} suggested change${review.adjustment.changes.length > 1 ? 's' : ''}` : 'Nothing to change, read the analysis'}
               </Notice>
             )}
             {toRate && (
-              <Notice to={`${ROUTES.session(toRate.id)}#ressenti`} icon={<Star />} title="Comment s’est passée ta séance ?">
+              <Notice to={`${ROUTES.session(toRate.id)}#ressenti`} icon={<Star />} title="How did your session go?" color="var(--session-tempo)">
                 {toRate.title} · {formatDay(toRate.date, { weekday: 'long' })}
               </Notice>
             )}
@@ -100,7 +98,7 @@ export function HomeTab() {
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           <Panel className="flex flex-col">
-            <PanelHeader title="Séance du jour" subtitle={todays.length ? `${todays.length} séance${todays.length > 1 ? 's' : ''} prévue${todays.length > 1 ? 's' : ''}` : 'Repos'} />
+            <PanelHeader title="Today’s session" subtitle={todays.length ? `${todays.length} session${todays.length > 1 ? 's' : ''} planned` : 'Rest day'} />
             {todays.length ? (
               todays.map((s, i) => <TodaySession key={s.id} session={s} divided={i > 0} />)
             ) : (
@@ -109,20 +107,23 @@ export function HomeTab() {
                   <Moon className="size-5 text-muted-foreground" />
                 </span>
                 <div>
-                  <p className="font-medium">Jour de repos</p>
-                  <p className="text-muted-foreground text-sm">La récupération fait partie de l’entraînement.</p>
+                  <p className="font-medium">Rest day</p>
+                  <p className="text-muted-foreground text-sm">Recovery is part of training.</p>
                 </div>
               </PanelSection>
             )}
             {next && (
               <PanelFooter className="mt-auto">
-                <div className="min-w-0">
-                  <p className="text-muted-foreground text-xs">Prochaine séance · {formatDay(next.date, { weekday: 'long', day: 'numeric', month: 'short' })}</p>
-                  <p className="truncate font-medium text-sm">{next.title}</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span aria-hidden className="h-8 w-1 shrink-0 rounded-full" style={{ background: TYPE_META[next.type].color }} />
+                  <div className="min-w-0">
+                    <p className="text-muted-foreground text-xs">Next · {formatDay(next.date, { weekday: 'long', day: 'numeric', month: 'short' })}</p>
+                    <p className="truncate font-medium text-sm">{next.title}</p>
+                  </div>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link to={ROUTES.session(next.id)}>
-                    Voir <ArrowRight />
+                    View <ArrowRight />
                   </Link>
                 </Button>
               </PanelFooter>
@@ -131,43 +132,144 @@ export function HomeTab() {
           <GoalPanel />
         </div>
 
-        {week && rings && (
-          <Panel>
-            <PanelHeader
-              title={`Semaine ${week.number} · ${PHASE_LABEL[week.phase]}`}
-              subtitle={week.focus}
-              actions={
-                <Button asChild variant="outline" size="sm">
-                  <Link to={ROUTES.adjust}>
-                    <Wand2 /> Ajuster ma semaine
-                  </Link>
-                </Button>
-              }
-            />
-            <PanelSection divided>
-              <ActivityRings
-                rings={[
-                  { id: 'volume', label: 'Volume', detail: `${formatDistance(rings.volume.done)} / ${formatDistance(rings.volume.planned, 'metric', 0)}`, value: rings.volume.value, color: RING_COLORS.volume },
-                  { id: 'sessions', label: 'Séances', detail: `${rings.sessions.done} / ${rings.sessions.planned} faites`, value: rings.sessions.value, color: RING_COLORS.sessions },
-                  { id: 'time', label: 'Temps', detail: `${formatDuration(rings.time.done)} / ${formatDuration(rings.time.planned)}`, value: rings.time.value, color: RING_COLORS.time },
-                ]}
-                centerCaption="de la semaine"
-                days={rings.perDay.map((d, i) => ({ key: d.key, label: WEEKDAY_LABELS[i], values: d.values, isToday: d.key === now }))}
-                selectedDay={day}
-                onSelectDay={setDay}
-              />
-            </PanelSection>
-          </Panel>
-        )}
+        {week && <ThisWeek week={week} now={now} />}
       </div>
     </StretchRefresh>
   )
 }
 
-function Notice({ to, icon, title, children }: { to: string; icon: React.ReactNode; title: string; children: React.ReactNode }) {
+/**
+ * La semaine en cours : trois jauges colorées (volume, séances, temps) puis les 7 jours en tuiles
+ * teintées de la couleur de la séance ; un clic sur un jour affiche ses séances dessous.
+ */
+function ThisWeek({ week, now }: { week: Week; now: string }) {
+  const { zones, links, feedback } = usePlan()
+  const units = useSettings((s) => s.units)
+  const activities = useActivities()
+  const navigate = useNavigate()
+  const days = weekDays(week)
+  const [selected, setSelected] = useState(days.includes(now) ? now : days[0])
+  const rings = weekRings(week, zones, activities.data?.activities ?? [], links, feedback)
+  const daySessions = week.sessions.filter((s) => s.date === selected)
+  const meters = [
+    { label: 'Volume', value: rings.volume.value, detail: `${formatDistance(rings.volume.done, units)} of ${formatDistance(rings.volume.planned, units, 0)}`, color: RING_COLORS.volume },
+    { label: 'Sessions', value: rings.sessions.value, detail: `${rings.sessions.done} of ${rings.sessions.planned} done`, color: RING_COLORS.sessions },
+    { label: 'Time', value: rings.time.value, detail: `${formatDuration(rings.time.done)} of ${formatDuration(rings.time.planned)}`, color: RING_COLORS.time },
+  ]
+  return (
+    <Panel>
+      <PanelHeader
+        title={`Week ${week.number} · ${PHASE_LABEL[week.phase]}`}
+        subtitle={`${formatDay(days[0], { day: 'numeric', month: 'short' })} – ${formatDay(days[6], { day: 'numeric', month: 'short' })} · ${week.focus}`}
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link to={ROUTES.adjust}>
+              <Wand2 /> Adjust my week
+            </Link>
+          </Button>
+        }
+      />
+      <div className="grid grid-cols-3 divide-x border-t">
+        {meters.map((m) => (
+          <div key={m.label} className="flex flex-col gap-2 px-4 py-4 sm:px-6">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-muted-foreground text-xs">{m.label}</p>
+              <p className="font-medium text-lg tabular-nums tracking-tight" style={{ color: m.color }}>
+                {Math.round(m.value * 100)}%
+              </p>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
+              <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.min(100, m.value * 100)}%`, background: m.color }} />
+            </div>
+            <p className="hidden truncate text-muted-foreground text-xs tabular-nums sm:block">{m.detail}</p>
+          </div>
+        ))}
+      </div>
+      <PanelSection divided>
+        <div className="no-scrollbar -mx-6 flex gap-2 overflow-x-auto px-6 sm:mx-0 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
+          {days.map((d, i) => {
+            const sessions = week.sessions.filter((s) => s.date === d)
+            const main = sessions[0]
+            const color = main ? TYPE_META[main.type].color : undefined
+            const done = sessions.length > 0 && sessions.every((s) => isDone(s, links, feedback))
+            const isSel = d === selected
+            return (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={isSel}
+                onClick={() => setSelected(d)}
+                className={`relative flex min-h-28 w-24 shrink-0 flex-col rounded-2xl border p-3 text-left transition-colors sm:w-auto ${isSel ? 'ring-2 ring-foreground/60' : 'hover:border-foreground/30'} ${!main ? 'border-dashed' : ''}`}
+                style={color ? { background: `color-mix(in srgb, ${color} 13%, transparent)`, borderColor: `color-mix(in srgb, ${color} 35%, transparent)` } : undefined}
+              >
+                <span className="flex items-center justify-between text-xs">
+                  <span className={d === now ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+                    {WEEKDAY_LABELS[i]} {Number(d.slice(8))}
+                  </span>
+                  {done && <Check className="size-3.5 text-emerald-400" aria-label="Done" />}
+                </span>
+                {main ? (
+                  <span className="mt-auto">
+                    <span className="block truncate font-medium text-xs" style={{ color }}>
+                      {TYPE_META[main.type].label}
+                    </span>
+                    <span className="block font-medium text-sm tabular-nums">
+                      {(() => {
+                        const t = sessionTotals(main, zones)
+                        return t.meters > 0 ? formatDistance(t.meters, units) : formatDuration(t.seconds)
+                      })()}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="mt-auto text-muted-foreground text-xs">Rest</span>
+                )}
+                {d === now && <span aria-hidden className="absolute top-3 right-3 size-1.5 rounded-full bg-foreground" style={done ? { display: 'none' } : undefined} />}
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-4">
+          {daySessions.length ? (
+            <div className="grid gap-2 md:grid-cols-2">
+              {daySessions.map((s) => {
+                const t = sessionTotals(s, zones)
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => navigate(ROUTES.session(s.id))}
+                    className="flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors hover:bg-foreground/[0.04]"
+                  >
+                    <span aria-hidden className="h-9 w-1 shrink-0 rounded-full" style={{ background: TYPE_META[s.type].color }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-sm">{s.title}</span>
+                      <span className="block truncate text-muted-foreground text-xs">
+                        {formatDay(s.date, { weekday: 'long', day: 'numeric', month: 'short' })} · {formatDuration(t.seconds)}
+                        {t.meters > 0 ? ` · ${formatDistance(t.meters, units)}` : ''}
+                      </span>
+                    </span>
+                    {isDone(s, links, feedback) ? <Check className="size-4 text-emerald-400" aria-label="Done" /> : <ArrowRight className="size-4 text-muted-foreground" />}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed px-4 py-3 text-muted-foreground text-sm">
+              <span className="font-medium text-foreground">{formatDay(selected, { weekday: 'long' })}</span> · Rest day. Recovery is part of training.
+            </p>
+          )}
+        </div>
+      </PanelSection>
+    </Panel>
+  )
+}
+
+function Notice({ to, icon, title, color, children }: { to: string; icon: React.ReactNode; title: string; color: string; children: React.ReactNode }) {
   return (
     <Link to={to} className="group flex items-center gap-4 rounded-[24px] border bg-card px-5 py-4 transition-colors hover:border-foreground/30">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-full border [&>svg]:size-4.5">{icon}</span>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full [&>svg]:size-4.5" style={{ color, background: `color-mix(in srgb, ${color} 16%, transparent)` }}>
+        {icon}
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block font-medium text-sm">{title}</span>
         <span className="block truncate text-muted-foreground text-sm">{children}</span>
@@ -182,8 +284,14 @@ function TodaySession({ session, divided }: { session: Session; divided?: boolea
   const units = useSettings((s) => s.units)
   const { seconds, meters } = sessionTotals(session, zones)
   const pace = meters > 0 ? seconds / (meters / 1000) : 0
+  const color = TYPE_META[session.type].color
   return (
-    <PanelSection divided className="flex flex-col gap-5" data-divided={divided}>
+    <PanelSection
+      divided
+      className="flex flex-col gap-5"
+      data-divided={divided}
+      style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${color} 12%, transparent), transparent 70%)` }}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <TypeBadge type={session.type} />
@@ -192,25 +300,27 @@ function TodaySession({ session, divided }: { session: Session; divided?: boolea
         </div>
         <Button asChild>
           <Link to={ROUTES.session(session.id)}>
-            Voir la séance <ArrowRight />
+            Open session <ArrowRight />
           </Link>
         </Button>
       </div>
-      <div className="grid grid-cols-3 divide-x rounded-2xl border">
-        <Stat label="Durée" value={formatDuration(seconds)} />
+      <div className="grid grid-cols-3 divide-x rounded-2xl border bg-card/60">
+        <Stat label="Duration" value={formatDuration(seconds)} color={color} />
         <Stat label="Distance" value={meters > 0 ? formatDistance(meters, units) : '—'} />
-        <Stat label="Allure moyenne" value={pace > 0 ? `${formatPace(pace, units)}` : '—'} />
+        <Stat label="Avg pace" value={pace > 0 ? `${formatPace(pace, units)}` : '—'} />
       </div>
       {session.blocks.length > 0 && <WorkoutChart blocks={session.blocks} zones={zones} className="h-14" />}
     </PanelSection>
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="px-4 py-3">
       <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="mt-0.5 font-medium text-xl tabular-nums tracking-tight">{value}</p>
+      <p className="mt-0.5 font-medium text-xl tabular-nums tracking-tight" style={color ? { color } : undefined}>
+        {value}
+      </p>
     </div>
   )
 }
@@ -225,11 +335,11 @@ function GoalPanel() {
   return (
     <Panel className="flex flex-col">
       <PanelHeader
-        title="Objectif"
+        title="Goal"
         subtitle={formatDay(plan.raceDate, { weekday: 'long', day: 'numeric', month: 'long' })}
         actions={
           <Link to={ROUTES.goal} className="text-muted-foreground text-sm hover:text-foreground">
-            Modifier
+            Edit
           </Link>
         }
       />
@@ -238,11 +348,13 @@ function GoalPanel() {
       </PanelSection>
       <div className="grid flex-1 grid-cols-2 items-center divide-x border-t">
         <div className="px-6 py-5">
-          <p className="text-muted-foreground text-xs">Jour J</p>
-          <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl">{daysLeft === 0 ? 'J' : `J-${daysLeft}`}</p>
+          <p className="text-muted-foreground text-xs">Race day</p>
+          <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl" style={{ color: 'var(--session-race)' }}>
+            {daysLeft === 0 ? 'Today' : `D-${daysLeft}`}
+          </p>
         </div>
         <div className="px-6 py-5">
-          <p className="text-muted-foreground text-xs">Temps visé</p>
+          <p className="text-muted-foreground text-xs">Target time</p>
           <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl">{goal?.targetTime ? formatDuration(goal.targetTime) : '—'}</p>
         </div>
       </div>
@@ -250,13 +362,18 @@ function GoalPanel() {
         <div className="flex w-full flex-col gap-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">
-              Semaine {current} sur {plan.weeks.length}
+              Week {current} of {plan.weeks.length}
             </span>
-            <span className="tabular-nums">{pct} %</span>
+            <span className="tabular-nums">{pct}%</span>
           </div>
           <div className="flex gap-1">
             {plan.weeks.map((w) => (
-              <span key={w.number} className={`h-1.5 flex-1 rounded-full ${w.number <= current ? 'bg-foreground' : 'bg-foreground/15'}`} />
+              <span
+                key={w.number}
+                title={`Week ${w.number} · ${PHASE_LABEL[w.phase]}`}
+                className="h-1.5 flex-1 rounded-full"
+                style={{ background: w.number <= current ? PHASE_COLORS[w.phase] : `color-mix(in srgb, ${PHASE_COLORS[w.phase]} 22%, transparent)` }}
+              />
             ))}
           </div>
         </div>
@@ -292,7 +409,7 @@ export function PlanTab() {
       key: d,
       weekday: WEEKDAY_LABELS[i],
       day: Number(d.slice(8)),
-      caption: sessions.length === 0 ? 'Repos' : allDone ? 'Fait ✓' : `${sessions.length} séance${sessions.length > 1 ? 's' : ''}`,
+      caption: sessions.length === 0 ? 'Rest' : allDone ? 'Done ✓' : sessions.length > 1 ? `${sessions.length} sessions` : TYPE_META[sessions[0].type].label,
       isToday: d === now,
       outside: d < week.start || d > week.end,
       sessions: sessions.map((s) => {
@@ -323,24 +440,24 @@ export function PlanTab() {
         <header className="flex flex-wrap items-end justify-between gap-4 pb-2">
           <div>
             <p className="text-muted-foreground text-sm">
-              {plan.weeks.length} semaines · course le {formatDay(plan.raceDate, { day: 'numeric', month: 'long' })}
+              {plan.weeks.length} weeks · race on {formatDay(plan.raceDate, { day: 'numeric', month: 'long' })}
             </p>
             <h1 className="font-heading font-medium text-2xl tracking-tight">{plan.name}</h1>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={ROUTES.goal}>Objectif</Link>
+            <Link to={ROUTES.goal}>Goal</Link>
           </Button>
         </header>
 
         <WeekPicker
-          title={`Semaine ${week.number} · ${PHASE_LABEL[week.phase]}`}
-          subtitle={`${formatDistance(volumes[week.number - 1], units, 0)} prévus · ${week.sessions.length} séance${week.sessions.length > 1 ? 's' : ''} · ${week.focus}`}
+          title={`Week ${week.number} · ${formatDay(days[0], { day: 'numeric', month: 'short' })} – ${formatDay(days[6], { day: 'numeric', month: 'short' })}`}
+          subtitle={`${PHASE_LABEL[week.phase]} · ${formatDistance(volumes[week.number - 1], units, 0)} planned · ${week.sessions.length} session${week.sessions.length > 1 ? 's' : ''} · ${week.focus}`}
           actions={
             <>
-              <Button variant="outline" size="icon" aria-label="Semaine précédente" disabled={week.number <= 1} onClick={() => goWeek(week.number - 1)}>
+              <Button variant="outline" size="icon" aria-label="Previous week" disabled={week.number <= 1} onClick={() => goWeek(week.number - 1)}>
                 <ChevronLeft />
               </Button>
-              <Button variant="outline" size="icon" aria-label="Semaine suivante" disabled={week.number >= plan.weeks.length} onClick={() => goWeek(week.number + 1)}>
+              <Button variant="outline" size="icon" aria-label="Next week" disabled={week.number >= plan.weeks.length} onClick={() => goWeek(week.number + 1)}>
                 <ChevronRight />
               </Button>
               <RefreshAction onRefresh={refresh} />
@@ -352,13 +469,13 @@ export function PlanTab() {
           dateLabel={(k) => formatDay(k, { weekday: 'long', day: 'numeric', month: 'long' })}
           legend={types.map((t) => ({ label: TYPE_META[t].label, color: TYPE_META[t].color }))}
           onOpenSession={(id) => navigate(ROUTES.session(id))}
-          footerCaption={week.number === current ? 'Cette semaine' : week.number < current ? 'Semaine passée' : 'À venir'}
-          footerSummary={`${week.sessions.filter((s) => isDone(s, links, feedback)).length} / ${week.sessions.length} séances faites · ${formatDistance(volumes[week.number - 1], units, 0)} prévus`}
+          footerCaption={week.number === current ? 'This week' : week.number < current ? 'Past week' : 'Upcoming'}
+          footerSummary={`${week.sessions.filter((s) => isDone(s, links, feedback)).length} / ${week.sessions.length} sessions done · ${formatDistance(volumes[week.number - 1], units, 0)} planned`}
           footerAction={
             week.number === current ? (
               <Button asChild>
                 <Link to={ROUTES.adjust}>
-                  <Wand2 /> Ajuster ma semaine
+                  <Wand2 /> Adjust my week
                 </Link>
               </Button>
             ) : undefined
@@ -367,16 +484,16 @@ export function PlanTab() {
 
         <div className="grid gap-4 xl:grid-cols-2">
           <Panel className="flex flex-col">
-            <PanelHeader title="Volume du plan" subtitle="Kilomètres prévus semaine par semaine" />
+            <PanelHeader title="Plan volume" subtitle="Planned distance, week by week" />
             <PanelSection divided>
               <BarChart
-                data={plan.weeks.map((w, i) => ({ key: String(w.number), label: `Semaine ${w.number}`, axisLabel: `S${w.number}`, value: distanceValue(volumes[i], units) }))}
-                label="Volume prévu"
-                period={`${plan.weeks.length} semaines`}
+                data={plan.weeks.map((w, i) => ({ key: String(w.number), label: `Week ${w.number}`, axisLabel: `W${w.number}`, value: distanceValue(volumes[i], units) }))}
+                label="Planned volume"
+                period={`${plan.weeks.length} weeks`}
                 unit={distanceUnit(units)}
-                averageLabel="Moyenne par semaine"
-                valueLabel="Volume prévu"
-                categoryLabel="Semaine"
+                averageLabel="Weekly average"
+                valueLabel="Planned volume"
+                categoryLabel="Week"
                 showAverage={false}
                 height={300}
                 formatValue={formatNumber}
@@ -392,44 +509,54 @@ export function PlanTab() {
                       w.number === week.number ? 'border-foreground/50 bg-foreground/10 text-foreground' : w.number === current ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    S{w.number}
+                    W{w.number}
                   </button>
                 ))}
               </div>
             </PanelSection>
-            {(goal?.course || plan.raceStrategy) && (
-              <PanelFooter className="mt-auto">
-                <p className="text-muted-foreground text-sm">{plan.raceStrategy ?? `${goal?.course?.distanceKm} km · ${goal?.course?.gain} m D+`}</p>
-              </PanelFooter>
-            )}
           </Panel>
 
           <ActivityTerrain
-            title="La forme de ton plan"
-            subtitle={`Chaque jour de chaque semaine, de S1 à S${plan.weeks.length}`}
+            title="The shape of your plan"
+            subtitle={`Every day of every week, W1 to W${plan.weeks.length}`}
             rowLabels={terrain.rowLabels}
             colLabels={terrain.colLabels}
             metrics={[
               { id: 'distance', label: 'Distance', values: terrain.distance, format: fmtKm },
-              { id: 'duration', label: 'Durée', values: terrain.duration, format: fmtMin },
-              { id: 'intensity', label: 'Intensité', values: terrain.intensity, format: (v) => (v === 0 ? 'Repos' : ['', 'Facile', 'Modérée', 'Dure'][Math.min(3, Math.round(v))] ?? 'Dure') },
+              { id: 'duration', label: 'Duration', values: terrain.duration, format: fmtMin },
+              { id: 'intensity', label: 'Intensity', values: terrain.intensity, format: (v) => (v === 0 ? 'Rest' : ['', 'Easy', 'Moderate', 'Hard'][Math.min(3, Math.round(v))] ?? 'Hard') },
             ]}
             stats={[
-              { label: 'Volume total', value: fmtKm(Math.round(volumes.reduce((a, v) => a + v, 0) / 1000)), detail: `${allSessions(plan).length} séances` },
+              { label: 'Total volume', value: fmtKm(Math.round(volumes.reduce((a, v) => a + v, 0) / 1000)), detail: `${allSessions(plan).length} sessions` },
               {
-                label: 'Plus grosses semaines',
+                label: 'Biggest weeks',
                 value: '',
                 list: plan.weeks
-                  .map((w, i) => ({ label: `Semaine ${w.number}`, km: volumes[i] }))
+                  .map((w, i) => ({ label: `Week ${w.number}`, km: volumes[i] }))
                   .sort((a, b) => b.km - a.km)
                   .slice(0, 3)
                   .map((w) => ({ label: w.label, value: formatDistance(w.km, units, 0) })),
               },
-              { label: 'Jour de sortie longue', value: goal ? ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'][goal.longRunDay] : '—' },
+              { label: 'Long run day', value: goal ? WEEKDAYS[goal.longRunDay] : '—' },
             ]}
-            hint="Survole une barre pour le détail."
+            hint="Hover a bar for details."
           />
         </div>
+
+        {(plan.raceStrategy || goal?.course) && (
+          <Panel>
+            <PanelHeader title="Race strategy" subtitle={goal?.course ? `${formatNumber(goal.course.distanceKm)} km · ${goal.course.gain} m elevation gain` : 'How Pacer sees race day'} />
+            {plan.raceStrategy && (
+              <PanelSection divided className="flex gap-4">
+                <CoachAvatar className="size-10 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Pacer</p>
+                  <p className="mt-1 max-w-3xl whitespace-pre-line text-muted-foreground text-sm leading-relaxed">{plan.raceStrategy}</p>
+                </div>
+              </PanelSection>
+            )}
+          </Panel>
+        )}
       </div>
     </StretchRefresh>
   )
@@ -438,8 +565,8 @@ export function PlanTab() {
 // ---------- Analytics ----------
 
 const RANGES = [
-  { value: '4', label: '4S' },
-  { value: '6', label: '6S' },
+  { value: '4', label: '4W' },
+  { value: '6', label: '6W' },
 ]
 
 export function AnalyticsDashboards() {
@@ -453,7 +580,7 @@ export function AnalyticsDashboards() {
   const weeks = weeklyMetrics(lastWeeks(now, Number(range)), acts, plan, zones)
   const last = weeks.at(-1)
   const prev = weeks.at(-2)
-  const delta = (a?: number, b?: number) => (a !== undefined && b ? `${Math.abs(Math.round(((a - b) / b) * 100))} %` : undefined)
+  const delta = (a?: number, b?: number) => (a !== undefined && b ? `${Math.abs(Math.round(((a - b) / b) * 100))}%` : undefined)
   const trend = (a?: number, b?: number): Kpi['trend'] => (a === undefined || b === undefined || a === b ? 'flat' : a > b ? 'up' : 'down')
 
   const kpis: Kpi[] = [
@@ -470,7 +597,7 @@ export function AnalyticsDashboards() {
     },
     {
       id: 'time',
-      label: 'Temps',
+      label: 'Time',
       value: formatDuration((last?.hours ?? 0) * 3600),
       delta: delta(last?.hours, prev?.hours),
       trend: trend(last?.hours, prev?.hours),
@@ -480,7 +607,7 @@ export function AnalyticsDashboards() {
     },
     {
       id: 'runs',
-      label: 'Sorties',
+      label: 'Runs',
       value: String(last?.runs ?? 0),
       delta: delta(last?.runs, prev?.runs),
       trend: trend(last?.runs, prev?.runs),
@@ -491,7 +618,7 @@ export function AnalyticsDashboards() {
     },
     {
       id: 'pace',
-      label: 'Allure moyenne',
+      label: 'Avg pace',
       value: last?.pace ? `${formatPace(last.pace, units)}` : '—',
       delta: delta(last?.pace || undefined, prev?.pace || undefined),
       trend: trend(last?.pace || undefined, prev?.pace || undefined),
@@ -515,37 +642,37 @@ export function AnalyticsDashboards() {
     <div className="flex w-full flex-col gap-4">
       <MetricsDashboard
         title="Analytics"
-        subtitle={connected ? `Tes ${range} dernières semaines, depuis COROS` : 'Connecte COROS pour suivre tes sorties'}
+        subtitle={connected ? `Your last ${range} weeks, from COROS` : 'Connect COROS to track your runs'}
         kpis={kpis}
         ranges={RANGES}
         range={range}
         onRangeChange={setRange}
-        compareLabel="Comparer au plan"
-        emptyLabel={connected ? 'Aucune sortie sur la période' : 'COROS n’est pas connecté'}
+        compareLabel="Compare to plan"
+        emptyLabel={connected ? 'No runs in this period' : 'COROS isn’t connected'}
         lists={[
           {
-            title: 'Plus longues sorties',
+            title: 'Longest runs',
             columnLabel: 'Distance',
             rows: longest.map((a) => ({ label: `${formatDay(a.date, { day: 'numeric', month: 'short' })} · ${a.name}`, value: a.meters ?? 0, display: formatDistance(a.meters ?? 0, units) })),
           },
-          { title: 'Séances du plan', columnLabel: 'Nombre', rows: byType },
+          { title: 'Plan sessions', columnLabel: 'Count', rows: byType },
         ]}
         actions={
           !connected ? (
             <Button asChild variant="outline" size="sm">
-              <Link to={ROUTES.settings}>Connecter COROS</Link>
+              <Link to={ROUTES.settings}>Connect COROS</Link>
             </Button>
           ) : undefined
         }
       />
       {acts.length > 0 && (
         <HorizonChart
-          title="Par rapport à ta moyenne"
-          subtitle="Volume, durée, sorties et allure sur 7 jours glissants, comparés à tes 6 dernières semaines"
+          title="Compared to your average"
+          subtitle="Volume, duration, runs and pace over a rolling 7 days, compared to your last 6 weeks"
           series={horizon.series}
           pointLabels={horizon.pointLabels}
           defaultBands={3}
-          format={(v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} %`}
+          format={(v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}%`}
         />
       )}
       <ActivityLog />
@@ -569,7 +696,7 @@ function ActivityLog() {
   if (!rows.length) return null
   return (
     <Panel>
-      <PanelHeader title="Journal" subtitle="Tes sorties des 6 dernières semaines, comparées au plan" />
+      <PanelHeader title="Log" subtitle="Your runs over the last 6 weeks, compared to the plan" />
       <div className="divide-y border-t">
         {rows.map((r, i) => {
           const target = r.session ? sessionTotals(r.session, zones) : null
@@ -581,7 +708,7 @@ function ActivityLog() {
                 <span className="h-7 w-1 shrink-0 rounded-full" style={{ background: r.session ? TYPE_META[r.session.type].color : 'var(--border)' }} />
                 <span className="min-w-0">
                   <span className="block truncate font-medium text-sm">{r.session?.title ?? r.activity?.name}</span>
-                  <span className="block truncate text-muted-foreground text-xs">{r.session ? TYPE_META[r.session.type].label : 'Hors plan'}</span>
+                  <span className="block truncate text-muted-foreground text-xs">{r.session ? TYPE_META[r.session.type].label : 'Off plan'}</span>
                 </span>
               </span>
               {r.activity ? (
@@ -590,11 +717,11 @@ function ActivityLog() {
                   <span className="hidden text-right text-muted-foreground text-sm tabular-nums sm:block">{r.activity.seconds ? formatDuration(r.activity.seconds) : '—'}</span>
                   <span className="hidden text-right text-muted-foreground text-sm tabular-nums sm:block">{r.activity.paceSecPerKm ? formatPace(r.activity.paceSecPerKm, units) : '—'}</span>
                   <span className={`hidden text-right text-xs tabular-nums sm:block ${delta === null ? 'text-muted-foreground' : Math.abs(delta) <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {delta === null ? '' : `${delta > 0 ? '+' : ''}${delta} %`}
+                    {delta === null ? '' : `${delta > 0 ? '+' : ''}${delta}%`}
                   </span>
                 </>
               ) : (
-                <span className="text-right text-red-400 text-sm sm:col-span-4">Non réalisée</span>
+                <span className="text-right text-red-400 text-sm sm:col-span-4">Missed</span>
               )}
             </div>
           )

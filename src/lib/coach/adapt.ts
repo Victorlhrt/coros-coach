@@ -1,5 +1,5 @@
 import { callStructured } from './claude'
-import { WEEKDAYS, addDays, today, weekday } from './dates'
+import { WEEKDAYS_FR as WEEKDAYS, addDays, today, weekday } from './dates'
 import { COACH_SYSTEM, describeGoal, describeProfile, describeZones } from './prompts'
 import { AdjustmentSchema, type Adjustment, type Goal, type Plan, type Profile, type Session, type Zone } from './schema'
 import { goalPace } from './repace'
@@ -24,7 +24,7 @@ export async function proposeAdjustment(params: {
   const { plan, goal, profile, zones, recent, performance, records = [] } = params
   const from = today()
   const week = plan.weeks.find((w) => w.start <= from && w.end >= from)
-  if (!week) throw new Error('Aucune semaine du plan ne couvre aujourd’hui.')
+  if (!week) throw new Error('No plan week covers today.')
 
   const remaining = week.sessions.filter((s) => s.date >= from)
   const allowed: string[] = []

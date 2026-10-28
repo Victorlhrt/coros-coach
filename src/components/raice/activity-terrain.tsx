@@ -160,7 +160,7 @@ export function ActivityTerrain({ title, subtitle, rowLabels, colLabels, metrics
       <Panel className={className}>
         <PanelHeader title={title} subtitle={subtitle} />
         <PanelSection divided className="py-12 text-center text-muted-foreground text-sm">
-          Aucune activité à afficher pour l'instant.
+          Nothing to show yet.
         </PanelSection>
       </Panel>
     )
@@ -173,9 +173,9 @@ export function ActivityTerrain({ title, subtitle, rowLabels, colLabels, metrics
     <Panel className={className}>
       <PanelHeader title={title} subtitle={subtitle} />
       <PanelSection className="flex flex-wrap items-center justify-between gap-3 pt-0">
-        <Segmented label="Métrique" value={metric.id} onChange={setMetricId} options={metrics.map((m) => ({ value: m.id, label: m.label }))} />
+        <Segmented label="Metric" value={metric.id} onChange={setMetricId} options={metrics.map((m) => ({ value: m.id, label: m.label }))} />
         <Segmented<View>
-          label="Vue"
+          label="View"
           value={view}
           onChange={(v) => {
             setHover(null)
@@ -183,7 +183,7 @@ export function ActivityTerrain({ title, subtitle, rowLabels, colLabels, metrics
           }}
           options={[
             { value: 'persp', label: 'Perspective' },
-            { value: 'top', label: 'Vue de dessus' },
+            { value: 'top', label: 'Top view' },
           ]}
         />
       </PanelSection>
@@ -277,13 +277,13 @@ export function ActivityTerrain({ title, subtitle, rowLabels, colLabels, metrics
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-muted-foreground text-xs">
           <div className="flex items-center gap-2">
-            <span>Moins</span>
+            <span>Less</span>
             <div className="flex gap-1">
               {[0.1, 0.3, 0.5, 0.7, 0.9].map((t) => (
                 <span key={t} className="size-3 rounded-[3px]" style={{ background: shade(t) }} />
               ))}
             </div>
-            <span>Plus</span>
+            <span>More</span>
           </div>
           {hint && <p className="text-right">{hint}</p>}
         </div>

@@ -27,7 +27,7 @@ export default function AdminApp() {
     )
   }
   if (!me.data) return <Navigate to={`/connexion?next=${encodeURIComponent(location.pathname)}`} replace />
-  if (me.data.role !== 'admin') return <Navigate to="/compte" replace />
+  if (me.data.role !== 'admin') return <Navigate to="/account" replace />
 
   return (
     <AppShell>

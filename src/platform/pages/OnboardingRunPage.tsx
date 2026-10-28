@@ -128,7 +128,7 @@ export function OnboardingRunPage() {
             } catch {
               /* sans stockage, l'inscription démarre vide */
             }
-            window.setTimeout(() => navigate(res.needsAccount ? '/inscription' : '/compte'), 1200)
+            window.setTimeout(() => navigate(res.needsAccount ? '/inscription' : '/account'), 1200)
           }}
         />
       </Frame>
@@ -154,7 +154,7 @@ export function OnboardingRunPage() {
       }
       const res = await api<{ needsAccount: boolean }>(`/onboarding/sessions/${sessionId}/complete`, { method: 'POST' })
       if (preview) setFinished(true)
-      else navigate(res.needsAccount ? '/inscription' : '/compte')
+      else navigate(res.needsAccount ? '/inscription' : '/account')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

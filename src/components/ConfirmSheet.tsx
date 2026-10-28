@@ -19,19 +19,19 @@ export function ConfirmSheet() {
       title={shown?.title ?? ''}
       description={shown?.description}
       detents={[0.5, 0.92]}
-      closeLabel="Fermer"
+      closeLabel="Close"
     >
       {shown?.details !== undefined && (
         <details className="rounded-[var(--radius-control)] bg-[var(--surface-muted)] p-3 text-xs">
-          <summary className="cursor-pointer font-medium">Détail de la requête</summary>
+          <summary className="cursor-pointer font-medium">Request details</summary>
           <pre className="mt-2 max-h-60 overflow-auto break-all whitespace-pre-wrap">{JSON.stringify(shown.details, null, 2)}</pre>
         </details>
       )}
       <div className="mt-6 grid grid-cols-2 gap-3 pb-[env(safe-area-inset-bottom)]">
         <Button variant="secondary" onClick={() => answer(false)}>
-          Annuler
+          Cancel
         </Button>
-        <Button onClick={() => answer(true)}>{shown?.confirmLabel ?? 'Confirmer'}</Button>
+        <Button onClick={() => answer(true)}>{shown?.confirmLabel ?? 'Confirm'}</Button>
       </div>
     </BottomSheet>
   )

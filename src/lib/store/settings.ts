@@ -3,8 +3,8 @@ import { persist } from 'zustand/middleware'
 
 /** Modèles proposés, du moins cher au plus cher (prix Anthropic par million de tokens). */
 export const MODELS = [
-  { id: 'claude-haiku-4-5', label: 'Haiku 4.5', price: '1 $ / 5 $' },
-  { id: 'claude-sonnet-5', label: 'Sonnet 5', price: '2 $ / 10 $' },
+  { id: 'claude-haiku-4-5', label: 'Haiku 4.5', price: '$1 / $5' },
+  { id: 'claude-sonnet-5', label: 'Sonnet 5', price: '$2 / $10' },
 ] as const
 
 export const DEFAULT_MODEL = MODELS[0].id

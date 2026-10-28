@@ -73,9 +73,11 @@ export function WeekPicker({
       <PanelHeader title={title} subtitle={subtitle} actions={actions} />
 
       <div className="pb-5 sm:px-6">
-        <div role="radiogroup" aria-label="Jours de la semaine" onKeyDown={onKeyDown} className="no-scrollbar flex snap-x snap-mandatory scroll-px-6 gap-2 overflow-x-auto px-6 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
+        <div role="radiogroup" aria-label="Days of the week" onKeyDown={onKeyDown} className="no-scrollbar flex snap-x snap-mandatory scroll-px-6 gap-2 overflow-x-auto px-6 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
           {days.map((d, i) => {
             const isSel = i === selIndex
+            // Tuile teintée de la couleur de la première séance du jour : on lit le type d'un coup d'œil.
+            const color = d.sessions[0]?.color
             return (
               <button
                 key={d.key}
@@ -88,16 +90,20 @@ export function WeekPicker({
                 aria-label={`${dateLabel(d.key)} · ${d.caption}`}
                 tabIndex={isSel ? 0 : -1}
                 onClick={() => onSelect(d.key)}
+                style={color ? { background: `color-mix(in srgb, ${color} ${isSel ? 24 : 12}%, transparent)`, borderColor: `color-mix(in srgb, ${color} ${isSel ? 70 : 32}%, transparent)` } : undefined}
                 className={cn(
                   'relative flex w-[4.75rem] shrink-0 snap-start flex-col items-center overflow-hidden rounded-2xl border px-1 pt-3 pb-3 sm:w-auto sm:min-w-0 sm:shrink text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pt-3',
-                  isSel ? 'border-foreground/40 bg-foreground/[0.12]' : 'hover:bg-foreground/[0.04]',
+                  !color && (isSel ? 'border-foreground/40 bg-foreground/[0.12]' : 'border-dashed hover:bg-foreground/[0.04]'),
+                  isSel && 'ring-1 ring-foreground/30',
                   d.outside && !isSel && 'opacity-45',
                 )}
               >
                 {d.isToday && <span aria-hidden className="absolute top-2 right-2 size-1.5 rounded-full bg-foreground" />}
                 <span className={cn('text-xs', isSel ? 'text-foreground' : 'text-muted-foreground')}>{d.weekday}</span>
                 <span className="mt-0.5 font-medium text-2xl tabular-nums tracking-tight">{d.day}</span>
-                <span className="mt-0.5 block max-w-full truncate text-[11px] text-muted-foreground">{d.caption}</span>
+                <span className="mt-0.5 block max-w-full truncate px-1 font-medium text-[11px]" style={{ color: color ?? 'var(--muted-foreground)' }}>
+                  {d.caption}
+                </span>
                 <span aria-hidden className="mt-2 flex h-1 w-full justify-center gap-1 px-1.5">
                   {d.sessions.map((s) => (
                     <span key={s.id} className="h-full max-w-6 flex-1 rounded-full" style={{ background: s.color }} />
@@ -140,7 +146,7 @@ export function WeekPicker({
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed bg-foreground/[0.02] px-4 py-4 text-muted-foreground text-sm">
-                <span className="font-medium text-foreground">Jour de repos</span> · La récupération fait partie de l'entraînement.
+                <span className="font-medium text-foreground">Rest day</span> · Recovery is part of training.
               </div>
             )}
           </motion.div>
@@ -171,7 +177,7 @@ function SessionCard({ session: s, onOpen }: { session: PickerSession; onOpen?: 
         {s.subtitle && <span className="block truncate text-muted-foreground text-xs">{s.subtitle}</span>}
       </span>
       <span className="flex shrink-0 items-center gap-2.5">
-        <span className="flex items-end gap-[3px]" role="img" aria-label={`Intensité ${s.intensity} sur 3`}>
+        <span className="flex items-end gap-[3px]" role="img" aria-label={`Intensity ${s.intensity} of 3`}>
           {[1, 2, 3].map((n) => (
             <span
               key={n}
@@ -180,7 +186,7 @@ function SessionCard({ session: s, onOpen }: { session: PickerSession; onOpen?: 
             />
           ))}
         </span>
-        {s.done && <Check className="size-4 text-emerald-400" aria-label="Faite" />}
+        {s.done && <Check className="size-4 text-emerald-400" aria-label="Done" />}
       </span>
     </>
   )

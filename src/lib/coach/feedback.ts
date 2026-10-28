@@ -22,8 +22,24 @@ export const FEELING_TAGS = [
   'Allures trop dures',
   'Allures trop faciles',
 ] as const
+export type FeelingTag = (typeof FEELING_TAGS)[number]
 
-export const RPE_LABELS = ['', 'Très facile', 'Facile', 'Facile', 'Modéré', 'Modéré', 'Soutenu', 'Difficile', 'Très difficile', 'Extrême', 'Maximal']
+/** Libellés affichés (les valeurs stockées et envoyées à Claude restent en français). */
+export const FEELING_TAG_LABEL: Record<FeelingTag, string> = {
+  'Bonnes sensations': 'Felt good',
+  Facile: 'Easy',
+  'Jambes lourdes': 'Heavy legs',
+  Fatigué: 'Tired',
+  Essoufflé: 'Out of breath',
+  Douleur: 'Pain',
+  'Mal dormi': 'Slept badly',
+  Chaleur: 'Heat',
+  Stress: 'Stress',
+  'Allures trop dures': 'Paces too hard',
+  'Allures trop faciles': 'Paces too easy',
+}
+
+export const RPE_LABELS = ['', 'Very easy', 'Easy', 'Easy', 'Moderate', 'Moderate', 'Steady', 'Hard', 'Very hard', 'Extreme', 'Max effort']
 
 export function describeFeedback(f: Feedback) {
   return [

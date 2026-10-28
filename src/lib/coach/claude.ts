@@ -14,10 +14,10 @@ function client() {
 
 /** Message lisible pour une erreur de l'API Anthropic. */
 export function claudeErrorMessage(err: unknown) {
-  if (err instanceof Anthropic.AuthenticationError) return 'Session expirée ou clé API du serveur refusée. Reconnecte-toi.'
-  if (err instanceof Anthropic.RateLimitError) return 'Trop de requêtes vers Claude, réessaie dans une minute.'
-  if (err instanceof Anthropic.NotFoundError) return 'Modèle Claude introuvable. Vérifie le modèle dans Réglages.'
-  if (err instanceof Anthropic.APIError) return `Erreur Claude ${err.status ?? ''} : ${err.message}`
+  if (err instanceof Anthropic.AuthenticationError) return 'Your session expired or the server API key was rejected. Sign in again.'
+  if (err instanceof Anthropic.RateLimitError) return 'Too many requests to Claude, try again in a minute.'
+  if (err instanceof Anthropic.NotFoundError) return 'Claude model not found. Check the model in Settings.'
+  if (err instanceof Anthropic.APIError) return `Claude error ${err.status ?? ''}: ${err.message}`
   return err instanceof Error ? err.message : String(err)
 }
 
@@ -64,14 +64,14 @@ export async function callStructured<T>({
       if (message.stop_reason === 'max_tokens') {
         lastErrors = ['La réponse a été coupée (trop longue). Fais plus concis : descriptions courtes.']
       } else if (message.stop_reason === 'refusal') {
-        throw new Error('Claude a refusé la demande.')
+        throw new Error('Claude declined the request.')
       } else {
         parsed = (message.parsed_output as T | null) ?? null
         lastErrors = parsed === null ? ['Réponse vide ou non conforme au schéma.'] : (validate?.(parsed) ?? [])
       }
     } catch (err) {
       if (err instanceof Anthropic.APIError) throw err
-      if (err instanceof Error && err.message === 'Claude a refusé la demande.') throw err
+      if (err instanceof Error && err.message === 'Claude declined the request.') throw err
       lastErrors = [`JSON invalide : ${err instanceof Error ? err.message : String(err)}`]
     }
 
@@ -85,5 +85,5 @@ export async function callStructured<T>({
       },
     )
   }
-  throw new Error(`Claude n’a pas produit un résultat valide :\n${lastErrors.slice(0, 5).join('\n')}`)
+  throw new Error(`Claude didn’t return a valid result:\n${lastErrors.slice(0, 5).join('\n')}`)
 }

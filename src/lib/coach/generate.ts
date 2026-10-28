@@ -1,5 +1,5 @@
 import { callStructured } from './claude'
-import { WEEKDAYS, addDays, diffDays, planWeeks, today, weekday, type WeekSlot } from './dates'
+import { WEEKDAYS_FR as WEEKDAYS, addDays, diffDays, planWeeks, today, weekday, type WeekSlot } from './dates'
 import { COACH_SYSTEM, describeGoal, describeProfile, describeZones } from './prompts'
 import {
   ProfileSchema,
@@ -130,7 +130,7 @@ async function buildPlan(
   const draft: PlanDraft = resume ? { ...resume, failed: false } : { goal, skeleton: null, sessions: {} }
   saveDraft(draft)
 
-  onProgress({ step: 'Structure du plan', done: 0, total })
+  onProgress({ step: 'Plan structure', done: 0, total })
   const skeleton =
     draft.skeleton ??
     (await callStructured({
@@ -175,7 +175,7 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
   const parts = Array.from({ length: chunks }, (_, c) => weeks.slice(c * CHUNK, (c + 1) * CHUNK))
   const isDone = (part: Week[]) => part.every((w) => draft.sessions[w.number])
   let done = 1 + parts.filter(isDone).length
-  const report = () => onProgress({ step: done < total ? `Séances, bloc ${done} sur ${chunks}` : 'Finalisation', done, total })
+  const report = () => onProgress({ step: done < total ? `Sessions, block ${done} of ${chunks}` : 'Finishing up', done, total })
   report()
 
   await Promise.all(
@@ -217,7 +217,7 @@ Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séanc
   )
 
   for (const w of weeks) w.sessions = withIds(draft.sessions[w.number])
-  onProgress({ step: 'Terminé', done: total, total })
+  onProgress({ step: 'Done', done: total, total })
   return {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),

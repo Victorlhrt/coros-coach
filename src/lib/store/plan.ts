@@ -156,7 +156,7 @@ export const usePlan = create<PlanState>()(
         set((s) => (s.reviews[week] ? { reviews: { ...s.reviews, [week]: { ...s.reviews[week], status } } } : s)),
       importData: (data) => {
         const d = data as Partial<PlanState>
-        if (!d || typeof d !== 'object' || !d.plan?.weeks) throw new Error('Fichier invalide : aucun plan trouvé.')
+        if (!d || typeof d !== 'object' || !d.plan?.weeks) throw new Error('Invalid file: no plan found.')
         set({
           goal: migrateGoal(d.goal),
           profile: d.profile ?? null,

@@ -86,7 +86,7 @@ export function updateDaysArgs(plan: Plan, planId: string, dates: string[]) {
     const courses = dayCourses(plan, d)
     return courses.length > 0
       ? courses
-      : [{ dayNo: diffDays(plan.startDate, d), sportType: 4, courseName: 'Repos', courseDescription: 'Jour de récupération', sections: [] }]
+      : [{ dayNo: diffDays(plan.startDate, d), sportType: 4, courseName: 'Rest', courseDescription: 'Recovery day', sections: [] }]
   })
   return { planInfo: { planId }, courseList }
 }

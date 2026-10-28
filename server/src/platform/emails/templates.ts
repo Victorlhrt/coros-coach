@@ -17,7 +17,7 @@ export function welcome(p: { name: string; app: string }): Email {
       { kind: 'title', text: `Bienvenue, ${first(p.name)}.` },
       { kind: 'paragraph', text: 'Ton compte est prêt. On prépare ton plan à partir de tes réponses : objectif, date de course, niveau et disponibilités.' },
       { kind: 'paragraph', text: 'Connecte ta montre COROS dès que possible : le plan se cale sur tes allures réelles et tes séances arrivent directement au poignet.' },
-      { kind: 'button', label: 'Ouvrir mon espace', href: `${p.app}/compte` },
+      { kind: 'button', label: 'Ouvrir mon espace', href: `${p.app}/account` },
     ],
   })
 }
@@ -78,7 +78,7 @@ export function planReady(p: { name: string; app: string; title: string; distanc
       { kind: 'title', text: p.title },
       { kind: 'metrics', items: metrics },
       { kind: 'paragraph', text: `${first(p.name)}, ton plan est construit semaine par semaine jusqu’au jour J. Chaque séance a ses allures et ses récupérations ; il s’ajuste ensuite selon tes sensations.` },
-      { kind: 'button', label: 'Voir mon plan', href: `${p.app}/compte` },
+      { kind: 'button', label: 'Voir mon plan', href: `${p.app}/account` },
     ],
   })
 }

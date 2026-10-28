@@ -1,6 +1,6 @@
 import { Star } from 'lucide-react'
 import { useState } from 'react'
-import { FEELING_TAGS, RPE_LABELS, type Feedback } from '@/lib/coach/feedback'
+import { FEELING_TAG_LABEL, FEELING_TAGS, RPE_LABELS, type Feedback, type FeelingTag } from '@/lib/coach/feedback'
 import { usePlan } from '@/lib/store/plan'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -19,9 +19,9 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
     return (
       <Card id="ressenti">
         <div className="flex items-center justify-between">
-          <CardTitle>Mon ressenti</CardTitle>
+          <CardTitle>How it felt</CardTitle>
           <button className="text-sm font-medium text-accent" onClick={() => setEditing(true)}>
-            Modifier
+            Edit
           </button>
         </div>
         <div className="mt-2 flex items-center gap-3">
@@ -30,8 +30,8 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
             RPE {saved.rpe}/10 · {RPE_LABELS[saved.rpe]}
           </span>
         </div>
-        {saved.tags.length > 0 && <p className="mt-2 text-sm text-muted-foreground">{saved.tags.join(' · ')}</p>}
-        {saved.comment && <p className="mt-2 text-sm">« {saved.comment} »</p>}
+        {saved.tags.length > 0 && <p className="mt-2 text-sm text-muted-foreground">{saved.tags.map((t) => FEELING_TAG_LABEL[t as FeelingTag] ?? t).join(' · ')}</p>}
+        {saved.comment && <p className="mt-2 text-sm">“{saved.comment}”</p>}
       </Card>
     )
   }
@@ -41,14 +41,14 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
 
   return (
     <Card id="ressenti">
-      <CardTitle>Comment c’était ?</CardTitle>
-      <CardDescription className="mt-1">Ton ressenti est pris en compte dans le bilan de la semaine.</CardDescription>
+      <CardTitle>How was it?</CardTitle>
+      <CardDescription className="mt-1">How you felt feeds into your weekly review.</CardDescription>
 
-      <p className="mt-4 text-sm font-medium text-muted-foreground">Note</p>
+      <p className="mt-4 text-sm font-medium text-muted-foreground">Rating</p>
       <Stars value={draft.rating} onChange={(rating) => setDraft((d) => ({ ...d, rating }))} size="lg" />
 
       <div className="mt-4 flex items-baseline justify-between">
-        <p className="text-sm font-medium text-muted-foreground">Effort perçu</p>
+        <p className="text-sm font-medium text-muted-foreground">Perceived effort</p>
         <p className="text-sm font-medium">
           {draft.rpe}/10 · {RPE_LABELS[draft.rpe]}
         </p>
@@ -61,21 +61,21 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
         value={draft.rpe}
         onChange={(e) => setDraft((d) => ({ ...d, rpe: Number(e.target.value) }))}
         className="mt-2 w-full accent-[var(--accent)]"
-        aria-label="Effort perçu de 1 à 10"
+        aria-label="Perceived effort from 1 to 10"
       />
 
-      <p className="mt-4 mb-2 text-sm font-medium text-muted-foreground">Sensations</p>
+      <p className="mt-4 mb-2 text-sm font-medium text-muted-foreground">How you felt</p>
       <div className="flex flex-wrap gap-2">
         {FEELING_TAGS.map((t) => (
           <Chip key={t} active={draft.tags.includes(t)} onClick={() => toggleTag(t)} className="h-9 px-3 text-xs">
-            {t}
+            {FEELING_TAG_LABEL[t]}
           </Chip>
         ))}
       </div>
 
       <textarea
         className="mt-4 h-20 w-full rounded-xl border border-border bg-background p-3 text-base outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
-        placeholder="Commentaire (douleur, météo, terrain…)"
+        placeholder="Comment (pain, weather, terrain…)"
         value={draft.comment}
         onChange={(e) => setDraft((d) => ({ ...d, comment: e.target.value }))}
       />
@@ -86,10 +86,10 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
         onClick={() => {
           setFeedback(sessionId, { ...draft, at: new Date().toISOString() })
           setEditing(false)
-          toast.success('Ressenti enregistré ✓')
+          toast.success('Feedback saved ✓')
         }}
       >
-        Enregistrer
+        Save
       </Button>
     </Card>
   )
@@ -97,11 +97,11 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
 
 function Stars({ value, onChange, size = 'sm' }: { value: number; onChange?: (v: number) => void; size?: 'sm' | 'lg' }) {
   return (
-    <div className="flex gap-1" role={onChange ? 'radiogroup' : undefined} aria-label={`Note ${value} sur 5`}>
+    <div className="flex gap-1" role={onChange ? 'radiogroup' : undefined} aria-label={`Rated ${value} out of 5`}>
       {[1, 2, 3, 4, 5].map((n) => {
         const icon = <Star className={cn(size === 'lg' ? 'size-9' : 'size-5', n <= value ? 'fill-accent text-accent' : 'text-muted-foreground/40')} />
         return onChange ? (
-          <button key={n} type="button" role="radio" aria-checked={n === value} aria-label={`${n} sur 5`} onClick={() => onChange(n)} className="p-0.5 active:scale-90">
+          <button key={n} type="button" role="radio" aria-checked={n === value} aria-label={`${n} out of 5`} onClick={() => onChange(n)} className="p-0.5 active:scale-90">
             {icon}
           </button>
         ) : (

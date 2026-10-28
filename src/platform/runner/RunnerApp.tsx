@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, SettingsIcon, ShieldIcon, UserIcon, WatchIcon } from 'lucide-react'
+import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PlusIcon, SettingsIcon, ShieldIcon, UserIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/arc/avatar/avatar'
@@ -8,7 +8,6 @@ import { Button } from '@/components/arc/button/button'
 import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Button as LinkButton } from '@/components/shadcn/button'
-import { UsageMeter } from '@/components/arc/usage-meter/usage-meter'
 import { CustomSidebarTrigger } from '@/components/custom-sidebar-trigger'
 import { LogoIcon } from '@/components/logo'
 import {
@@ -26,8 +25,6 @@ import {
 import { cn } from '@/lib/utils'
 import { api } from '../api'
 import { BRAND } from '../brand'
-import { DISTANCE_LABELS, PLAN_STATUS, formatDate } from '../format'
-import { CoachAvatar } from '../onboarding/CoachAvatar'
 import type { CompleteAnswers } from '../onboarding/CompleteOnboarding'
 import { formatDuration, formatPace } from '../onboarding/estimate'
 import { ShareButtons } from '../invite/ShareButtons'
@@ -35,6 +32,7 @@ import { useLogout, useMe } from '../session'
 import { ConfirmSheet } from '@/components/ConfirmSheet'
 import { LockScreen } from '@/components/LockScreen'
 import { Toaster } from '@/components/Toaster'
+import { formatDay } from '@/lib/coach/dates'
 import { useAutoLink } from '@/lib/coach/links'
 import { useWeeklyReview } from '@/lib/coach/review'
 import { useCorosCallback } from '@/lib/coros/callback'
@@ -50,10 +48,13 @@ import { PlanPage as CoachPlanPage } from '@/pages/PlanPage'
 import { SessionPage } from '@/pages/SessionPage'
 import { SettingsPage as CoachSettingsPage } from '@/pages/SettingsPage'
 import { AnalyticsDashboards, HomeTab, PlanTab } from './CoachTabs'
+import { BrandLogo } from './brands'
+import { CoachChat } from './CoachChat'
+import { Integrations } from './Integrations'
 import { Panel as RPanel, PanelHeader as RPanelHeader } from '@/components/raice/panel'
 
 /**
- * Espace coureur (app.raice.run/compte) : barre latérale avec Plan, Analytics, Coach et Equipment,
+ * Espace coureur (app.raice.run/account) : barre latérale avec Plan, Analytics, Coach et Equipment,
  * Profile et Settings en bas à gauche ; contenu en pleine largeur sur desktop.
  * Tout part des réponses du dernier onboarding, en attendant la synchronisation des montres.
  */
@@ -62,28 +63,38 @@ type Plan = { id: string; title: string; goal_distance: string; goal_date: strin
 type Overview = { answers: CompleteAnswers | null; completedAt: string | null; plans: Plan[] }
 
 const NAV = [
-  { title: 'Home', path: '/compte/home', icon: <HomeIcon /> },
-  { title: 'Plan', path: '/compte/plan', icon: <CalendarDaysIcon /> },
-  { title: 'Analytics', path: '/compte/analytics', icon: <BarChart3Icon /> },
-  { title: 'Coach', path: '/compte/coach', icon: <MessageCircleIcon /> },
-  { title: 'Equipment', path: '/compte/equipment', icon: <FootprintsIcon /> },
+  { title: 'Home', path: '/account/home', icon: <HomeIcon /> },
+  { title: 'Plan', path: '/account/plan', icon: <CalendarDaysIcon /> },
+  { title: 'Analytics', path: '/account/analytics', icon: <BarChart3Icon /> },
+  { title: 'Coach', path: '/account/coach', icon: <MessageCircleIcon /> },
+  { title: 'Equipment', path: '/account/equipment', icon: <FootprintsIcon /> },
 ]
 const FOOTER_NAV = [
-  { title: 'Profile', path: '/compte/profil', icon: <UserIcon /> },
-  { title: 'Settings', path: '/compte/settings', icon: <SettingsIcon /> },
+  { title: 'Profile', path: '/account/profile', icon: <UserIcon /> },
+  { title: 'Settings', path: '/account/settings', icon: <SettingsIcon /> },
 ]
 
 const WEEK = [
-  ['mon', 'Lun'],
-  ['tue', 'Mar'],
-  ['wed', 'Mer'],
-  ['thu', 'Jeu'],
-  ['fri', 'Ven'],
-  ['sat', 'Sam'],
-  ['sun', 'Dim'],
+  ['mon', 'Mon'],
+  ['tue', 'Tue'],
+  ['wed', 'Wed'],
+  ['thu', 'Thu'],
+  ['fri', 'Fri'],
+  ['sat', 'Sat'],
+  ['sun', 'Sun'],
 ] as const
-const LEVELS: Record<string, string> = { debutant: 'Débutant', intermediaire: 'Intermédiaire', confirme: 'Confirmé' }
-const SESSION_MAX: Record<string, string> = { '30': '30 min', '45': '45 min', '60': '1 h', '90': '1 h 30 et plus' }
+const LEVELS: Record<string, string> = { debutant: 'Beginner', intermediaire: 'Intermediate', confirme: 'Advanced' }
+const SESSION_MAX: Record<string, string> = { '30': '30 min', '45': '45 min', '60': '1h', '90': '1h30 or more' }
+const DISTANCE_LABELS: Record<string, string> = { '5k': '5K', '10k': '10K', half: 'Half marathon', marathon: 'Marathon', trail: 'Trail' }
+const PLAN_STATUS: Record<string, { label: string; tone: BadgeTone }> = {
+  requested: { label: 'Requested', tone: 'info' },
+  generating: { label: 'Generating', tone: 'warning' },
+  active: { label: 'Active', tone: 'success' },
+  completed: { label: 'Completed', tone: 'neutral' },
+  archived: { label: 'Archived', tone: 'neutral' },
+  failed: { label: 'Failed', tone: 'danger' },
+}
+const formatDate = (iso: string) => (/^\d{4}-\d{2}-\d{2}/.test(iso) ? formatDay(iso.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' }) : iso)
 const WATCHES: Record<string, string> = { coros: 'COROS', garmin: 'Garmin', apple: 'Apple Watch', suunto: 'Suunto', polar: 'Polar' }
 
 function useOverview() {
@@ -140,16 +151,16 @@ export default function RunnerApp() {
         <RunnerHeader />
         {coros.status === 'error' && (
           <div className="mx-4 mt-4 rounded-[18px] border border-destructive/50 p-4 text-sm md:mx-8">
-            <p className="font-medium">Connexion COROS impossible</p>
+            <p className="font-medium">Couldn’t connect to COROS</p>
             <p className="mt-1 text-muted-foreground">{coros.message}</p>
             <button type="button" className="mt-2 text-sm underline" onClick={coros.dismiss}>
-              Fermer
+              Close
             </button>
           </div>
         )}
         <div className="flex w-full flex-1 flex-col p-4 md:p-8">
           {coros.status === 'pending' || (active && !synced) ? (
-            <p className="text-muted-foreground text-sm">{coros.status === 'pending' ? 'Connexion à COROS…' : 'Chargement de ton plan…'}</p>
+            <p className="text-muted-foreground text-sm">{coros.status === 'pending' ? 'Connecting to COROS…' : 'Loading your plan…'}</p>
           ) : (
             <CoachRoutes />
           )}
@@ -172,12 +183,12 @@ function CoachRoutes() {
       <Route path="home" element={hasPlan ? <HomeTab /> : <OnboardingPlanPage />} />
       <Route path="plan" element={hasPlan ? <PlanTab /> : <CoachPlanPage />} />
       <Route path="analytics" element={<AnalyticsTab />} />
-      <Route path="coach" element={hasPlan ? <AdjustPage /> : <CoachPlaceholder />} />
+      <Route path="coach" element={<CoachTab />} />
       <Route path="equipment" element={<EquipmentPage />} />
-      <Route path="profil" element={<ProfilePage />} />
+      <Route path="profile" element={<ProfilePage />} />
       <Route path="settings" element={<SettingsTab />} />
-      <Route path="seance/:id" element={<SessionPage />} />
-      <Route path="objectif" element={<GoalPage />} />
+      <Route path="session/:id" element={<SessionPage />} />
+      <Route path="goal" element={<GoalPage />} />
       <Route path="debug" element={<DebugPage />} />
       <Route path="*" element={<Navigate to="home" replace />} />
     </Routes>
@@ -195,9 +206,12 @@ function AnalyticsTab() {
 }
 
 function SettingsTab() {
+  const { data } = useOverview()
   return (
     <div className="flex w-full flex-col gap-10">
-      <CoachSettingsPage />
+      <CoachSettingsPage>
+        <Integrations stravaRuns={data?.answers?.strava?.runs} />
+      </CoachSettingsPage>
       <AccountSettings />
     </div>
   )
@@ -226,7 +240,7 @@ function RunnerSidebar() {
     >
       <SidebarHeader className="h-14 justify-center border-b px-2">
         <SidebarMenuButton asChild>
-          <Link to="/compte/home">
+          <Link to="/account/home">
             <LogoIcon />
             <span className="font-medium">{BRAND.name}</span>
           </Link>
@@ -295,11 +309,11 @@ function Panel({ title, children, className }: { title?: string; children: React
 function NoOnboarding() {
   return (
     <EmptyState
-      title="Pas encore de plan"
-      description="Réponds aux questions de Pacer et on prépare ton plan."
+      title="No plan yet"
+      description="Answer Pacer’s questions and we’ll build your plan."
       action={
         <LinkButton asChild>
-          <Link to="/onboarding">Créer mon plan</Link>
+          <Link to="/onboarding">Create my plan</Link>
         </LinkButton>
       }
     />
@@ -322,31 +336,31 @@ function OnboardingPlanPage() {
   return (
     <>
       <PageTitle
-        title={race?.name ?? plan?.title ?? 'Mon plan'}
-        action={plan && <Badge tone={(PLAN_STATUS[plan.status]?.tone ?? 'neutral') as BadgeTone}>{PLAN_STATUS[plan.status]?.label ?? plan.status}</Badge>}
+        title={race?.name ?? plan?.title ?? 'My plan'}
+        action={plan && <Badge tone={PLAN_STATUS[plan.status]?.tone ?? 'neutral'}>{PLAN_STATUS[plan.status]?.label ?? plan.status}</Badge>}
       >
-        {[race?.detail ?? (plan && DISTANCE_LABELS[plan.goal_distance]), date && `le ${formatDate(date)}`, plan?.weeks && `${plan.weeks} semaines`].filter(Boolean).join(' · ')}
+        {[race?.detail ?? (plan && DISTANCE_LABELS[plan.goal_distance]), date && `on ${formatDate(date)}`, plan?.weeks && `${plan.weeks} weeks`].filter(Boolean).join(' · ')}
       </PageTitle>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {date && (
-          <Panel title="Jour J" className="lg:col-span-2">
-            <Countdown target={`${date}T08:00:00`} timeZone="Europe/Paris" units={['days', 'hours']} label="Avant la course" completeLabel="C’est le grand jour" />
+          <Panel title="Race day" className="lg:col-span-2">
+            <Countdown target={`${date}T08:00:00`} timeZone="Europe/Paris" units={['days', 'hours']} label="Until the race" completeLabel="It’s race day" />
           </Panel>
         )}
-        <Panel title="Objectif" className={date ? '' : 'lg:col-span-3'}>
+        <Panel title="Goal" className={date ? '' : 'lg:col-span-3'}>
           {a?.estimate?.target ? (
             <div>
               <p className="font-semibold text-4xl tabular-nums tracking-tight">{formatDuration(a.estimate.target)}</p>
               {race && <p className="mt-1 text-muted-foreground text-sm">{formatPace(a.estimate.target, race.km)}</p>}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">Pas de temps visé : on construit d’abord la régularité.</p>
+            <p className="text-muted-foreground text-sm">No target time: we build consistency first.</p>
           )}
         </Panel>
       </div>
 
-      <Panel title="Ta semaine type" className="mt-4">
+      <Panel title="Your typical week" className="mt-4">
         {days.length ? (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
             {WEEK.map(([id, label]) => {
@@ -357,20 +371,20 @@ function OnboardingPlanPage() {
                   <span className="text-muted-foreground text-xs">{label}</span>
                   <span className="flex items-center gap-1.5 text-sm [&>svg]:size-3.5">
                     {on ? <ActivityIcon /> : null}
-                    {long ? 'Sortie longue' : on ? 'Séance' : 'Repos'}
+                    {long ? 'Long run' : on ? 'Session' : 'Rest'}
                   </span>
                 </div>
               )
             })}
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm">Indique tes jours disponibles pour voir ta semaine type.</p>
+          <p className="text-muted-foreground text-sm">Pick your available days to see your typical week.</p>
         )}
         <p className="text-muted-foreground text-xs">
-          {days.length > 0 && `${days.length} séance${days.length > 1 ? 's' : ''} par semaine`}
-          {days.length > 0 && a?.session_max && ` · ${SESSION_MAX[a.session_max]} max en semaine`}
-          {days.length > 0 && a?.level && ` · niveau ${LEVELS[a.level]?.toLowerCase() ?? a.level}. `}
-          Le détail des séances apparaît ici dès que ton plan est prêt.
+          {days.length > 0 && `${days.length} session${days.length > 1 ? 's' : ''} a week`}
+          {days.length > 0 && a?.session_max && ` · ${SESSION_MAX[a.session_max]} max on weekdays`}
+          {days.length > 0 && a?.level && ` · ${LEVELS[a.level]?.toLowerCase() ?? a.level} level. `}
+          Session details show up here as soon as your plan is ready.
         </p>
       </Panel>
     </>
@@ -388,14 +402,14 @@ function OnboardingAnalytics() {
   if (!st && !perfs.length) return null
   return (
     <RPanel>
-      <RPanelHeader title="Historique importé" subtitle={st ? `Depuis ton export Strava · ${st.runs} sorties` : 'Chronos déclarés à l’onboarding'} />
+      <RPanelHeader title="Imported history" subtitle={st ? `From your Strava export · ${st.runs} runs` : 'Times you entered during onboarding'} />
       {st && (
         <div className="grid grid-cols-2 divide-x border-t sm:grid-cols-4">
           {[
-            ['Sorties (12 sem.)', String(st.recent.runs)],
-            ['Volume hebdo', `${st.recent.weeklyKm} km`],
-            ['Plus longue sortie', `${st.recent.longestKm} km`],
-            ['Depuis', st.since ? String(new Date(st.since).getFullYear()) : '—'],
+            ['Runs (12 wks)', String(st.recent.runs)],
+            ['Weekly volume', `${st.recent.weeklyKm} km`],
+            ['Longest run', `${st.recent.longestKm} km`],
+            ['Since', st.since ? String(new Date(st.since).getFullYear()) : '—'],
           ].map(([k, v]) => (
             <div key={k} className="px-6 py-4">
               <p className="text-muted-foreground text-xs">{k}</p>
@@ -423,41 +437,30 @@ function OnboardingAnalytics() {
 
 // ---------- Coach ----------
 
-function CoachPlaceholder() {
+/** Chat avec Pacer (bientôt) et, une fois le plan prêt, le bilan de la semaine. */
+function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
-  const a = data?.answers
-  const first = a?.identity?.firstName ?? me?.name.split(' ')[0]
-  const lines = [
-    `Salut ${first ?? ''} ! Content de te retrouver.`,
-    a?.goal?.race ? `On vise ${a.goal.race.name}${a.estimate?.target ? ` en ${formatDuration(a.estimate.target)}` : ''}. Je prépare tes séances.` : 'Je prépare ton plan à partir de tes réponses.',
-    'Bientôt, tu pourras me parler ici : décaler une séance, signaler une douleur, me dire que ta semaine est chargée. J’adapterai le plan tout seul.',
-  ]
+  const hasPlan = usePlan((st) => !!st.plan)
+  const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="mb-6 flex items-center gap-3">
-        <CoachAvatar className="size-11" />
-        <div>
-          <p className="font-medium">Pacer</p>
-          <p className="text-muted-foreground text-xs">Ton coach</p>
+    <div className="grid w-full items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <CoachChat firstName={first} className="xl:sticky xl:top-20" />
+      {hasPlan ? (
+        <div className="[&>div>header]:pt-0">
+          <AdjustPage />
         </div>
-      </div>
-      <div className="flex flex-1 flex-col gap-2">
-        {lines.map((l, i) => (
-          <p key={i} className="w-fit max-w-xl rounded-2xl border bg-card px-4 py-2.5 text-sm">
-            {l}
-          </p>
-        ))}
-      </div>
-      <div className="mt-6 flex items-center gap-2 rounded-[22px] border bg-card p-2 pl-4 opacity-60">
-        <span className="flex-1 text-muted-foreground text-sm">Le chat avec Pacer arrive bientôt…</span>
-        <Button disabled>Envoyer</Button>
-      </div>
+      ) : null}
     </div>
   )
 }
 
 // ---------- Equipment ----------
+
+/** Durée de vie indicative d'une paire, pour la jauge d'usure. */
+const SHOE_LIFE_KM = 800
+
+type Shoe = { brand: string; model: string; km: number; rotation: boolean }
 
 function EquipmentPage() {
   const { data, isPending } = useOverview()
@@ -465,50 +468,81 @@ function EquipmentPage() {
   const a = data?.answers
   if (!a) return <NoOnboarding />
   const g = a.gear
+  const shoes: Shoe[] = g?.brand ? [{ brand: g.brand, model: g.model, km: g.shoeKm, rotation: g.rotation }] : []
   const watches = (a.wearables ?? []).filter((w) => w !== 'none')
   return (
     <>
-      <PageTitle title="Equipment">Tes chaussures et tes sources de données.</PageTitle>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Chaussures">
-          {g?.brand ? (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="font-medium">
-                  {g.brand} {g.model}
-                </p>
-                {g.rotation && <Badge size="sm">En rotation</Badge>}
-              </div>
-              <UsageMeter label="Usure" unit=" km" decimals={0} limit={800} segments={[{ id: 'km', label: 'Kilomètres', value: g.shoeKm }]} freeLabel="restants" overLabel="À remplacer" warnAt={0.85} />
-            </>
-          ) : (
-            <p className="text-muted-foreground text-sm">Aucune paire renseignée.</p>
-          )}
-        </Panel>
-        <Panel title="Montres et applications">
-          <ul className="flex flex-col gap-2">
-            {watches.map((w) => (
-              <li key={w} className="flex items-center justify-between rounded-[16px] border bg-background p-3 text-sm">
-                <span className="flex items-center gap-2">
-                  <WatchIcon className="size-4 text-muted-foreground" /> {WATCHES[w] ?? w}
-                </span>
-                <Badge size="sm" tone="neutral">
-                  Connexion bientôt
-                </Badge>
-              </li>
-            ))}
-            <li className="flex items-center justify-between rounded-[16px] border bg-background p-3 text-sm">
-              <span className="flex items-center gap-2">
-                <img src="/partners/strava.png" alt="" className="size-5 rounded" /> Strava
-              </span>
-              <Badge size="sm" tone={a.strava ? 'success' : 'neutral'}>
-                {a.strava ? `${a.strava.runs} sorties importées` : 'Non importé'}
-              </Badge>
-            </li>
-          </ul>
-        </Panel>
+      <PageTitle title="Equipment">Your shoes and the devices that track your runs.</PageTitle>
+      <h2 className="mb-3 font-medium text-sm">Shoes</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {shoes.map((s, i) => (
+          <ShoeCard key={i} shoe={s} />
+        ))}
+        <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-[28px] border border-dashed p-6 text-center">
+          <span className="flex size-10 items-center justify-center rounded-full border text-muted-foreground">
+            <PlusIcon className="size-4" />
+          </span>
+          <p className="font-medium text-sm">Add a pair</p>
+          <p className="max-w-56 text-muted-foreground text-xs">Track the mileage of every pair in your rotation. Coming soon.</p>
+        </div>
+      </div>
+
+      <h2 className="mt-8 mb-3 font-medium text-sm">Devices</h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+        {watches.map((w) => (
+          <Link key={w} to="/account/settings" className="flex flex-col items-center gap-4 rounded-[24px] border bg-card px-4 py-6 transition-colors hover:border-foreground/30">
+            <span className="flex h-10 items-center">
+              <BrandLogo brand={w} className="max-h-10 max-w-24" />
+            </span>
+            <span className="text-center text-muted-foreground text-xs">{WATCHES[w] ?? w}</span>
+          </Link>
+        ))}
+        {a.strava && (
+          <div className="flex flex-col items-center gap-4 rounded-[24px] border bg-card px-4 py-6">
+            <span className="flex h-10 items-center">
+              <BrandLogo brand="strava" className="max-h-10 max-w-24" />
+            </span>
+            <span className="text-center text-muted-foreground text-xs">{a.strava.runs} runs imported</span>
+          </div>
+        )}
       </div>
     </>
+  )
+}
+
+/** Carte d'une paire, façon profil UTMB : logo de la marque en grand, modèle, kilométrage et usure. */
+function ShoeCard({ shoe: s }: { shoe: Shoe }) {
+  const wear = Math.min(1, s.km / SHOE_LIFE_KM)
+  const color = wear >= 0.85 ? '#ef4444' : wear >= 0.6 ? '#f2a33a' : '#43b581'
+  return (
+    <article className="flex flex-col overflow-hidden rounded-[28px] border bg-card">
+      <div className="relative flex h-40 items-center justify-center bg-[radial-gradient(80%_90%_at_50%_100%,--theme(--color-foreground/.09),transparent)]">
+        <BrandLogo brand={s.brand} className="max-h-14 max-w-[55%] text-4xl" />
+        {s.rotation && (
+          <Badge size="sm" tone="info" className="absolute top-4 right-4">
+            In rotation
+          </Badge>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-4 border-t p-6">
+        <div>
+          <p className="text-muted-foreground text-xs uppercase tracking-wider">{s.brand}</p>
+          <p className="mt-0.5 font-medium text-xl tracking-tight">{s.model || 'Unknown model'}</p>
+        </div>
+        <div className="mt-auto">
+          <div className="flex items-baseline justify-between">
+            <p className="font-medium text-3xl tabular-nums tracking-tight">
+              {s.km}
+              <span className="ml-1 text-muted-foreground text-sm">km</span>
+            </p>
+            <p className="text-muted-foreground text-xs tabular-nums">{wear >= 1 ? 'Time to replace' : `~${SHOE_LIFE_KM - s.km} km left`}</p>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10">
+            <div className="h-full rounded-full" style={{ width: `${Math.max(2, wear * 100)}%`, background: color }} />
+          </div>
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -521,10 +555,10 @@ function ProfilePage() {
   if (!me) return null
   const rows: [string, string | null | undefined][] = [
     ['E-mail', me.email],
-    ['Sexe', a?.about?.sex === 'f' ? 'Femme' : a?.about?.sex === 'm' ? 'Homme' : null],
-    ['Année de naissance', a?.about?.birthYear ? String(a.about.birthYear) : null],
-    ['Niveau', a?.level ? LEVELS[a.level] : null],
-    ['Profil UTMB', a?.utmb?.name ? `${a.utmb.name}${a.utmb.index ? ` · index ${a.utmb.index}` : ''}` : null],
+    ['Sex', a?.about?.sex === 'f' ? 'Female' : a?.about?.sex === 'm' ? 'Male' : null],
+    ['Year of birth', a?.about?.birthYear ? String(a.about.birthYear) : null],
+    ['Level', a?.level ? LEVELS[a.level] : null],
+    ['UTMB profile', a?.utmb?.name ? `${a.utmb.name}${a.utmb.index ? ` · index ${a.utmb.index}` : ''}` : null],
   ]
   return (
     <>
@@ -532,7 +566,7 @@ function ProfilePage() {
         <Avatar name={me.name} size="lg" />
         <div>
           <h1 className="font-heading text-2xl">{me.name}</h1>
-          <p className="text-muted-foreground text-sm">Coureur sur {BRAND.name}</p>
+          <p className="text-muted-foreground text-sm">Runner on {BRAND.name}</p>
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -546,7 +580,7 @@ function ProfilePage() {
           ))}
         </dl>
         <LinkButton asChild variant="secondary" className="mt-auto self-start">
-          <Link to="/onboarding">Refaire l’onboarding</Link>
+          <Link to="/onboarding">Redo onboarding</Link>
         </LinkButton>
       </Panel>
       <InvitePanel />
@@ -560,17 +594,17 @@ function AccountSettings() {
   const navigate = useNavigate()
   return (
     <>
-      <PageTitle title="Compte" />
+      <PageTitle title="Account" />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Mot de passe">
-          <p className="text-muted-foreground text-sm">Reçois un lien par e-mail pour en choisir un nouveau.</p>
+        <Panel title="Password">
+          <p className="text-muted-foreground text-sm">Get an email link to choose a new one.</p>
           <LinkButton asChild variant="secondary" className="self-start">
-            <Link to="/mot-de-passe-oublie">Changer de mot de passe</Link>
+            <Link to="/mot-de-passe-oublie">Change password</Link>
           </LinkButton>
         </Panel>
         <Panel title="Session">
           <Button variant="secondary" className="self-start" onClick={() => void logout().then(() => navigate('/'))}>
-            <LogOutIcon className="size-4" /> Se déconnecter
+            <LogOutIcon className="size-4" /> Log out
           </Button>
         </Panel>
       </div>
@@ -585,18 +619,18 @@ function InvitePanel() {
   if (!d) return null
   const left = d.max_uses === null ? null : Math.max(0, d.max_uses - d.uses)
   return (
-    <Panel title="Invite tes potes">
+    <Panel title="Invite your friends">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <p className="text-muted-foreground text-xs">Ton code</p>
+          <p className="text-muted-foreground text-xs">Your code</p>
           <p className="whitespace-nowrap font-mono font-semibold text-2xl tracking-wide">{d.code}</p>
         </div>
-        <Badge tone={left === 0 ? 'warning' : 'neutral'}>{left === null ? 'Illimité' : `${left} invitation${left > 1 ? 's' : ''} restante${left > 1 ? 's' : ''}`}</Badge>
+        <Badge tone={left === 0 ? 'warning' : 'neutral'}>{left === null ? 'Unlimited' : `${left} invite${left > 1 ? 's' : ''} left`}</Badge>
       </div>
       <ShareButtons
         url={`${window.location.origin}/onboarding?code=${d.code}`}
-        subject="Je t’invite sur Raice.run"
-        text={`Je t’invite sur Raice.run, un coach running qui construit ton plan sur mesure. Mon code : ${d.code}.`}
+        subject="Join me on Raice.run"
+        text={`Join me on Raice.run, an AI running coach that builds a plan just for you. My code: ${d.code}.`}
       />
     </Panel>
   )

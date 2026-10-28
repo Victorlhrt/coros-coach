@@ -32,18 +32,18 @@ export function TodayPage() {
   if (!plan) {
     return (
       <>
-        <PageHeader subtitle={formatDay(now)} title="Aujourd’hui" />
+        <PageHeader subtitle={formatDay(now)} title="Today" />
         <Card>
           <EmptyState
             icon={Sparkles}
-            title="Pas encore de plan"
+            title="No plan yet"
             action={
               <Link to={connected ? ROUTES.goal : ROUTES.settings}>
-                <Button>{connected ? 'Créer mon plan' : 'Connecter COROS'}</Button>
+                <Button>{connected ? 'Create my plan' : 'Connect COROS'}</Button>
               </Link>
             }
           >
-            {connected ? 'Fixe ton objectif et Claude construit ton plan à partir de tes données COROS.' : 'Connecte d’abord ta montre COROS dans Réglages.'}
+            {connected ? 'Set your goal and Pacer builds your plan from your COROS data.' : 'First, connect your COROS watch in Settings.'}
           </EmptyState>
         </Card>
       </>
@@ -63,7 +63,7 @@ export function TodayPage() {
 
   return (
     <>
-      <PageHeader subtitle={formatDay(now)} title="Aujourd’hui" />
+      <PageHeader subtitle={formatDay(now)} title="Today" />
       <div className="grid items-start gap-4 lg:grid-cols-3">
         {(review?.status === 'pending' || toRate) && (
           <div className="grid gap-4 md:grid-cols-2 lg:col-span-3">
@@ -72,11 +72,11 @@ export function TodayPage() {
                 <Card className="flex items-center gap-3 bg-accent text-accent-foreground">
                   <Wand2 className="size-6 shrink-0" />
                   <div className="flex-1">
-                    <p className="font-medium">Ton bilan de la semaine est prêt</p>
+                    <p className="font-medium">Your weekly review is ready</p>
                     <p className="text-sm opacity-85">
                       {review.adjustment.changes.length > 0
-                        ? `${review.adjustment.changes.length} ajustement${review.adjustment.changes.length > 1 ? 's' : ''} proposé${review.adjustment.changes.length > 1 ? 's' : ''}`
-                        : 'Rien à changer, consulte l’analyse'}
+                        ? `${review.adjustment.changes.length} suggested adjustment${review.adjustment.changes.length > 1 ? 's' : ''}`
+                        : 'Nothing to change, see the analysis'}
                     </p>
                   </div>
                   <ArrowRight className="size-5" />
@@ -89,7 +89,7 @@ export function TodayPage() {
                 <Card className="flex items-center gap-3">
                   <Star className="size-6 shrink-0 text-accent" />
                   <div className="flex-1">
-                    <p className="font-medium">Comment s’est passée ta séance ?</p>
+                    <p className="font-medium">How did your session go?</p>
                     <p className="text-sm text-muted-foreground">
                       {toRate.title} · <span className="capitalize">{formatDay(toRate.date, { weekday: 'long' })}</span>
                     </p>
@@ -112,10 +112,10 @@ export function TodayPage() {
                 </div>
                 <div>
                   <TypeBadge type="rest" />
-                  <p className="mt-1 text-2xl font-medium tracking-tight">Jour de repos</p>
+                  <p className="mt-1 text-2xl font-medium tracking-tight">Rest day</p>
                 </div>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">La récupération fait partie de l’entraînement.</p>
+              <p className="mt-3 text-sm text-muted-foreground">Recovery is part of training.</p>
             </Card>
           )}
         </div>
@@ -126,7 +126,7 @@ export function TodayPage() {
             <Card>
               <div className="flex items-baseline justify-between">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Semaine {week.number}/{plan.weeks.length}
+                  Week {week.number}/{plan.weeks.length}
                 </p>
                 <p className="text-sm text-muted-foreground">{week.focus}</p>
               </div>
@@ -134,10 +134,10 @@ export function TodayPage() {
                 {activities.isLoading ? <Skeleton className="h-9 w-32" /> : <SlotText value={formatDistance(done, units)} />}
                 <span className="text-lg font-medium text-muted-foreground"> / {formatDistance(planned, units, 0)}</span>
               </p>
-              <Progress className="mt-3" value={done} max={planned || 1} label="Volume réalisé cette semaine" showValue />
+              <Progress className="mt-3" value={done} max={planned || 1} label="Volume completed this week" showValue />
               <Link to={ROUTES.adjust} className="mt-4 block">
                 <Button variant="secondary" className="w-full">
-                  <Wand2 className="size-5" /> Ajuster ma semaine
+                  <Wand2 className="size-5" /> Adjust my week
                 </Button>
               </Link>
             </Card>
@@ -145,7 +145,7 @@ export function TodayPage() {
 
           {next && (
             <div>
-              <p className="mb-2 px-1 text-sm font-medium text-muted-foreground">Prochaine séance</p>
+              <p className="mb-2 px-1 text-sm font-medium text-muted-foreground">Next session</p>
               <SessionCard session={next} />
             </div>
           )}
@@ -165,18 +165,18 @@ function GoalCard() {
   return (
     <Card>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-muted-foreground">Objectif</p>
+        <p className="text-sm font-medium text-muted-foreground">Goal</p>
         <Link to={ROUTES.goal} className="text-sm text-muted-foreground hover:text-foreground">
-          Modifier
+          Edit
         </Link>
       </div>
       <p className="mt-2 text-2xl leading-tight font-medium tracking-tight">{plan.name}</p>
       <p className="mt-1 text-sm text-muted-foreground capitalize">{formatDay(plan.raceDate, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <BigStat label="Jour J" value={daysLeft === 0 ? 'Jour J' : `J-${daysLeft}`} />
-        <BigStat label="Temps visé" value={goal?.targetTime ? formatDuration(goal.targetTime) : '—'} />
+        <BigStat label="Race day" value={daysLeft === 0 ? 'Race day' : `D-${daysLeft}`} />
+        <BigStat label="Target time" value={goal?.targetTime ? formatDuration(goal.targetTime) : '—'} />
       </div>
-      <Progress className="mt-5" value={current} max={plan.weeks.length} label={`Semaine ${current} sur ${plan.weeks.length}`} showValue />
+      <Progress className="mt-5" value={current} max={plan.weeks.length} label={`Week ${current} of ${plan.weeks.length}`} showValue />
     </Card>
   )
 }
@@ -191,13 +191,13 @@ function TodayCard({ session }: { session: Session }) {
       <TextReveal as="h2" text={session.title} className="mt-2 text-3xl leading-tight font-medium tracking-tight" />
       <p className="mt-2 text-muted-foreground">{session.description}</p>
       <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-lg">
-        <BigStat label="Durée" value={formatDuration(seconds)} />
-        <BigStat label={meters > 0 ? 'Distance estimée' : 'Type'} value={meters > 0 ? formatDistance(meters, units) : 'Renfo'} />
+        <BigStat label="Duration" value={formatDuration(seconds)} />
+        <BigStat label={meters > 0 ? 'Estimated distance' : 'Type'} value={meters > 0 ? formatDistance(meters, units) : 'Strength'} />
       </div>
       {session.blocks.length > 0 && <WorkoutChart blocks={session.blocks} zones={zones} className="mt-5 h-16 lg:h-28" />}
       <Link to={ROUTES.session(session.id)} className="mt-5 block sm:w-fit">
         <Button className="w-full sm:px-8">
-          Voir le détail <ArrowRight className="size-5" />
+          View details <ArrowRight className="size-5" />
         </Button>
       </Link>
     </Card>

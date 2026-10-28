@@ -1,5 +1,5 @@
-import { DISTANCES, TERRAINS, type Goal, type Profile, type Zone } from './schema'
-import { WEEKDAYS, formatDay } from './dates'
+import { DISTANCES_FR as DISTANCES, TERRAINS_FR as TERRAINS, type Goal, type Profile, type Zone } from './schema'
+import { WEEKDAYS_FR as WEEKDAYS, formatDayFr as formatDay } from './dates'
 import { formatClock, formatPace } from './format'
 import { RECORD_DISTANCES, bestVdot, predictTime, thresholdPace, type RaceRecord } from './vdot'
 

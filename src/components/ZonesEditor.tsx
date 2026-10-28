@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatPace, parseClock } from '@/lib/coach/format'
 import { zoneColor } from '@/lib/coach/ui'
-import { zonesFromThreshold } from '@/lib/coach/zones'
+import { ZONE_NAMES, zonesFromThreshold } from '@/lib/coach/zones'
 import { usePlan } from '@/lib/store/plan'
 import { toast } from '@/lib/toast'
 import { Button } from './ui/button'
@@ -21,7 +21,7 @@ export function ZonesEditor() {
   return (
     <div>
       <div className="flex gap-2">
-        <Input aria-label="Allure seuil" inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+        <Input aria-label="Threshold pace" inputMode="numeric" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
         <Button
           variant="secondary"
           className="shrink-0"
@@ -29,19 +29,19 @@ export function ZonesEditor() {
             const t = parseClock(threshold)
             if (!t) return
             const n = retuneZones(zonesFromThreshold(t)).length
-            if (n) toast.success(`${n} séance${n > 1 ? 's' : ''} à venir ajustée${n > 1 ? 's' : ''} aux nouvelles zones`)
+            if (n) toast.success(`${n} upcoming session${n > 1 ? 's' : ''} adjusted to the new zones`)
           }}
         >
-          Recalculer
+          Recalculate
         </Button>
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">Allure seuil (min/km) utilisée pour dériver les zones.</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">Threshold pace (min/km) used to derive the zones.</p>
       <div className="mt-4 space-y-2">
         {zones.map((z) => (
           <div key={`${z.zone}-${z.paceFast}-${z.paceSlow}`} className="flex items-center gap-2">
             <span className="h-8 w-1.5 rounded-full" style={{ backgroundColor: zoneColor(z.zone) }} />
             <span className="w-24 text-sm font-medium">
-              Z{z.zone} {z.name}
+              Z{z.zone} {ZONE_NAMES[z.zone] ?? z.name}
             </span>
             <Input className="h-10 text-center tabular-nums" defaultValue={formatPace(z.paceFast)} onBlur={(e) => edit(z.zone, 'paceFast', e.target.value)} />
             <span className="text-muted-foreground">–</span>
@@ -50,7 +50,7 @@ export function ZonesEditor() {
         ))}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Sur la montre, les blocs d’endurance sont pilotés aux zones FC calculées par COROS ; les blocs de qualité à l’allure.
+        On the watch, endurance blocks are driven by the HR zones COROS calculates; quality blocks by pace.
       </p>
     </div>
   )

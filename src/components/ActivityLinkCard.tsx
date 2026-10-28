@@ -28,9 +28,9 @@ export function ActivityLinkCard({ session }: { session: Session }) {
       <div className="flex items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
           {activity ? <Link2 className="size-5 text-session-easy" /> : <Link2Off className="size-5 text-muted-foreground" />}
-          Activité réalisée
+          Completed activity
         </CardTitle>
-        {link?.auto && activity && <span className="text-xs text-muted-foreground">liée automatiquement</span>}
+        {link?.auto && activity && <span className="text-xs text-muted-foreground">linked automatically</span>}
       </div>
 
       {isLoading && <Skeleton className="mt-3 h-16" />}
@@ -42,8 +42,8 @@ export function ActivityLinkCard({ session }: { session: Session }) {
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <Metric label="Distance" value={activity.meters ? formatDistance(activity.meters, units, 2) : '—'} />
-            <Metric label="Durée" value={activity.seconds ? formatDuration(activity.seconds) : '—'} />
-            <Metric label={`Allure ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
+            <Metric label="Duration" value={activity.seconds ? formatDuration(activity.seconds) : '—'} />
+            <Metric label={`Pace ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
           </div>
 
           <p className="mt-4 text-sm font-medium">Splits</p>
@@ -55,9 +55,9 @@ export function ActivityLinkCard({ session }: { session: Session }) {
                 <tr>
                   <th className="py-1 text-left font-medium">#</th>
                   <th className="text-right font-medium">Dist.</th>
-                  <th className="text-right font-medium">Temps</th>
-                  <th className="text-right font-medium">Allure</th>
-                  <th className="text-right font-medium">FC</th>
+                  <th className="text-right font-medium">Time</th>
+                  <th className="text-right font-medium">Pace</th>
+                  <th className="text-right font-medium">HR</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,18 +75,18 @@ export function ActivityLinkCard({ session }: { session: Session }) {
           )}
           {laps.data && laps.data.laps.length === 0 && (
             <details className="mt-1 text-xs text-muted-foreground">
-              <summary>Format des splits non reconnu — voir la réponse brute</summary>
+              <summary>Unrecognised splits format — see the raw response</summary>
               <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap">{JSON.stringify(laps.data.raw, null, 2).slice(0, 3000)}</pre>
             </details>
           )}
         </>
       )}
 
-      {!activity && !isLoading && <p className="mt-2 text-sm text-muted-foreground">Aucune activité COROS liée à cette séance.</p>}
+      {!activity && !isLoading && <p className="mt-2 text-sm text-muted-foreground">No COROS activity linked to this session.</p>}
 
       {candidates.length > 0 && (
         <label className="mt-4 block text-sm text-muted-foreground">
-          {activity ? 'Changer d’activité' : 'Lier une activité'}
+          {activity ? 'Change activity' : 'Link an activity'}
           <select
             className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-base text-foreground"
             value={activity?.labelId ?? ''}
@@ -101,7 +101,7 @@ export function ActivityLinkCard({ session }: { session: Session }) {
               setLinks({ ...released, [session.id]: { labelId: picked?.labelId ?? null, sportType: picked?.sportType ?? 100, auto: false } })
             }}
           >
-            <option value="">Aucune</option>
+            <option value="">None</option>
             {candidates.map((a) => (
               <option key={a.labelId} value={a.labelId}>
                 {formatDay(a.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {a.name} · {a.meters ? formatDistance(a.meters, units) : ''}

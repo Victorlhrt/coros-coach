@@ -121,7 +121,7 @@ export function normalizeActivities(raw: unknown): Activity[] {
         labelId: String(o.labelId),
         sportType: Number(o.sportType ?? 100),
         date,
-        name: String(pick(o, /name|title|sport.?name/i) ?? 'Course'),
+        name: String(pick(o, /name|title|sport.?name/i) ?? 'Run'),
         meters,
         seconds,
         paceSecPerKm: pace,

@@ -10,7 +10,7 @@ import type { Plan, Session, SessionType, Week, Zone } from '@/lib/coach/schema'
 
 export type ActivityLink = { labelId?: string | null }
 
-export const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 /** Intensité perçue d'un type de séance, de 1 (facile) à 3 (dur). */
 export const INTENSITY: Record<SessionType, 1 | 2 | 3> = { recovery: 1, easy: 1, strength: 1, long: 2, tempo: 2, interval: 3, race: 3 }
@@ -81,7 +81,7 @@ export function planTerrain(plan: Plan, zones: Zone[]) {
     )
   return {
     rowLabels: WEEKDAY_LABELS,
-    colLabels: plan.weeks.map((w) => `S${w.number}`),
+    colLabels: plan.weeks.map((w) => `W${w.number}`),
     distance: grid((s) => (isRun(s) ? sessionTotals(s, zones).meters / 1000 : 0)),
     duration: grid((s) => sessionTotals(s, zones).seconds / 60),
     intensity: grid((s) => INTENSITY[s.type]),
@@ -135,9 +135,9 @@ export function baselineDeviation(activities: Activity[], now: string, days = 42
   }
   const series = [
     { id: 'km', name: 'Volume', raw: rolling((a) => sumBy(a, (x) => x.meters ?? 0)), invert: false },
-    { id: 'time', name: 'Durée', raw: rolling((a) => sumBy(a, (x) => x.seconds ?? 0)), invert: false },
-    { id: 'runs', name: 'Sorties', raw: rolling((a) => a.length), invert: false },
-    { id: 'pace', name: 'Allure', raw: rolling(pace), invert: true },
+    { id: 'time', name: 'Duration', raw: rolling((a) => sumBy(a, (x) => x.seconds ?? 0)), invert: false },
+    { id: 'runs', name: 'Runs', raw: rolling((a) => a.length), invert: false },
+    { id: 'pace', name: 'Pace', raw: rolling(pace), invert: true },
   ]
   return {
     pointLabels: dates.map((d) => formatDay(d, { weekday: 'short', day: 'numeric', month: 'short' })),

@@ -49,10 +49,18 @@ export function fromCoros(ymd: string | number) {
   return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`
 }
 
-export const WEEKDAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-export const WEEKDAYS_SHORT = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+export const WEEKDAYS_SHORT = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+
+/** Jours en français : réservés aux prompts envoyés à Claude (rédigés en français). */
+export const WEEKDAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
 export function formatDay(iso: string, opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) {
+  return fromIso(iso).toLocaleDateString('en-GB', opts)
+}
+
+/** Variante française de formatDay, réservée aux prompts envoyés à Claude. */
+export function formatDayFr(iso: string, opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) {
   return fromIso(iso).toLocaleDateString('fr-FR', opts)
 }
 
@@ -75,7 +83,7 @@ export function planWeeks(raceDate: string, from = today()): { start: string; we
     start = addDays(raceSunday, -16 * 7 + 1)
     count = 16
   }
-  if (count < 4) return { start, weeks: [], error: 'La course doit être au moins 4 semaines plus tard (format COROS : 4 à 16 semaines).' }
+  if (count < 4) return { start, weeks: [], error: 'Your race needs to be at least 4 weeks away (COROS plans run 4 to 16 weeks).' }
   const weeks: WeekSlot[] = []
   for (let i = 0; i < count; i++) {
     const monday = addDays(mondayOf(start), i * 7)

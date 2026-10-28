@@ -22,7 +22,7 @@ export function RecordsCard() {
     mutationFn: fetchRecords,
     onSuccess: (fresh) => {
       setRecords(mergeRecords(usePlan.getState().records, fresh))
-      toast.success(fresh.length ? `${fresh.length} record${fresh.length > 1 ? 's' : ''} trouvé${fresh.length > 1 ? 's' : ''}` : 'Aucune course de ces distances sur 12 mois')
+      toast.success(fresh.length ? `${fresh.length} record${fresh.length > 1 ? 's' : ''} found` : 'No races at these distances in the last 12 months')
     },
     onError: toast.error,
   })
@@ -37,9 +37,9 @@ export function RecordsCard() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-2">
-        <Trophy className="size-5 text-accent" /> Profil coureur
+        <Trophy className="size-5 text-accent" /> Runner profile
       </CardTitle>
-      <CardDescription className="mt-1">Meilleurs temps des 12 derniers mois. Modifiables à la main (h:mm:ss).</CardDescription>
+      <CardDescription className="mt-1">Best times from the last 12 months. You can edit them by hand (h:mm:ss).</CardDescription>
 
       <div className="mt-4 space-y-2">
         {RECORD_DISTANCES.map((d) => {
@@ -55,7 +55,7 @@ export function RecordsCard() {
                 onBlur={(e) => edit(d.key, e.target.value)}
               />
               <span className="w-20 text-right text-xs text-muted-foreground">
-                {r ? (r.source === 'manual' ? 'saisi' : r.date) : vdot ? 'prédiction' : ''}
+                {r ? (r.source === 'manual' ? 'manual' : r.date) : vdot ? 'predicted' : ''}
               </span>
             </div>
           )
@@ -69,7 +69,7 @@ export function RecordsCard() {
             <p className="text-2xl font-medium tabular-nums">{vdot}</p>
           </div>
           <div className="rounded-xl bg-muted p-3">
-            <p className="text-xs text-muted-foreground">Allure seuil estimée</p>
+            <p className="text-xs text-muted-foreground">Estimated threshold pace</p>
             <p className="text-2xl font-medium tabular-nums">{formatPace(thresholdPace(vdot))}</p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export function RecordsCard() {
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Button size="sm" variant="secondary" disabled={!connected || load.isPending} onClick={() => load.mutate()}>
-          {load.isPending ? 'Recherche…' : 'Récupérer (COROS)'}
+          {load.isPending ? 'Searching…' : 'Fetch (COROS)'}
         </Button>
         <Button
           size="sm"
@@ -87,10 +87,10 @@ export function RecordsCard() {
             const pace = thresholdPace(vdot!)
             const n = retuneZones(zonesFromThreshold(pace)).length
             if (profile) setProfile({ ...profile, thresholdPace: pace })
-            toast.success(`Zones recalculées (seuil ${formatPace(pace)}/km)${n ? ` · ${n} séance${n > 1 ? 's' : ''} à venir ajustée${n > 1 ? 's' : ''}` : ''}`)
+            toast.success(`Zones recalculated (threshold ${formatPace(pace)}/km)${n ? ` · ${n} upcoming session${n > 1 ? 's' : ''} adjusted` : ''}`)
           }}
         >
-          Appliquer aux zones
+          Apply to zones
         </Button>
       </div>
     </Card>

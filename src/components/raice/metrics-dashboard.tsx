@@ -48,7 +48,7 @@ export function MetricsDashboard({
   lists,
   actions,
   compareLabel = 'Comparer',
-  emptyLabel = 'Pas encore de données sur cette période.',
+  emptyLabel = 'No data for this period yet.',
   className,
 }: MetricsDashboardProps) {
   const [activeId, setActiveId] = useState(kpis[0]?.id)
@@ -60,7 +60,7 @@ export function MetricsDashboard({
     (ranges && ranges.length > 0 && range !== undefined) || actions ? (
       <>
         {ranges && ranges.length > 0 && range !== undefined && (
-          <Segmented value={range} options={ranges} onChange={(v) => onRangeChange?.(v)} label="Période" />
+          <Segmented value={range} options={ranges} onChange={(v) => onRangeChange?.(v)} label="Period" />
         )}
         {actions}
       </>

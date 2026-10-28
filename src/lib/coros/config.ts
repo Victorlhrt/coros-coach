@@ -8,7 +8,7 @@ export const COACH_BASE = '/app/'
 
 /** URL de retour OAuth : les réglages de l'espace coureur, identique en dev et en prod. */
 export function redirectUrl() {
-  return `${window.location.origin}/compte/settings`
+  return `${window.location.origin}/account/settings`
 }
 
 /** Outils qui modifient le compte COROS : ils passent obligatoirement par `corosWrite`. */

@@ -31,7 +31,7 @@ export function NavUser() {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<button aria-label="Mon compte" className="rounded-full" type="button">
+				<button aria-label="My account" className="rounded-full" type="button">
 					<Avatar className="size-8">
 						<AvatarFallback>{initials(user.name)}</AvatarFallback>
 					</Avatar>
@@ -51,13 +51,13 @@ export function NavUser() {
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
-					<DropdownMenuItem onSelect={() => navigate("/compte")}>
+					<DropdownMenuItem onSelect={() => navigate("/account")}>
 						<UserIcon />
-						Mon espace coureur
+						My runner space
 					</DropdownMenuItem>
 					<DropdownMenuItem onSelect={() => navigate("/admin/administration")}>
 						<ShieldIcon />
-						Accès et réglages
+						Access & settings
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
@@ -66,7 +66,7 @@ export function NavUser() {
 					variant="destructive"
 				>
 					<LogOutIcon />
-					Se déconnecter
+					Log out
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>

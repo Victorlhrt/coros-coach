@@ -2,10 +2,10 @@ import { Check, CloudOff, RefreshCw, Smartphone } from 'lucide-react'
 import type { SyncStatus } from '@/lib/coros/sync'
 
 const META: Record<SyncStatus, { label: string; icon: typeof Check; className: string }> = {
-  synced: { label: 'Sur la montre', icon: Check, className: 'text-session-easy' },
-  modified: { label: 'Modifiée, à renvoyer', icon: RefreshCw, className: 'text-session-tempo' },
-  'not-sent': { label: 'Pas encore envoyée', icon: CloudOff, className: 'text-muted-foreground' },
-  'app-only': { label: 'Dans l’app uniquement', icon: Smartphone, className: 'text-muted-foreground' },
+  synced: { label: 'On your watch', icon: Check, className: 'text-session-easy' },
+  modified: { label: 'Changed, resend needed', icon: RefreshCw, className: 'text-session-tempo' },
+  'not-sent': { label: 'Not sent yet', icon: CloudOff, className: 'text-muted-foreground' },
+  'app-only': { label: 'In the app only', icon: Smartphone, className: 'text-muted-foreground' },
 }
 
 export function SyncBadge({ status, compact = false }: { status: SyncStatus; compact?: boolean }) {

@@ -113,7 +113,7 @@ export function OnboardingPage() {
     return (
       <div className="flex min-h-[70dvh] flex-col justify-center px-2">
         <Sparkles className="size-10 text-accent" />
-        <h1 className="mt-4 text-3xl font-medium tracking-tight">Ton plan se construit</h1>
+        <h1 className="mt-4 text-3xl font-medium tracking-tight">Building your plan</h1>
         <TextShimmer as="p" className="mt-2 text-lg font-medium">{`${progress.step}…`}</TextShimmer>
         <div className="mt-6 h-2 overflow-hidden rounded-full bg-muted">
           <div
@@ -121,7 +121,7 @@ export function OnboardingPage() {
             style={{ width: `${Math.max(8, (progress.done / progress.total) * 100)}%` }}
           />
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">Compte moins d’une minute. Si l’app se recharge, la génération reprend où elle en était.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Takes less than a minute. If the app reloads, generation picks up where it left off.</p>
       </div>
     )
   }
@@ -129,10 +129,10 @@ export function OnboardingPage() {
   return (
     <div className="grid gap-4 pb-6 lg:grid-cols-2">
       <header className="flex items-center gap-2 pt-4 lg:col-span-2">
-        <Link to={ROUTES.today} aria-label="Retour" className="-ml-2 p-2">
+        <Link to={ROUTES.today} aria-label="Back" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="font-heading text-2xl font-medium tracking-tight">Mon objectif</h1>
+        <h1 className="font-heading text-2xl font-medium tracking-tight">My goal</h1>
       </header>
 
       <div className="flex flex-col gap-4 lg:[&>*:last-child]:flex-1">
@@ -140,16 +140,16 @@ export function OnboardingPage() {
         <div className="flex items-center gap-3">
           <Activity className="size-6 text-accent" />
           <div className="flex-1">
-            <CardTitle>Mes données COROS</CardTitle>
-            <CardDescription>Allures, prédictions et volume récent pour calibrer le plan.</CardDescription>
+            <CardTitle>My COROS data</CardTitle>
+            <CardDescription>Paces, predictions and recent volume to calibrate your plan.</CardDescription>
           </div>
         </div>
         {store.profile && (
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <Stat label="Allure seuil" value={store.profile.thresholdPace ? `${formatPace(store.profile.thresholdPace)} /km` : '—'} />
+            <Stat label="Threshold pace" value={store.profile.thresholdPace ? `${formatPace(store.profile.thresholdPace)} /km` : '—'} />
             <Stat label="VO2max" value={store.profile.vo2max ? String(store.profile.vo2max) : '—'} />
-            <Stat label="Volume 4 sem." value={store.volume ? `${store.volume.avg4w} km/sem` : '—'} />
-            <Stat label="Plus longue sortie" value={store.profile.longestRunKm != null ? `${store.profile.longestRunKm} km` : '—'} />
+            <Stat label="4-week volume" value={store.volume ? `${store.volume.avg4w} km/wk` : '—'} />
+            <Stat label="Longest run" value={store.profile.longestRunKm != null ? `${store.profile.longestRunKm} km` : '—'} />
             <p className="col-span-2 text-muted-foreground">{store.profile.notes}</p>
           </dl>
         )}
@@ -159,9 +159,9 @@ export function OnboardingPage() {
           disabled={!connected || readCoros.isPending}
           onClick={() => readCoros.mutate()}
         >
-          {readCoros.isPending ? <TextShimmer>Lecture de tes données…</TextShimmer> : store.profile ? 'Relire mes données' : 'Lire mes données COROS'}
+          {readCoros.isPending ? <TextShimmer>Reading your data…</TextShimmer> : store.profile ? 'Re-read my data' : 'Read my COROS data'}
         </Button>
-        {!connected && <p className="mt-2 text-xs text-muted-foreground">Connecte COROS dans Réglages.</p>}
+        {!connected && <p className="mt-2 text-xs text-muted-foreground">Connect COROS in Settings.</p>}
         {readCoros.error && <p className="mt-2 text-sm text-destructive">{claudeErrorMessage(readCoros.error)}</p>}
       </Card>
         <CourseCard goal={goal} update={update} />
@@ -178,47 +178,47 @@ export function OnboardingPage() {
           </div>
         </Field>
 
-        <Field label="Volume actuel (km par semaine)">
+        <Field label="Current volume (km per week)">
           <Input
             inputMode="numeric"
-            placeholder="ex. 32"
+            placeholder="e.g. 32"
             value={goal.currentWeeklyKm ?? ''}
             onChange={(e) => update({ currentWeeklyKm: Number(e.target.value.replace(',', '.')) || null })}
           />
           <p className="mt-1.5 text-sm text-muted-foreground">
             {store.volume
-              ? `COROS : ${store.volume.avg4w} km/sem sur 4 semaines · mois dernier ${store.volume.lastMonthKm} km (${store.volume.lastMonthWeekly} km/sem) · ce mois-ci ${store.volume.thisMonthKm} km.`
-              : 'Le plan démarre de ce volume. « Lire mes données COROS » le calcule pour toi.'}
+              ? `COROS: ${store.volume.avg4w} km/wk over 4 weeks · last month ${store.volume.lastMonthKm} km (${store.volume.lastMonthWeekly} km/wk) · this month ${store.volume.thisMonthKm} km.`
+              : 'Your plan starts from this volume. “Read my COROS data” calculates it for you.'}
           </p>
         </Field>
 
-        <Field label="Date de course">
+        <Field label="Race date">
           <Input type="date" min={addDays(today(), 28)} value={goal.raceDate} onChange={(e) => update({ raceDate: e.target.value })} />
           <p className={weeks.error ? 'mt-1.5 text-sm text-destructive' : 'mt-1.5 text-sm text-muted-foreground'}>
-            {weeks.error ?? `Plan de ${weeks.weeks.length} semaines à partir du ${weeks.start}.`}
+            {weeks.error ?? `${weeks.weeks.length}-week plan starting ${weeks.start}.`}
           </p>
         </Field>
 
-        <Field label="Temps visé (h:mm:ss, facultatif)">
+        <Field label="Target time (h:mm:ss, optional)">
           <Input inputMode="numeric" placeholder={prediction ? formatClock(prediction) : '0:50:00'} value={targetText} onChange={(e) => setTargetText(e.target.value)} />
           {prediction && (
             <button type="button" className="mt-1.5 text-sm font-medium text-accent" onClick={() => setTargetText(formatClock(prediction))}>
-              Prédiction COROS : {formatClock(prediction)} — utiliser
+              COROS prediction: {formatClock(prediction)} — use it
             </button>
           )}
         </Field>
 
-        <Field label="Niveau">
+        <Field label="Level">
           <div className="grid grid-cols-3 gap-2">
             {(['beginner', 'intermediate', 'advanced'] as const).map((l) => (
               <Chip key={l} active={goal.level === l} onClick={() => update({ level: l })} className="px-2">
-                {{ beginner: 'Débutant', intermediate: 'Inter.', advanced: 'Confirmé' }[l]}
+                {{ beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' }[l]}
               </Chip>
             ))}
           </div>
         </Field>
 
-        <Field label={`Jours disponibles (${goal.days.length})`}>
+        <Field label={`Available days (${goal.days.length})`}>
           <div className="grid grid-cols-7 gap-1.5">
             {WEEKDAYS_SHORT.map((d, i) => (
               <Chip key={i} active={goal.days.includes(i)} onClick={() => toggleDay(i)} className="px-0" aria-label={WEEKDAYS[i]}>
@@ -228,7 +228,7 @@ export function OnboardingPage() {
           </div>
         </Field>
 
-        <Field label="Sortie longue le">
+        <Field label="Long run on">
           <div className="flex flex-wrap gap-2">
             {goal.days.map((d) => (
               <Chip key={d} active={goal.longRunDay === d} onClick={() => update({ longRunDay: d })}>
@@ -239,19 +239,19 @@ export function OnboardingPage() {
         </Field>
 
         <label className="flex items-center justify-between gap-4">
-          <span className="font-medium">Séance de renforcement</span>
+          <span className="font-medium">Strength session</span>
           <input type="checkbox" className="size-6 accent-[var(--accent)]" checked={goal.strength} onChange={(e) => update({ strength: e.target.checked })} />
         </label>
       </Card>
 
       {generate.error && <Card className="text-sm text-destructive whitespace-pre-line lg:col-span-2">{claudeErrorMessage(generate.error)}</Card>}
-      {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground lg:col-span-2">Indique ton volume actuel pour générer le plan.</p>}
+      {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground lg:col-span-2">Enter your current volume to generate your plan.</p>}
 
       <Button className="w-full lg:col-span-2" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate(null)}>
         <Sparkles className="size-5" />
-        {store.plan ? 'Régénérer mon plan' : 'Générer mon plan'}
+        {store.plan ? 'Regenerate my plan' : 'Generate my plan'}
       </Button>
-      {store.plan && <p className="text-center text-xs text-muted-foreground lg:col-span-2">Le plan actuel sera remplacé.</p>}
+      {store.plan && <p className="text-center text-xs text-muted-foreground lg:col-span-2">Your current plan will be replaced.</p>}
     </div>
   )
 }

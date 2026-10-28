@@ -39,7 +39,7 @@ export function predictTime(v: number, meters: number) {
 export const RECORD_DISTANCES = [
   { key: '5k', label: '5 km', meters: 5000 },
   { key: '10k', label: '10 km', meters: 10000 },
-  { key: 'half', label: 'Semi', meters: 21097.5 },
+  { key: 'half', label: 'Half', meters: 21097.5 },
   { key: 'marathon', label: 'Marathon', meters: 42195 },
 ] as const
 export type RecordKey = (typeof RECORD_DISTANCES)[number]['key']

@@ -13,7 +13,7 @@ export function CustomSidebarTrigger() {
 				<SidebarTrigger />
 			</TooltipTrigger>
 			<TooltipContent className="px-2 py-1" side="right">
-				Afficher ou masquer le menu{" "}
+				Toggle sidebar{" "}
 				<KbdGroup>
 					<Kbd>⌘</Kbd>
 					<Kbd>b</Kbd>

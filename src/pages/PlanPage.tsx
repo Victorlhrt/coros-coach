@@ -32,14 +32,14 @@ export function PlanPage() {
         <Card>
           <EmptyState
             icon={CalendarDays}
-            title="Aucun plan"
+            title="No plan yet"
             action={
               <Link to={ROUTES.goal}>
-                <Button>Créer mon plan</Button>
+                <Button>Create my plan</Button>
               </Link>
             }
           >
-            Fixe ton objectif pour générer ton plan semaine par semaine.
+            Set your goal to generate your week-by-week plan.
           </EmptyState>
         </Card>
       </>
@@ -53,11 +53,11 @@ export function PlanPage() {
   return (
     <>
       <PageHeader
-        subtitle={`${plan.weeks.length} semaines · course le ${formatDay(plan.raceDate, { day: 'numeric', month: 'long' })}`}
+        subtitle={`${plan.weeks.length} weeks · race on ${formatDay(plan.raceDate, { day: 'numeric', month: 'long' })}`}
         title={plan.name}
         action={
           <Link to={ROUTES.goal} className="shrink-0 text-sm font-medium text-accent">
-            Objectif
+            Goal
           </Link>
         }
       />
@@ -66,7 +66,7 @@ export function PlanPage() {
         <Card className="mb-4 p-4">
           <details>
             <summary className="flex cursor-pointer list-none items-center justify-between">
-              <span className="font-medium">Parcours et stratégie</span>
+              <span className="font-medium">Course and strategy</span>
               {goal?.course && (
                 <span className="text-sm text-muted-foreground tabular-nums">
                   {goal.course.distanceKm} km · {goal.course.gain} m D+
@@ -81,13 +81,13 @@ export function PlanPage() {
 
       <Card className="p-4">
         <BarChart
-          data={plan.weeks.map((w, i) => ({ key: String(w.number), label: `Semaine ${w.number}`, axisLabel: `S${w.number}`, value: distanceValue(volumes[i], units) }))}
-          label="Volume prévu"
-          period={`${plan.weeks.length} semaines`}
+          data={plan.weeks.map((w, i) => ({ key: String(w.number), label: `Week ${w.number}`, axisLabel: `W${w.number}`, value: distanceValue(volumes[i], units) }))}
+          label="Planned volume"
+          period={`${plan.weeks.length} weeks`}
           unit={distanceUnit(units)}
-          averageLabel="Moyenne par semaine"
-          valueLabel="Volume prévu"
-          categoryLabel="Semaine"
+          averageLabel="Weekly average"
+          valueLabel="Planned volume"
+          categoryLabel="Week"
           showAverage={false}
           height={180}
           formatValue={formatNumber}
@@ -98,7 +98,7 @@ export function PlanPage() {
               key={w.number}
               onClick={() => setSelected(w.number)}
               aria-pressed={w.number === selected}
-              aria-label={`Semaine ${w.number}`}
+              aria-label={`Week ${w.number}`}
               className={cn(
                 'h-8 min-w-8 shrink-0 rounded-full border px-2 text-xs font-medium transition-colors',
                 w.number === selected
@@ -108,7 +108,7 @@ export function PlanPage() {
                     : 'border-[var(--border)] text-[var(--text-secondary)]',
               )}
             >
-              S{w.number}
+              W{w.number}
             </button>
           ))}
         </div>
@@ -118,7 +118,7 @@ export function PlanPage() {
         <div className="flex items-end justify-between px-1">
           <div>
             <p className="text-sm font-medium text-accent">{PHASE_LABEL[week.phase]}</p>
-            <h2 className="text-2xl font-medium tracking-tight">Semaine {week.number}</h2>
+            <h2 className="text-2xl font-medium tracking-tight">Week {week.number}</h2>
           </div>
           <SlotText value={formatDistance(volumes[week.number - 1], units, 0)} className="text-2xl font-medium" />
         </div>
@@ -154,13 +154,13 @@ export function PlanPage() {
           {week.sessions.map((s) => (
             <SessionCard key={s.id} session={s} />
           ))}
-          {week.sessions.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">Semaine de repos.</p>}
+          {week.sessions.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">Rest week.</p>}
         </div>
 
         {week.number === current && (
           <Link to={ROUTES.adjust} className="mt-4 block sm:w-fit">
             <Button variant="secondary" className="w-full sm:px-8">
-              <Wand2 className="size-5" /> Ajuster ma semaine
+              <Wand2 className="size-5" /> Adjust my week
             </Button>
           </Link>
         )}

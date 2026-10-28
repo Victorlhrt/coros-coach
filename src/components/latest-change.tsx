@@ -7,10 +7,10 @@ import { XIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const latestChange = {
-	badge: "BÊTA",
-	title: "Tests A/B d’onboarding",
-	description: "Pondère et compare les parcours.", // TIP: Use a single line of text for the description. (max 5 words)
-	readMore: { href: "/admin/onboardings", label: "Voir les parcours" },
+	badge: "BETA",
+	title: "Onboarding A/B tests",
+	description: "Weight and compare flows.", // TIP: Use a single line of text for the description. (max 5 words)
+	readMore: { href: "/admin/onboardings", label: "View flows" },
 } as const;
 
 export function LatestChange() {
@@ -45,7 +45,7 @@ export function LatestChange() {
 			</Button>
 			<Button
 				className="absolute top-2 right-2 z-10 size-6 rounded-full opacity-0 transition-opacity group-hover/latest-change:opacity-100"
-				aria-label="Masquer"
+				aria-label="Dismiss"
 				onClick={() => setIsOpen(false)}
 				size="icon-sm"
 				variant="ghost"

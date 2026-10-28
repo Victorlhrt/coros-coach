@@ -8,7 +8,7 @@ export function WorkoutChart({ blocks, zones, className }: { blocks: Block[]; zo
   const steps = flatten(blocks, zones)
   const total = steps.reduce((a, s) => a + s.seconds, 0) || 1
   return (
-    <div className={cn('flex h-24 items-end gap-[2px]', className)} role="img" aria-label="Profil d’intensité de la séance">
+    <div className={cn('flex h-24 items-end gap-[2px]', className)} role="img" aria-label="Session intensity profile">
       {steps.map((s, i) => (
         <div
           key={i}

@@ -49,10 +49,10 @@ async function describeLaps(a: Activity) {
 export async function runReview() {
   const store = usePlan.getState()
   const { plan, goal } = store
-  if (!plan || !goal) throw new Error('Crée d’abord un plan.')
+  if (!plan || !goal) throw new Error('Create a plan first.')
   const now = today()
   const week = plan.weeks.find((w) => w.start <= now && w.end >= now)
-  if (!week) throw new Error('Aucune semaine du plan ne couvre aujourd’hui.')
+  if (!week) throw new Error('No plan week covers today.')
 
   const recent = await fetchRecentData()
   const activities = normalizeActivities(recent.querySportRecords)
@@ -116,10 +116,10 @@ export function useWeeklyReview() {
       .then(({ adjustment }) =>
         toast.success(
           adjustment.changes.length > 0
-            ? `Bilan de la semaine prêt : ${adjustment.changes.length} ajustement${adjustment.changes.length > 1 ? 's' : ''} proposé${adjustment.changes.length > 1 ? 's' : ''}`
-            : 'Bilan de la semaine prêt : rien à changer',
+            ? `Weekly review ready: ${adjustment.changes.length} suggested change${adjustment.changes.length > 1 ? 's' : ''}`
+            : 'Weekly review ready: nothing to change',
         ),
       )
-      .catch((err) => toast.error(`Bilan hebdo : ${claudeErrorMessage(err)}`))
+      .catch((err) => toast.error(`Weekly review: ${claudeErrorMessage(err)}`))
   }, [plan, week, reviews, connected, autoReview])
 }

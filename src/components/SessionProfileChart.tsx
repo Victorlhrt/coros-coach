@@ -5,7 +5,7 @@ import type { Block, Zone } from '@/lib/coach/schema'
 import { STEP_LABEL } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
 
-const SERIES = [{ key: 'zone', label: 'Intensité', area: true }]
+const SERIES = [{ key: 'zone', label: 'Intensity', area: true }]
 const SAMPLES = 160
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
@@ -40,12 +40,12 @@ export function SessionProfileChart({ blocks, zones, units, className }: { block
       className={className}
       data={data}
       series={SERIES}
-      label="Profil d’intensité de la séance"
+      label="Session intensity profile"
       height={180}
       max={6}
       legend={false}
       curve="linear"
-      categoryLabel="Temps"
+      categoryLabel="Time"
       formatValue={(v) => `Z${v} ${ZONE_NAMES[v] ?? ''}`}
       formatTick={(v) => (v > 0 && v <= 6 && Number.isInteger(v) ? `Z${v}` : '')}
     />

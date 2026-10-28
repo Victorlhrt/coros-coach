@@ -29,8 +29,8 @@ export function CourseCard({ goal, update }: { goal: Goal; update: (patch: Parti
       <div className="flex items-center gap-3">
         <Mountain className="size-6 text-accent" />
         <div className="flex-1">
-          <CardTitle>Profil de la course</CardTitle>
-          <CardDescription>Importe le GPX pour adapter la préparation au parcours.</CardDescription>
+          <CardTitle>Race course</CardTitle>
+          <CardDescription>Import the GPX to tailor your training to the course.</CardDescription>
         </div>
       </div>
 
@@ -38,14 +38,14 @@ export function CourseCard({ goal, update }: { goal: Goal; update: (patch: Parti
         <div className="mt-4">
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium">{course.name}</p>
-            <button aria-label="Retirer le GPX" className="text-muted-foreground" onClick={() => update({ course: null })}>
+            <button aria-label="Remove GPX" className="text-muted-foreground" onClick={() => update({ course: null })}>
               <X className="size-5" />
             </button>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-center">
             <Stat label="Distance" value={`${course.distanceKm} km`} />
-            <Stat label="D+" value={`${course.gain} m`} />
-            <Stat label="D-" value={`${course.loss} m`} />
+            <Stat label="Gain" value={`${course.gain} m`} />
+            <Stat label="Loss" value={`${course.loss} m`} />
           </div>
           <ElevationChart course={course} className="mt-3" />
           {course.segments.length > 0 && (
@@ -56,10 +56,10 @@ export function CourseCard({ goal, update }: { goal: Goal; update: (patch: Parti
                 .map((s, i) => (
                   <li key={i} className="flex justify-between gap-2">
                     <span className={s.kind === 'climb' ? 'text-accent' : 'text-session-long'}>
-                      {s.kind === 'climb' ? '↗ Montée' : '↘ Descente'} km {s.startKm}–{s.endKm}
+                      {s.kind === 'climb' ? '↗ Climb' : '↘ Descent'} km {s.startKm}–{s.endKm}
                     </span>
                     <span className="tabular-nums text-muted-foreground">
-                      {s.elevation} m · {Math.abs(s.grade)} %
+                      {s.elevation} m · {Math.abs(s.grade)}%
                     </span>
                   </li>
                 ))}
@@ -69,7 +69,7 @@ export function CourseCard({ goal, update }: { goal: Goal; update: (patch: Parti
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3">
           <label className="text-sm text-muted-foreground">
-            Dénivelé + (m)
+            Elevation gain (m)
             <Input className="mt-1" inputMode="numeric" value={goal.elevationGain ?? ''} onChange={(e) => update({ elevationGain: Number(e.target.value) || null })} />
           </label>
           {goal.distance === 'trail' && (
@@ -91,7 +91,7 @@ export function CourseCard({ goal, update }: { goal: Goal; update: (patch: Parti
       </div>
 
       <Button variant="secondary" className="mt-4 w-full" onClick={() => fileInput.current?.click()}>
-        <Upload className="size-4" /> {course ? 'Remplacer le GPX' : 'Importer un GPX'}
+        <Upload className="size-4" /> {course ? 'Replace GPX' : 'Import a GPX'}
       </Button>
       {/* Pas de filtre accept : iOS grise souvent les .gpx sinon. */}
       <input

@@ -50,11 +50,11 @@ export function AdjustPage() {
       const { plan, coros } = usePlan.getState()
       const dates = [...changes.map((c) => c.date), ...repaced]
       if (!coros.created || !plan || dates.length === 0) return 'local'
-      const sent = await pushDays(plan, dates, 'les séances ajustées')
+      const sent = await pushDays(plan, dates, 'the adjusted sessions')
       return sent ? 'sent' : 'local'
     },
     onSuccess: (r) => {
-      toast.success(r === 'sent' ? 'Semaine ajustée et envoyée sur la montre ✓' : 'Semaine ajustée dans l’app')
+      toast.success(r === 'sent' ? 'Week adjusted and sent to your watch ✓' : 'Week adjusted in the app')
       navigate(ROUTES.plan)
     },
     onError: (e) => {
@@ -70,20 +70,20 @@ export function AdjustPage() {
   return (
     <div className="space-y-4 pb-4">
       <header className="flex items-center gap-2 pt-4">
-        <Link to={ROUTES.plan} aria-label="Retour" className="-ml-2 p-2">
+        <Link to={ROUTES.plan} aria-label="Back" className="-ml-2 p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="font-heading text-2xl font-medium tracking-tight">Bilan de la semaine</h1>
+        <h1 className="font-heading text-2xl font-medium tracking-tight">Weekly review</h1>
       </header>
 
       {!result && !analyse.isPending && (
         <Card>
           <CardDescription>
-            Claude compare tes séances prévues avec les activités COROS liées et leurs splits, lit ta récupération, ta HRV, ton sommeil et ta FC de repos, puis
-            propose des changements pour le reste de la semaine. Rien n’est modifié sans ton accord.
+            Pacer compares your planned sessions with your linked COROS activities and their splits, reads your recovery, HRV, sleep and resting HR, then
+            suggests changes for the rest of the week. Nothing changes without your OK.
           </CardDescription>
           <Button className="mt-4 w-full" onClick={() => analyse.mutate()}>
-            <Wand2 className="size-5" /> Analyser ma semaine
+            <Wand2 className="size-5" /> Analyse my week
           </Button>
         </Card>
       )}
@@ -92,7 +92,7 @@ export function AdjustPage() {
       {analyse.isPending && (
         <div className="space-y-3">
           <TextShimmer as="p" className="px-1 text-sm">
-            Lecture des activités, des splits et de la récupération…
+            Reading activities, splits and recovery…
           </TextShimmer>
           <Skeleton className="h-28" />
           <Skeleton className="h-40" />
@@ -104,11 +104,11 @@ export function AdjustPage() {
         <>
           <Card>
             <div className="flex items-center justify-between">
-              <p className="font-medium">Bilan</p>
+              <p className="font-medium">Review</p>
               <p className="text-xs text-muted-foreground">
-                {new Date(review!.createdAt).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
-                {review!.status === 'applied' && ' · appliqué'}
-                {review!.status === 'dismissed' && ' · ignoré'}
+                {new Date(review!.createdAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                {review!.status === 'applied' && ' · applied'}
+                {review!.status === 'dismissed' && ' · dismissed'}
               </p>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{result.summary}</p>
@@ -124,10 +124,10 @@ export function AdjustPage() {
                   onChange={(e) => setUpdateZones(e.target.checked)}
                 />
                 <div>
-                  <p className="font-medium">Nouvelle allure seuil : {formatPace(result.newThresholdPace)} /km</p>
+                  <p className="font-medium">New threshold pace: {formatPace(result.newThresholdPace)} /km</p>
                   <p className="text-sm text-muted-foreground">
-                    {store.profile?.thresholdPace ? `Actuelle : ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalcule tes zones d’allure et les
-                    allures cibles des séances à venir (sauf l’allure course).
+                    {store.profile?.thresholdPace ? `Current: ${formatPace(store.profile.thresholdPace)} /km. ` : ''}Recalculates your pace zones and the
+                    target paces of upcoming sessions (except race pace).
                   </p>
                 </div>
               </label>
@@ -135,7 +135,7 @@ export function AdjustPage() {
           )}
 
           {result.changes.length === 0 ? (
-            <p className="py-4 text-center text-muted-foreground">Aucun changement nécessaire. Continue comme prévu.</p>
+            <p className="py-4 text-center text-muted-foreground">No changes needed. Keep going as planned.</p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
               {result.changes.map((c, i) => (
@@ -160,15 +160,15 @@ export function AdjustPage() {
           {pending && (
             <div className="grid gap-2 sm:grid-cols-2">
               <Button className="w-full" disabled={(chosen.length === 0 && !result.newThresholdPace) || apply.isPending} onClick={() => apply.mutate(chosen)}>
-                {chosen.length > 0 ? `Appliquer ${chosen.length} changement${chosen.length > 1 ? 's' : ''}` : 'Mettre à jour mes zones'}
+                {chosen.length > 0 ? `Apply ${chosen.length} change${chosen.length > 1 ? 's' : ''}` : 'Update my zones'}
               </Button>
               <Button variant="ghost" className="w-full" onClick={() => week && store.setReviewStatus(week.number, 'dismissed')}>
-                Ignorer ce bilan
+                Dismiss this review
               </Button>
             </div>
           )}
           <Button variant="secondary" className="w-full" onClick={() => analyse.mutate()}>
-            <Wand2 className="size-5" /> Analyser à nouveau
+            <Wand2 className="size-5" /> Analyse again
           </Button>
         </>
       )}
@@ -190,7 +190,7 @@ function ChangeCard({
   const { plan, zones } = usePlan()
   const units = useSettings((s) => s.units)
   const before = allSessions(plan).filter((s) => s.date === change.date && s.type !== 'strength')
-  const actionLabel = { replace: 'Modifiée', remove: 'Supprimée', add: 'Ajoutée' }[change.action]
+  const actionLabel = { replace: 'Changed', remove: 'Removed', add: 'Added' }[change.action]
 
   return (
     <Card className={cn('p-4 transition-opacity', !checked && !disabled && 'opacity-50')}>
@@ -204,9 +204,9 @@ function ChangeCard({
         </div>
       </label>
       <div className="mt-3 space-y-1.5">
-        <Version label="Avant" session={before[0] ?? null} zones={zones} units={units} muted />
+        <Version label="Before" session={before[0] ?? null} zones={zones} units={units} muted />
         <ArrowDown className="mx-auto size-4 text-muted-foreground" />
-        <Version label="Après" session={change.session} zones={zones} units={units} />
+        <Version label="After" session={change.session} zones={zones} units={units} />
       </div>
     </Card>
   )
@@ -241,7 +241,7 @@ function Version({
           </p>
         </>
       ) : (
-        <p className="mt-1 font-medium">Repos</p>
+        <p className="mt-1 font-medium">Rest</p>
       )}
     </div>
   )

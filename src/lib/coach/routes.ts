@@ -1,13 +1,13 @@
-/** Adresses du coach dans l'espace coureur (app.raice.run/compte). */
+/** Adresses du coach dans l'espace coureur (app.raice.run/account). */
 export const ROUTES = {
-  today: '/compte/home',
-  plan: '/compte/plan',
-  history: '/compte/analytics',
-  adjust: '/compte/coach',
-  settings: '/compte/settings',
-  goal: '/compte/objectif',
-  debug: '/compte/debug',
-  session: (id: string) => `/compte/seance/${id}`,
+  today: '/account/home',
+  plan: '/account/plan',
+  history: '/account/analytics',
+  adjust: '/account/coach',
+  settings: '/account/settings',
+  goal: '/account/goal',
+  debug: '/account/debug',
+  session: (id: string) => `/account/session/${id}`,
 }
 
 /** Ancienne adresse du coach personnel (/app/#/…) vers sa place dans l'espace coureur. */

@@ -58,8 +58,8 @@ function planDates(plan: Plan) {
 /** Crée le plan complet sur COROS (une seule écriture confirmée). */
 export async function pushPlan(plan: Plan) {
   const now = today()
-  if (plan.startDate < now) throw new Error('Le plan a déjà commencé : COROS n’accepte qu’un début entre aujourd’hui et J+14. Régénère le plan.')
-  if (plan.startDate > addDays(now, 14)) throw new Error(`COROS n’accepte un plan qu’à partir de 14 jours avant son début (${plan.startDate}). Reviens plus tard.`)
+  if (plan.startDate < now) throw new Error('Your plan has already started: COROS only accepts a start date between today and D+14. Regenerate your plan.')
+  if (plan.startDate > addDays(now, 14)) throw new Error(`COROS only accepts a plan from 14 days before it starts (${plan.startDate}). Come back later.`)
 
   const inProgress = await corosRead('queryTrainingPlanLibrary', {}).catch(() => null)
   const hasOther = inProgress !== null && /plan\s*id|planId/i.test(JSON.stringify(inProgress))
@@ -67,9 +67,9 @@ export async function pushPlan(plan: Plan) {
   const result = await corosWrite(
     'createTrainingPlan',
     args,
-    `Créer le plan « ${plan.name} » sur COROS : ${plan.weeks.length} semaines, ${args.courseList.length} séances, à partir du ${plan.startDate}.` +
-      (hasOther ? ' Attention : un autre plan est déjà en cours sur COROS, les dates peuvent se chevaucher.' : '') +
-      ' Le renforcement reste dans l’app (non pris en charge par COROS).',
+    `Create the plan “${plan.name}” on COROS: ${plan.weeks.length} weeks, ${args.courseList.length} sessions, starting ${plan.startDate}.` +
+      (hasOther ? ' Heads-up: another plan is already running on COROS, dates may overlap.' : '') +
+      ' Strength sessions stay in the app (COROS doesn’t support them).',
   )
   if (result === null) return false
 
@@ -84,15 +84,15 @@ export async function pushDays(plan: Plan, dates: string[], label: string) {
   const { coros } = usePlan.getState()
   if (!coros.created) return pushPlan(plan)
   if (!coros.planId) {
-    throw new Error('Plan ID COROS introuvable : impossible de mettre à jour le plan. Ouvre /#/debug et vérifie queryTrainingPlanLibrary.')
+    throw new Error('COROS plan ID not found: can’t update the plan. Open /#/debug and check queryTrainingPlanLibrary.')
   }
   const future = [...new Set(dates)].filter((d) => d >= today()).sort()
-  if (future.length === 0) throw new Error('Ces jours sont passés : rien à envoyer.')
+  if (future.length === 0) throw new Error('These days are in the past: nothing to send.')
 
   const result = await corosWrite(
     'updateTrainingPlan',
     updateDaysArgs(plan, coros.planId, future),
-    `Mettre à jour ${label} sur COROS (${future.length} jour${future.length > 1 ? 's' : ''}). Les jours déjà réalisés sont ignorés par COROS.`,
+    `Update ${label} on COROS (${future.length} day${future.length > 1 ? 's' : ''}). COROS ignores days already completed.`,
   )
   if (result === null) return false
   usePlan.getState().markSynced(hashesFor(plan, future))

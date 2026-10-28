@@ -68,10 +68,14 @@ export interface Plan {
 
 // --- Objectif et profil ---
 
-export const DISTANCES = { '5k': '5 km', '10k': '10 km', half: 'Semi-marathon', marathon: 'Marathon', trail: 'Trail' } as const
+export const DISTANCES = { '5k': '5 km', '10k': '10 km', half: 'Half marathon', marathon: 'Marathon', trail: 'Trail' } as const
+/** Libellés français, réservés aux prompts envoyés à Claude. */
+export const DISTANCES_FR: Record<keyof typeof DISTANCES, string> = { '5k': '5 km', '10k': '10 km', half: 'Semi-marathon', marathon: 'Marathon', trail: 'Trail' }
 export type GoalDistance = keyof typeof DISTANCES
 
-export const TERRAINS = { road: 'Route', mixed: 'Mixte', trail: 'Sentiers / montagne' } as const
+export const TERRAINS = { road: 'Road', mixed: 'Mixed', trail: 'Trail / mountain' } as const
+/** Libellés français, réservés aux prompts envoyés à Claude. */
+export const TERRAINS_FR: Record<keyof typeof TERRAINS, string> = { road: 'Route', mixed: 'Mixte', trail: 'Sentiers / montagne' }
 export type Terrain = keyof typeof TERRAINS
 
 export interface Goal {

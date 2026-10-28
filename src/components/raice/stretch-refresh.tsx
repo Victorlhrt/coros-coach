@@ -198,7 +198,7 @@ export function StretchRefresh({ onRefresh, children, className, threshold = 72,
   }, [y])
 
   const refreshing = phase === 'refreshing'
-  const hint = refreshing ? 'Actualisation…' : phase === 'release' ? 'Relâche pour actualiser' : 'Tire pour actualiser'
+  const hint = refreshing ? 'Refreshing…' : phase === 'release' ? 'Release to refresh' : 'Pull to refresh'
 
   return (
     <div ref={rootRef} className={cn('relative', className)} aria-busy={refreshing}>
@@ -229,7 +229,7 @@ export function StretchRefresh({ onRefresh, children, className, threshold = 72,
         </motion.p>
       </motion.div>
       <span className="sr-only" role="status">
-        {refreshing ? 'Actualisation…' : ''}
+        {refreshing ? 'Refreshing…' : ''}
       </span>
       <motion.div style={{ y }}>{children}</motion.div>
     </div>
@@ -237,7 +237,7 @@ export function StretchRefresh({ onRefresh, children, className, threshold = 72,
 }
 
 /** Bouton rond d'actualisation pour un en-tête de panneau ; l'icône tourne pendant `refreshing`. */
-export function RefreshButton({ refreshing, className, disabled, 'aria-label': ariaLabel = 'Actualiser', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { refreshing?: boolean }) {
+export function RefreshButton({ refreshing, className, disabled, 'aria-label': ariaLabel = 'Refresh', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { refreshing?: boolean }) {
   return (
     <button
       type="button"
