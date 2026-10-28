@@ -111,7 +111,7 @@ function RunCta({ href }: { href: string }) {
 export function HeroSection() {
 	return (
 		<section>
-			<div className="relative flex flex-col items-center justify-center gap-5 px-4 py-12 md:px-4 md:py-24 lg:py-28">
+			<div className="relative flex min-h-[calc(100svh-3.5rem)] flex-col items-center justify-start gap-5 overflow-hidden px-4 pt-12 pb-[min(62vw,22rem)] md:px-4 md:pt-24 lg:min-h-0 lg:justify-center lg:overflow-visible lg:py-28">
 				{/* X Faded Borders & Shades */}
 				{/* Desktop : la photo est calée à droite de l'écran, le coureur hors de la colonne de texte, fondu vers la gauche */}
 				<div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 -z-2 hidden w-screen -translate-x-1/2 overflow-hidden lg:block">
@@ -135,10 +135,10 @@ export function HeroSection() {
 							"blur-[50px]"
 						)}
 					/>
-					<div className="absolute inset-y-0 left-4 w-px bg-linear-to-b from-transparent via-border to-border md:left-8" />
-					<div className="absolute inset-y-0 right-4 w-px bg-linear-to-b from-transparent via-border to-border md:right-8" />
-					<div className="absolute inset-y-0 left-8 w-px bg-linear-to-b from-transparent via-border/50 to-border/50 md:left-12" />
-					<div className="absolute inset-y-0 right-8 w-px bg-linear-to-b from-transparent via-border/50 to-border/50 md:right-12" />
+					<div className="absolute inset-y-0 left-4 hidden w-px lg:block bg-linear-to-b from-transparent via-border to-border md:left-8" />
+					<div className="absolute inset-y-0 right-4 hidden w-px lg:block bg-linear-to-b from-transparent via-border to-border md:right-8" />
+					<div className="absolute inset-y-0 left-8 hidden w-px lg:block bg-linear-to-b from-transparent via-border/50 to-border/50 md:left-12" />
+					<div className="absolute inset-y-0 right-8 hidden w-px lg:block bg-linear-to-b from-transparent via-border/50 to-border/50 md:right-12" />
 				</div>
 				<a
 					className={cn(
@@ -182,11 +182,17 @@ export function HeroSection() {
 					<RunCta href={appHref("/onboarding")} />
 				</div>
 
-				{/* Mobile et tablette : la photo sous le bouton, jamais derrière le texte */}
-				<div aria-hidden="true" className="relative -mx-4 mt-4 h-64 w-screen overflow-hidden sm:h-80 lg:hidden">
-					<img alt="" className="absolute inset-0 size-full object-cover object-[72%_40%] opacity-85" src="/visuals/hero-sm.webp" />
-					<div className="absolute inset-x-0 top-0 h-20 bg-linear-to-b from-background to-transparent" />
-					<div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-background to-transparent" />
+				{/* Mobile et tablette : la photo fait le fond du bas du hero. Son haut est noir et se fond dans la page,
+				    le coureur court en bas à droite sous le texte, sans bande séparée. */}
+				<div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 -z-2 lg:hidden">
+					<img
+						alt=""
+						className="fade-in relative left-1/2 w-[max(165%,40rem)] max-w-none -translate-x-[58%] animate-in opacity-85 duration-1000 sm:w-[120%] sm:-translate-x-1/2"
+						fetchPriority="high"
+						src="/visuals/hero-sm.webp"
+					/>
+					<div className="absolute inset-x-0 top-0 h-1/2 bg-linear-to-b from-background to-transparent" />
+					<div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent" />
 				</div>
 			</div>
 		</section>
