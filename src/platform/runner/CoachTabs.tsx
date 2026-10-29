@@ -1,10 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BarChart } from '@/components/arc/bar-chart/bar-chart'
 import { ActivityTerrain } from '@/components/raice/activity-terrain'
-import { HorizonChart } from '@/components/raice/horizon-chart'
 import { MetricsDashboard, type Kpi } from '@/components/raice/metrics-dashboard'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { RefreshButton, StretchRefresh } from '@/components/raice/stretch-refresh'
@@ -23,12 +22,12 @@ import { useActivities } from '@/lib/coros/activity-hooks'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
-import { INTENSITY, WEEKDAY_LABELS, baselineDeviation, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weekRings, weeklyMetrics } from './coach-data'
+import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weekRings, weeklyMetrics } from './coach-data'
 
 /**
  * Onglets du coach dans l'espace coureur, construits avec les panneaux Raice (style Arc) :
  * Home (séance du jour, objectif, anneaux de la semaine), Plan (semaine jour par jour, terrain du plan)
- * et Analytics (indicateurs, écart à la moyenne).
+ * et Analytics › Runs (indicateurs, journal).
  */
 
 const RING_COLORS = { volume: '#6c7cf5', sessions: '#f2a33a', time: '#43b581' }
@@ -636,7 +635,6 @@ export function AnalyticsDashboards() {
         .filter((r) => r.value > 0)
         .sort((a, b) => b.value - a.value)
     : []
-  const horizon = baselineDeviation(acts, now)
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -665,16 +663,6 @@ export function AnalyticsDashboards() {
           ) : undefined
         }
       />
-      {acts.length > 0 && (
-        <HorizonChart
-          title="Compared to your average"
-          subtitle="Volume, duration, runs and pace over a rolling 7 days, compared to your last 6 weeks"
-          series={horizon.series}
-          pointLabels={horizon.pointLabels}
-          defaultBands={3}
-          format={(v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}%`}
-        />
-      )}
       <ActivityLog />
     </div>
   )
@@ -686,6 +674,7 @@ function ActivityLog() {
   const units = useSettings((s) => s.units)
   const activities = useActivities()
   const [now] = useState(today)
+  const [open, setOpen] = useState(false)
   const acts = activities.data?.activities ?? []
   const byLabel = new Map(allSessions(plan).flatMap((s) => (links[s.id]?.labelId ? [[links[s.id].labelId as string, s] as const] : [])))
   const missed = allSessions(plan).filter((s) => s.date < now && s.date >= addDays(now, -42) && isRun(s) && !isDone(s, links, feedback))
@@ -694,9 +683,19 @@ function ActivityLog() {
     ...missed.map((s) => ({ date: s.date, activity: undefined, session: s })),
   ].sort((a, b) => b.date.localeCompare(a.date))
   if (!rows.length) return null
+  const done = rows.filter((r) => r.activity).length
+  const missedCount = rows.length - done
   return (
     <Panel>
-      <PanelHeader title="Log" subtitle="Your runs over the last 6 weeks, compared to the plan" />
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between gap-4 text-left transition-colors hover:bg-foreground/[0.02]">
+        <PanelHeader
+          title="Log"
+          subtitle={`${done} run${done > 1 ? 's' : ''}${missedCount ? ` · ${missedCount} missed` : ''} over the last 6 weeks, compared to the plan`}
+          className="flex-1"
+        />
+        <ChevronDown className={`mr-6 size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
       <div className="divide-y border-t">
         {rows.map((r, i) => {
           const target = r.session ? sessionTotals(r.session, zones) : null
@@ -734,6 +733,7 @@ function ActivityLog() {
           )
         })}
       </div>
+      )}
     </Panel>
   )
 }

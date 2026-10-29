@@ -30,7 +30,15 @@ const PRICES: (Price & { prefix: string })[] = [
 // Modèle inconnu : on compte au prix le plus haut plutôt que de sous-estimer.
 const FALLBACK: Price = { input: 10, output: 50 }
 
-export type Usage = { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
+export type Usage = {
+  input_tokens?: number
+  output_tokens?: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+  /** Recherches web côté serveur (10 $ les 1 000), facturées en plus des tokens. */
+  server_tool_use?: { web_search_requests?: number } | null
+}
+const WEB_SEARCH_USD = 0.01
 
 export function costUsd(model: string, u: Usage) {
   const p: Price = PRICES.find((x) => model.startsWith(x.prefix)) ?? FALLBACK
@@ -40,7 +48,8 @@ export function costUsd(model: string, u: Usage) {
       (u.output_tokens ?? 0) * p.output +
       (u.cache_creation_input_tokens ?? 0) * p.input * 1.25 +
       (u.cache_read_input_tokens ?? 0) * cacheRead) /
-    1_000_000
+      1_000_000 +
+    (u.server_tool_use?.web_search_requests ?? 0) * WEB_SEARCH_USD
   )
 }
 

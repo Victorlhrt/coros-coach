@@ -8,6 +8,8 @@ export interface Activity {
   meters: number | null
   seconds: number | null
   paceSecPerKm: number | null
+  /** Fréquence cardiaque moyenne (bpm), quand COROS la donne. */
+  avgHr: number | null
 }
 
 export type Obj = Record<string, unknown>
@@ -125,6 +127,7 @@ export function normalizeActivities(raw: unknown): Activity[] {
         meters,
         seconds,
         paceSecPerKm: pace,
+        avgHr: num(pick(o, /^(avg|average).?(heart.?rate|hr)$/i)),
       }
     })
     .filter((a): a is Activity => a !== null)

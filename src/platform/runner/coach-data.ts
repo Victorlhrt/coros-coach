@@ -117,38 +117,3 @@ export function weeklyMetrics(starts: string[], activities: Activity[], plan: Pl
     }
   })
 }
-
-/**
- * Écart à la moyenne, jour par jour, sur une fenêtre glissante de 7 jours : volume, durée, sorties,
- * allure (positive quand on court plus vite que d'habitude). En %, pour le graphique horizon.
- */
-export function baselineDeviation(activities: Activity[], now: string, days = 42) {
-  const dates = Array.from({ length: days }, (_, i) => addDays(now, i - days + 1))
-  const rolling = (f: (acts: Activity[]) => number) =>
-    dates.map((d) => {
-      const from = addDays(d, -6)
-      return f(activities.filter((a) => a.date >= from && a.date <= d))
-    })
-  const pace = (acts: Activity[]) => {
-    const m = sumBy(acts, (a) => (a.paceSecPerKm ? (a.meters ?? 0) : 0))
-    return m > 0 ? sumBy(acts, (a) => (a.paceSecPerKm ?? 0) * (a.meters ?? 0)) / m : 0
-  }
-  const series = [
-    { id: 'km', name: 'Volume', raw: rolling((a) => sumBy(a, (x) => x.meters ?? 0)), invert: false },
-    { id: 'time', name: 'Duration', raw: rolling((a) => sumBy(a, (x) => x.seconds ?? 0)), invert: false },
-    { id: 'runs', name: 'Runs', raw: rolling((a) => a.length), invert: false },
-    { id: 'pace', name: 'Pace', raw: rolling(pace), invert: true },
-  ]
-  return {
-    pointLabels: dates.map((d) => formatDay(d, { weekday: 'short', day: 'numeric', month: 'short' })),
-    series: series.map(({ id, name, raw, invert }) => {
-      const usable = raw.filter((v) => v > 0)
-      const avg = usable.length ? sumBy(usable, (v) => v) / usable.length : 0
-      return {
-        id,
-        name,
-        values: raw.map((v) => (avg > 0 && v > 0 ? Math.round(((invert ? avg - v : v - avg) / avg) * 100) : 0)),
-      }
-    }),
-  }
-}

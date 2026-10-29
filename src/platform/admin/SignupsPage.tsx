@@ -44,7 +44,7 @@ export function SignupsPage() {
     queryFn: () => api<UserRow[]>(`/admin/users${status === 'all' ? '' : `?status=${status}`}`),
   })
   const update = useMutation({
-    mutationFn: ({ id, ...patch }: { id: string; status?: UserStatus; role?: UserRole }) => api(`/admin/users/${id}`, { method: 'PATCH', body: patch }),
+    mutationFn: ({ id, ...patch }: { id: string; status?: UserStatus }) => api(`/admin/users/${id}`, { method: 'PATCH', body: patch }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   })
   const remove = useMutation({
@@ -93,9 +93,6 @@ export function SignupsPage() {
                 Suspend
               </Button>
             )}
-            <Button size="xs" variant="ghost" onClick={() => update.mutate({ id: u.id, role: u.role === 'admin' ? 'runner' : 'admin' })}>
-              {u.role === 'admin' ? 'Remove admin' : 'Make admin'}
-            </Button>
             <Button
               size="xs"
               variant="ghost"

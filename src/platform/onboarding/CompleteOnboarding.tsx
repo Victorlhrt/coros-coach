@@ -79,6 +79,14 @@ type UtmbProfile = {
   }[]
 }
 type Shoe = { id: string; brand: string; model: string; use: string }
+/** Profil public trouvé en ligne par le serveur (sites de résultats hors UTMB). */
+type WebProfile = {
+  found: boolean
+  summary: string | null
+  sources: { site: string; url: string; title: string }[]
+  results: { date: string | null; race: string; distance: string | null; time: string | null; rank: string | null; url: string | null }[]
+  photos: { url: string; source: string; pageUrl: string | null }[]
+}
 
 type StepProps = {
   answers: CompleteAnswers
@@ -93,6 +101,12 @@ export type CompleteAnswers = {
   connected?: string[]
   identity?: { firstName: string; lastName: string; email: string }
   utmb?: { uri: string; name: string; index?: number | null } | null
+  /** Ville où la personne court (lue aussi par le classement par ville). */
+  city?: string
+  /** Photo de profil confirmée par la personne (« C'est moi ») : Gravatar, UTMB ou trouvée en ligne. `null` : aucune. */
+  photoUrl?: string | null
+  /** Résultats trouvés en ligne et confirmés par la personne. */
+  online?: { summary: string | null; sources: WebProfile['sources']; results: WebProfile['results'] } | null
   goal?: {
     type: string
     terrain: 'road' | 'trail'
@@ -129,13 +143,14 @@ export type CompleteAnswers = {
 }
 
 const STEPS = [
+  { id: 'identity', label: 'You' },
   { id: 'reason', label: 'Motivation' },
   { id: 'watch', label: 'Watch' },
   { id: 'wearables', label: 'Model' },
   { id: 'connect', label: 'Connect' },
   { id: 'nowatch', label: 'Data' },
   { id: 'strava', label: 'Strava' },
-  { id: 'identity', label: 'Profile' },
+  { id: 'profile', label: 'Profile' },
   { id: 'about', label: 'About you' },
   { id: 'experience', label: 'Experience' },
   { id: 'goal', label: 'Goal' },
@@ -290,6 +305,9 @@ const DURATIONS = [
   { value: '60', label: '1 h' },
   { value: '90', label: '1 h 30 or more' },
 ]
+/** Villes proposées d'office ; « Other » ouvre une saisie libre. */
+const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille', 'Toulouse', 'Nantes', 'Annecy', 'Chamonix', 'Grenoble']
+const OTHER_CITY = '__other'
 const MANUAL_DISTANCES = [
   { value: '5', label: '5 km' },
   { value: '10', label: '10 km' },
@@ -308,7 +326,7 @@ export function CompleteOnboarding({
   sessionId: string | null
   preview: boolean
   ready: boolean
-  onSave: (answers: CompleteAnswers, stepReached: number) => Promise<void>
+  onSave: (answers: CompleteAnswers, stepReached: number, stepId: string) => Promise<void>
   onComplete: (answers: CompleteAnswers) => Promise<void>
 }) {
   const [index, setIndex] = useState(0)
@@ -319,6 +337,19 @@ export function CompleteOnboarding({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const patch = (p: Partial<CompleteAnswers>) => setA((cur) => ({ ...cur, ...p }))
+  const qc = useQueryClient()
+
+  /**
+   * Première étape envoyée : le lead est enregistré (hors aperçu), puis la photo Gravatar et la recherche en ligne
+   * partent en arrière-plan pour être prêtes à l'étape Profil. Un échec ne bloque jamais le parcours.
+   */
+  async function captureLead(id: NonNullable<CompleteAnswers['identity']>) {
+    if (!sessionId) return
+    const person = { firstName: id.firstName.trim(), lastName: id.lastName.trim(), email: id.email.trim().toLowerCase() }
+    if (!preview) await api('/onboarding/leads', { body: { sessionId, ...person } }).catch(() => null)
+    void qc.prefetchQuery(gravatarQuery(person.email))
+    void qc.prefetchQuery(webProfileQuery(sessionId, person))
+  }
   // « M'entraîner » n'a pas de course à choisir : l'étape Course disparaît du fil.
   const flow = STEPS.filter((s) => {
     if (s.id === 'target') return a.goal?.type !== 'train'
@@ -336,7 +367,8 @@ export function CompleteOnboarding({
     connect: true,
     strava: true,
     identity: !!a.identity?.firstName.trim() && !!a.identity.lastName.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a.identity.email.trim()),
-    about: true,
+    profile: true,
+    about: !!a.city?.trim(),
     experience: !!a.experience,
     days: (a.schedule?.days.length ?? 0) > 0,
     duration: !!a.session_max,
@@ -356,7 +388,8 @@ export function CompleteOnboarding({
     setError('')
     try {
       const flat = withPlanFields({ ...a, ...extra })
-      await onSave(flat, index + 1)
+      if (step.id === 'identity' && flat.identity) await captureLead(flat.identity)
+      await onSave(flat, index + 1, step.id)
       setA(flat)
       setIndex(index + 1)
     } catch (e) {
@@ -473,6 +506,7 @@ export function CompleteOnboarding({
               {step.id === 'connect' && <ConnectStep answers={a} patch={patch} sessionId={sessionId} />}
               {step.id === 'strava' && <StravaImport answers={a} patch={patch} />}
               {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
+              {step.id === 'profile' && <ProfileStep answers={a} patch={patch} sessionId={sessionId} />}
               {step.id === 'about' && <AboutStep answers={a} patch={patch} />}
               {step.id === 'days' && <DaysStep answers={a} patch={patch} />}
               {step.id === 'target' && <TargetStep answers={a} patch={patch} />}
@@ -565,8 +599,10 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
   const race = a.goal?.race
   const h = a.health
   switch (step) {
+    case 'identity':
+      return ['Hi! I’m Pacer, your running coach.', 'First, let’s get to know each other: your first name, last name and email.']
     case 'reason':
-      return ['Hi! I’m Pacer, your running coach.', 'Before I build your plan, tell me: what brings you here?']
+      return [`Nice to meet you${first ? `, ${first}` : ''}!`, 'Before I build your plan, tell me: what brings you here?']
     case 'watch':
       return [REASON_PRAISE[a.reason ?? ''] ?? 'Got it.', 'Do you run with a watch or another wearable?']
     case 'wearables':
@@ -581,7 +617,7 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
       return ['No problem.', 'Do you log your runs on Strava, or do you run without tracking anything?']
     case 'strava':
       return ['Strava will do just fine.', 'Import your history: I use it to calibrate your plan and your paces.']
-    case 'identity': {
+    case 'profile': {
       const w = a.wearables ?? []
       const st = a.strava
       const praise = st
@@ -593,16 +629,18 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
             : w.some((x) => x === 'coros' || x === 'garmin')
               ? 'No problem, you can connect your watch later from your account.'
               : 'Noted, I’ll let you know as soon as your watch is supported.'
-      return [praise, 'Let’s get to know each other. Your first name, last name and email. I’ll also check whether you have any public results.']
+      return [praise, 'I also looked for your public race results online, on UTMB and other results sites. Is this you?']
     }
     case 'about':
       return [
         a.utmb?.index
-          ? `Nice to meet you, ${first}! UTMB index ${a.utmb.index}, impressive record.`
-          : a.utmb
-            ? `Nice to meet you, ${first}! I found your UTMB profile, I’ll use it.`
-            : `Nice to meet you${first ? `, ${first}` : ''}!`,
-        'To set your zones and paces: are you a woman or a man, and what year were you born? Both are optional.',
+          ? `UTMB index ${a.utmb.index}, impressive record.`
+          : a.utmb || a.online
+            ? 'Great, I’ll use your results to calibrate your plan.'
+            : a.photoUrl
+              ? 'Nice photo, I’ve added it to your profile.'
+              : 'No problem, we’ll start from your answers.',
+        'Where do you usually run? And to set your zones and paces: are you a woman or a man, and what year were you born? Those two are optional.',
       ]
     case 'experience':
       return [
@@ -687,10 +725,18 @@ function summarize(step: string, a: CompleteAnswers): string {
       return a.strava ? `Strava history imported (${a.strava.runs} runs)` : 'I’ll import it later'
     case 'identity': {
       const id = a.identity
-      return id ? `${id.firstName} ${id.lastName} · ${id.email}${a.utmb ? ' · that’s me on UTMB' : ''}` : '—'
+      return id ? `${id.firstName} ${id.lastName} · ${id.email}` : '—'
+    }
+    case 'profile': {
+      const parts = [a.utmb ? 'That’s me on UTMB' : null, a.online ? 'These results are mine' : null, a.photoUrl ? 'Use this photo' : null].filter(Boolean)
+      return parts.length ? parts.join(' · ') : 'No public profile for me'
     }
     case 'about': {
-      const parts = [SEXES.find((x) => x.value === a.about?.sex && x.value !== 'x')?.label, a.about?.birthYear ? `born in ${a.about.birthYear}` : null].filter(Boolean)
+      const parts = [
+        a.city ? `I run in ${a.city}` : null,
+        SEXES.find((x) => x.value === a.about?.sex && x.value !== 'x')?.label,
+        a.about?.birthYear ? `born in ${a.about.birthYear}` : null,
+      ].filter(Boolean)
       return parts.length ? parts.join(' · ') : 'I’d rather skip'
     }
     case 'experience':
@@ -767,6 +813,7 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
     weekly_km: a.health?.weeklyKm,
     days: a.schedule?.days ?? a.days,
     level: EXPERIENCES.find((e) => e.value === a.experience)?.level ?? a.level,
+    city: a.city?.trim() || undefined,
   }
 }
 
@@ -962,21 +1009,56 @@ function useDebounced<T>(value: T, ms = 400) {
   return v
 }
 
+type Person = { firstName: string; lastName: string; email: string }
+
+/** Photo Gravatar de l'e-mail (sans photo : `url: null`). */
+const gravatarQuery = (email: string) => ({
+  queryKey: ['gravatar', email],
+  queryFn: () => api<{ url: string | null }>(`/lookup/gravatar?email=${encodeURIComponent(email)}`),
+  staleTime: Infinity,
+  retry: false,
+})
+
+/** Recherche en ligne des résultats publics (lente : jusqu'à ~90 s côté serveur). `profile: null` quand elle n'a rien donné. */
+const webProfileQuery = (sessionId: string, p: Person) => ({
+  queryKey: ['web-profile', p.email, p.firstName.toLowerCase(), p.lastName.toLowerCase()],
+  queryFn: () => api<{ profile: WebProfile | null }>('/lookup/web-profile', { body: { sessionId, ...p } }),
+  staleTime: Infinity,
+  retry: false,
+})
+
 function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: Partial<CompleteAnswers>) => void }) {
   const id = answers.identity ?? { firstName: '', lastName: '', email: '' }
   const set = (p: Partial<typeof id>) => patch({ identity: { ...id, ...p } })
-  const fullName = useDebounced(`${id.firstName} ${id.lastName}`.trim())
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Input label="First name" autoComplete="given-name" value={id.firstName} onChange={(e) => set({ firstName: e.target.value })} />
+        <Input label="Last name" autoComplete="family-name" value={id.lastName} onChange={(e) => set({ lastName: e.target.value })} />
+      </div>
+      <Input label="Email" type="email" autoComplete="email" placeholder="name@example.com" value={id.email} onChange={(e) => set({ email: e.target.value })} />
+      <p className="text-muted-foreground text-xs">I’ll use them to save your plan and to look for your public race results.</p>
+    </>
+  )
+}
+
+// ---------- Profil public : UTMB, résultats en ligne, photo ----------
+
+function ProfileStep({ answers, patch, sessionId }: StepProps & { sessionId: string | null }) {
+  const id = answers.identity ?? { firstName: '', lastName: '', email: '' }
+  const person: Person = { firstName: id.firstName.trim(), lastName: id.lastName.trim(), email: id.email.trim().toLowerCase() }
+  const fullName = `${person.firstName} ${person.lastName}`.trim()
   const qc = useQueryClient()
-  const typedName = `${id.firstName} ${id.lastName}`.trim()
-  const canSearch = id.firstName.trim().length >= 2 && id.lastName.trim().length >= 2
+  const canSearch = person.firstName.length >= 2 && person.lastName.length >= 2
   const runners = useQuery({
     queryKey: ['utmb', 'runners', fullName],
-    // Un temps de recherche minimal : le résultat ne surgit pas pendant qu'on tape encore.
+    // Un temps de recherche minimal : le résultat ne surgit pas d'un coup.
     queryFn: () => Promise.all([api<UtmbRunner[]>(`/lookup/utmb/runners?q=${encodeURIComponent(fullName)}`), new Promise((r) => window.setTimeout(r, 1400))]).then(([r]) => r),
     enabled: canSearch,
     staleTime: Infinity,
   })
-  const searching = canSearch && (runners.isFetching || typedName !== fullName)
+  const gravatar = useQuery({ ...gravatarQuery(person.email), enabled: !!person.email })
+  const web = useQuery({ ...webProfileQuery(sessionId ?? '', person), enabled: !!sessionId && canSearch && !!person.email })
 
   function pick(uri: string) {
     if (uri === 'none') return patch({ utmb: null })
@@ -990,15 +1072,19 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
     })
   }
 
+  // Photos candidates : jamais utilisées sans un « C'est moi » explicite.
+  const utmbPick = runners.data?.find((r) => r.uri === answers.utmb?.uri)
+  const photos = [
+    gravatar.data?.url ? { url: gravatar.data.url, source: 'Gravatar' } : null,
+    utmbPick?.picture ? { url: utmbPick.picture, source: 'UTMB' } : null,
+    ...(web.data?.profile?.photos ?? []).map((p) => ({ url: p.url, source: p.source })),
+  ].filter((p, i, all): p is { url: string; source: string } => !!p && all.findIndex((x) => x?.url === p.url) === i)
+  const profile = web.data?.profile
+  const online = profile?.found ? profile : null
+
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="First name" autoComplete="given-name" value={id.firstName} onChange={(e) => set({ firstName: e.target.value })} />
-        <Input label="Last name" autoComplete="family-name" value={id.lastName} onChange={(e) => set({ lastName: e.target.value })} />
-      </div>
-      <Input label="Email" type="email" autoComplete="email" placeholder="name@example.com" value={id.email} onChange={(e) => set({ email: e.target.value })} />
-
-      {searching ? (
+      {runners.isFetching ? (
         <div className="flex flex-col gap-3">
           <TextShimmer as="p" className="text-sm">
             Looking for your UTMB profile…
@@ -1013,8 +1099,114 @@ function IdentityStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
         runners.data &&
         runners.data.length > 0 && <UtmbPicker runners={runners.data.slice(0, 6)} value={answers.utmb?.uri ?? (answers.utmb === null ? 'none' : null)} onPick={pick} />
       )}
-      <p className="text-muted-foreground text-xs">Road runner? FFA running index isn’t linked yet. You can add a recent time at the estimate step.</p>
+
+      {web.isFetching ? (
+        <TextShimmer as="p" className="text-sm">
+          Searching results sites (ITRA, Betrail, FFA, DUV…). You can carry on, it’s optional.
+        </TextShimmer>
+      ) : (
+        online && (
+          <OnlineResults
+            profile={online}
+            value={answers.online === undefined ? null : !!answers.online}
+            onPick={(mine) => patch({ online: mine ? { summary: online.summary, sources: online.sources, results: online.results } : null })}
+          />
+        )
+      )}
+
+      {photos.length > 0 && <PhotoPicker photos={photos} name={fullName} value={answers.photoUrl} onPick={(photoUrl) => patch({ photoUrl })} />}
+
+      {!runners.isFetching && !web.isFetching && !runners.data?.length && !online && photos.length === 0 && (
+        <p className="text-muted-foreground text-sm">I didn’t find any public profile under your name. No problem, we’ll go from your answers.</p>
+      )}
+      <p className="text-muted-foreground text-xs">Road runner? You can also add a recent time at the estimate step.</p>
     </>
+  )
+}
+
+/** Résultats trouvés en ligne : la personne confirme qu'il s'agit bien d'elle. */
+function OnlineResults({ profile, value, onPick }: { profile: WebProfile; value: boolean | null; onPick: (mine: boolean) => void }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-[18px] border bg-background p-4">
+      <div className="flex items-center gap-2">
+        <CompassIcon className="size-4 text-muted-foreground" />
+        <span className="font-medium text-sm">Are these your results?</span>
+      </div>
+      {profile.summary && <p className="text-muted-foreground text-sm">{profile.summary}</p>}
+      {profile.results.length > 0 && (
+        <ul className="flex flex-col gap-1.5 text-sm">
+          {profile.results.slice(0, 5).map((r, i) => (
+            <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <span>
+                {r.race}
+                {r.distance ? <span className="text-muted-foreground"> · {r.distance}</span> : null}
+              </span>
+              <span className="text-muted-foreground text-xs tabular-nums">{[r.time, r.rank, r.date?.slice(0, 4)].filter(Boolean).join(' · ')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {profile.sources.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          {profile.sources.map((src) => (
+            <a key={src.url} href={src.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-muted-foreground underline underline-offset-2 hover:text-foreground">
+              {src.site || new URL(src.url).hostname} <ExternalLinkIcon className="size-3" />
+            </a>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Button type="button" size="sm" variant={value === true ? undefined : 'secondary'} onClick={() => onPick(true)}>
+          {value === true && <CheckIcon className="size-4" />} That’s me
+        </Button>
+        <Button type="button" size="sm" variant={value === false ? undefined : 'ghost'} onClick={() => onPick(false)}>
+          Not me
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Photos trouvées (Gravatar, UTMB, en ligne) : aucune n'est gardée sans confirmation. */
+function PhotoPicker({ photos, name, value, onPick }: { photos: { url: string; source: string }[]; name: string; value: string | null | undefined; onPick: (url: string | null) => void }) {
+  const [broken, setBroken] = useState<string[]>([])
+  const shown = photos.filter((p) => !broken.includes(p.url))
+  if (!shown.length) return null
+  const ring = (on: boolean) => (on ? 'border-foreground ring-2 ring-foreground/30' : 'border-border hover:border-foreground/50')
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="font-medium text-sm">Is this you? I’ll use it as your profile photo.</span>
+      <div className="flex flex-wrap gap-3">
+        {shown.map((p) => (
+          <button
+            key={p.url}
+            type="button"
+            aria-pressed={value === p.url}
+            aria-label={`Use the ${p.source} photo`}
+            onClick={() => onPick(p.url)}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <span className={`relative block size-20 overflow-hidden rounded-full border transition-all ${ring(value === p.url)}`}>
+              <img src={p.url} alt={`${name}, ${p.source}`} className="size-full object-cover" referrerPolicy="no-referrer" onError={() => setBroken((b) => [...b, p.url])} />
+              {value === p.url && (
+                <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full bg-white text-black">
+                  <CheckIcon className="size-3" />
+                </span>
+              )}
+            </span>
+            <span className="text-muted-foreground text-xs">{p.source}</span>
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        aria-pressed={value === null}
+        onClick={() => onPick(null)}
+        className={`rounded-[18px] border border-dashed p-3 text-muted-foreground text-sm transition-all ${value === null ? 'border-foreground text-foreground' : 'hover:text-foreground'}`}
+      >
+        None of these is me
+      </button>
+    </div>
   )
 }
 
@@ -1095,8 +1287,21 @@ function AboutStep({ answers, patch }: StepProps) {
   const set = (p: Partial<typeof ab>) => patch({ about: { ...ab, ...p } })
   const year = new Date().getFullYear()
   const [yearText, setYearText] = useState('')
+  const preset = CITIES.includes(answers.city ?? '')
+  const [other, setOther] = useState(!!answers.city && !preset)
   return (
     <>
+      <ChipGroup
+        label="City you run in"
+        multiple={false}
+        options={[...CITIES.map((c) => ({ value: c, label: c })), { value: OTHER_CITY, label: 'Other' }]}
+        value={other ? [OTHER_CITY] : answers.city ? [answers.city] : []}
+        onValueChange={([v]) => {
+          setOther(v === OTHER_CITY)
+          patch({ city: v && v !== OTHER_CITY ? v : '' })
+        }}
+      />
+      {other && <Input label="Your city" autoComplete="address-level2" placeholder="E.g. Montpellier" value={answers.city ?? ''} onChange={(e) => patch({ city: e.target.value })} />}
       <ChipGroup label="Sex" multiple={false} options={SEXES} value={ab.sex ? [ab.sex] : []} onValueChange={([sex]) => set({ sex: sex ?? null })} />
       <Input
         label="Year of birth"

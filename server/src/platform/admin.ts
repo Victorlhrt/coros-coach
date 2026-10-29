@@ -78,7 +78,6 @@ adminRoutes.get('/users', async (c) => {
 
 const UserPatch = z.object({
   status: z.enum(['waitlist', 'active', 'suspended']).optional(),
-  role: z.enum(['runner', 'admin']).optional(),
   notes: z.string().max(2000).nullable().optional(),
 })
 
@@ -88,14 +87,13 @@ adminRoutes.patch('/users/:id', async (c) => {
   const parsed = UserPatch.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: 'Invalid request' }, 400)
   const patch = parsed.data
-  if (id === me.id && (patch.role === 'runner' || (patch.status && patch.status !== 'active'))) {
+  if (id === me.id && patch.status && patch.status !== 'active') {
     return c.json({ error: 'You can’t remove your own admin rights.' }, 400)
   }
   const [before] = await db<{ status: string }[]>`select status from users where id = ${id}`
   const [row] = await db`
     update users set
       status = coalesce(${patch.status ?? null}, status),
-      role = coalesce(${patch.role ?? null}, role),
       notes = case when ${patch.notes !== undefined} then ${patch.notes ?? null} else notes end
     where id = ${id}
     returning id, email, name, status, role`
@@ -132,6 +130,35 @@ adminRoutes.get('/export/users.csv', async (c) => {
   await audit(c.get('user').id, 'users.export', null, { rows: rows.length })
   c.header('content-type', 'text/csv; charset=utf-8')
   c.header('content-disposition', `attachment; filename="users-${new Date().toISOString().slice(0, 10)}.csv"`)
+  return c.body(csv)
+})
+
+// ---------- Leads ----------
+
+const LEAD_COLUMNS = ['email', 'first_name', 'last_name', 'city', 'source', 'invite_code', 'step_reached', 'last_step', 'completed_at', 'signed_up', 'created_at', 'updated_at']
+
+adminRoutes.get('/leads', async (c) => {
+  const rows = await db`
+    select l.id, l.email, l.first_name, l.last_name, l.city, l.source, l.invite_code, l.step_reached, l.last_step,
+           l.completed_at, l.photo_url, l.user_id, (l.user_id is not null) signed_up, l.created_at, l.updated_at,
+           coalesce(jsonb_array_length(l.web_profile->'results'), 0)::int web_results
+    from leads l order by l.created_at desc limit 2000`
+  return c.json(rows)
+})
+
+adminRoutes.get('/export/leads.csv', async (c) => {
+  const rows = await db<Record<string, unknown>[]>`
+    select email, first_name, last_name, city, source, invite_code, step_reached, last_step, completed_at,
+           (user_id is not null) signed_up, created_at, updated_at
+    from leads order by created_at`
+  const cell = (v: unknown) => {
+    const s = v instanceof Date ? v.toISOString() : v == null ? '' : String(v)
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = [LEAD_COLUMNS.join(','), ...rows.map((r) => LEAD_COLUMNS.map((k) => cell(r[k])).join(','))].join('\n')
+  await audit(c.get('user').id, 'leads.export', null, { rows: rows.length })
+  c.header('content-type', 'text/csv; charset=utf-8')
+  c.header('content-disposition', `attachment; filename="leads-${new Date().toISOString().slice(0, 10)}.csv"`)
   return c.body(csv)
 })
 

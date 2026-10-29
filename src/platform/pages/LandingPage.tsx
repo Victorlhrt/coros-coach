@@ -21,6 +21,7 @@ import { HeroSection } from '@/components/hero'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { DotWordmark } from './DotWordmark'
 import { CoachFlow, WatchFlow } from './landing-flows'
+import { StepsTrack, type TrackStep } from './StepsTrack'
 import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { cn } from '@/lib/utils'
@@ -30,7 +31,7 @@ import { BRAND, appHref } from '../brand'
 const DOT_GRID =
   'bg-[radial-gradient(color-mix(in_oklab,var(--foreground)_16%,transparent)_1px,transparent_1px)] [background-size:14px_14px] [mask-image:linear-gradient(to_bottom,black,transparent)]'
 
-const STEPS: { title: string; text: string; icon: ReactNode; visual: ReactNode }[] = [
+const STEPS: TrackStep[] = [
   { title: 'Connect your watch', text: 'Your history syncs in the background.', icon: <WatchIcon />, visual: <SyncVisual /> },
   { title: 'We find your results', text: 'Public race results set your real level.', icon: <MountainIcon />, visual: <ResultsVisual /> },
   { title: 'Pick your race', text: 'Get a predicted time you can tune.', icon: <TargetIcon />, visual: <TimeVisual /> },
@@ -86,29 +87,7 @@ export function LandingPage() {
             </>
           }
         >
-          <ol className="grid gap-px border bg-border sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map((s, i) => (
-              <motion.li
-                key={s.title}
-                className="group/step relative flex min-h-80 flex-col gap-4 overflow-hidden bg-background p-5 transition-colors hover:bg-card/60"
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ delay: i * 0.08, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0', DOT_GRID)} />
-                <div className="relative flex items-center justify-between">
-                  <span className="flex size-9 items-center justify-center rounded-md border bg-card text-foreground [&>svg]:size-4.5">{s.icon}</span>
-                  <span className="text-muted-foreground text-xs">{String(i + 1).padStart(2, '0')}</span>
-                </div>
-                <div className="relative flex flex-1 items-center justify-center">{s.visual}</div>
-                <div className="relative flex flex-col gap-1">
-                  <h3 className="font-medium">{s.title}</h3>
-                  <p className="text-muted-foreground text-sm">{s.text}</p>
-                </div>
-              </motion.li>
-            ))}
-          </ol>
+          <StepsTrack steps={STEPS} />
         </Section>
 
         <Section

@@ -215,7 +215,7 @@ function monotonePath(pts: [number, number][]): string {
 
 const defaultFormat = (v: number) => v.toLocaleString('fr-FR', { maximumFractionDigits: 1 })
 
-function LineChart({ kpi, showCompare, emptyLabel }: { kpi: Kpi; showCompare: boolean; emptyLabel: string }) {
+export function LineChart({ kpi, showCompare, emptyLabel }: { kpi: Kpi; showCompare: boolean; emptyLabel: string }) {
   const reduce = useReducedMotion()
   const gradId = useId()
   const wrapRef = useRef<HTMLDivElement>(null)

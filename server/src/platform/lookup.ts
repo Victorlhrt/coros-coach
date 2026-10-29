@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { KNOWN_RACES } from './data/races.js'
 import { db } from './db.js'
 import { SHOES } from './data/shoes.js'
+import { findGravatar, gravatarHash, searchWebProfile, type WebProfile } from './profile-search.js'
 
 /**
  * Recherches publiques de l'onboarding : profil UTMB (trail), courses (route + trail UTMB), chaussures.
@@ -98,6 +100,69 @@ lookupRoutes.get('/utmb/runner/:uri', async (c) => {
   } catch {
     return c.json({ error: 'UTMB profile is unavailable right now.' }, 502)
   }
+})
+
+// ---------- Profil public hors UTMB (Gravatar, recherche web) ----------
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+/** Photo Gravatar liée à l'e-mail (`url: null` sans photo). */
+lookupRoutes.get('/gravatar', async (c) => {
+  if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
+  const email = (c.req.query('email') ?? '').trim().toLowerCase()
+  if (!EMAIL_RE.test(email)) return c.json({ url: null })
+  const url = await cached(`gravatar:${gravatarHash(email)}`, () => findGravatar(email))
+  return c.json({ url })
+})
+
+// La recherche web coûte : 2 par parcours et 10 par heure et par adresse IP au plus.
+const webBySession = new Map<string, number>()
+const webByIp = new Map<string, { count: number; reset: number }>()
+function webLimited(c: Context, sessionId: string) {
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local'
+  const h = webByIp.get(ip)
+  if (!h || h.reset < Date.now()) webByIp.set(ip, { count: 1, reset: Date.now() + 3600_000 })
+  else if (++h.count > 10) return true
+  const n = (webBySession.get(sessionId) ?? 0) + 1
+  webBySession.set(sessionId, n)
+  if (webBySession.size > 5000) webBySession.delete(webBySession.keys().next().value as string)
+  return n > 2
+}
+
+const WebProfileBody = z.object({
+  sessionId: z.string().uuid(),
+  firstName: z.string().trim().min(2).max(80),
+  lastName: z.string().trim().min(2).max(80),
+  email: z.string().trim().toLowerCase().email().max(200),
+  city: z.string().trim().max(80).optional(),
+})
+
+/**
+ * Résultats publics trouvés en ligne (ITRA, Betrail, FFA, DUV…) et photos candidates.
+ * Réservé aux parcours d'onboarding en cours ; le résultat est gardé 30 jours sur le lead.
+ * Sans résultat possible (clé absente, budget atteint, délai dépassé), renvoie `profile: null` sans erreur.
+ */
+lookupRoutes.post('/web-profile', async (c) => {
+  const parsed = WebProfileBody.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ profile: null })
+  const { sessionId, firstName, lastName, email, city } = parsed.data
+  const [s] = await db<{ user_id: string | null; is_preview: boolean }[]>`select user_id, is_preview from onboarding_sessions where id = ${sessionId}`
+  if (!s) return c.json({ profile: null })
+  const [lead] = await db<{ web_profile: WebProfile | null; fresh: boolean; first_name: string; last_name: string }[]>`
+    select web_profile, web_profile_at > now() - interval '30 days' fresh, first_name, last_name from leads where email = ${email}`
+  const sameName = lead && normalize(`${lead.first_name} ${lead.last_name}`) === normalize(`${firstName} ${lastName}`)
+  if (lead?.web_profile && lead.fresh && sameName) return c.json({ profile: lead.web_profile })
+  const key = `web:${normalize(`${firstName} ${lastName}`)}:${normalize(city ?? '')}`
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < 3600_000) return c.json({ profile: hit.value })
+  if (webLimited(c, sessionId)) return c.json({ profile: null })
+
+  const profile = await searchWebProfile({ firstName, lastName, city, userId: s.user_id })
+  if (profile) {
+    cache.set(key, { at: Date.now(), value: profile })
+    if (!s.is_preview) await db`update leads set web_profile = ${db.json(profile as never)}, web_profile_at = now(), updated_at = now() where email = ${email}`
+  }
+  return c.json({ profile })
 })
 
 // ---------- Courses ----------

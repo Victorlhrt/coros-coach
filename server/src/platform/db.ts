@@ -158,6 +158,53 @@ export async function migratePlatform() {
       created_at timestamptz not null default now()
     )`
   await db`delete from oauth_pending where created_at < now() - interval '1 hour'`
+  // Leads : nom et e-mail saisis à la première étape de l'onboarding, avant toute inscription (base des relances).
+  await db`
+    create table if not exists leads (
+      id uuid primary key default gen_random_uuid(),
+      email text not null unique,
+      first_name text not null default '',
+      last_name text not null default '',
+      city text,
+      source text not null default 'onboarding',
+      invite_code text,
+      onboarding_session_id uuid references onboarding_sessions(id) on delete set null,
+      step_reached int not null default 0,
+      last_step text,
+      completed_at timestamptz,
+      user_id uuid references users(id) on delete set null,
+      photo_url text,
+      web_profile jsonb,
+      web_profile_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`
+  await db`create index if not exists leads_created_idx on leads (created_at desc)`
+  await db`create index if not exists leads_session_idx on leads (onboarding_session_id)`
+  // Classements : totaux de course par jour (poussés par l'app depuis COROS) et amitiés entre coureurs.
+  await db`
+    create table if not exists run_days (
+      user_id uuid not null references users(id) on delete cascade,
+      day date not null,
+      meters int not null default 0,
+      seconds int not null default 0,
+      runs int not null default 0,
+      updated_at timestamptz not null default now(),
+      primary key (user_id, day)
+    )`
+  await db`create index if not exists run_days_day_idx on run_days (day)`
+  await db`
+    create table if not exists friendships (
+      requester_id uuid not null references users(id) on delete cascade,
+      addressee_id uuid not null references users(id) on delete cascade,
+      status text not null default 'pending' check (status in ('pending', 'accepted')),
+      created_at timestamptz not null default now(),
+      accepted_at timestamptz,
+      primary key (requester_id, addressee_id),
+      check (requester_id <> addressee_id)
+    )`
+  await db`create unique index if not exists friendships_pair_idx on friendships (least(requester_id, addressee_id), greatest(requester_id, addressee_id))`
+  await db`create index if not exists friendships_addressee_idx on friendships (addressee_id, status)`
   await db`insert into invite_codes (code, label, max_uses) values ('victor43', 'Code de Victor (illimité)', null) on conflict (code) do nothing`
   await db`create index if not exists users_created_idx on users (created_at)`
   await db`create index if not exists onboarding_sessions_variant_idx on onboarding_sessions (variant_id, created_at)`

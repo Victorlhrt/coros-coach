@@ -115,8 +115,8 @@ export function OnboardingRunPage() {
           sessionId={sessionId}
           preview={preview}
           ready={!!sessionId}
-          onSave={async (answers, stepReached) => {
-            await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached } })
+          onSave={async (answers, stepReached, stepId) => {
+            await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached, stepId } })
           }}
           onComplete={async (answers: CompleteAnswers) => {
             await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached: 8 } })

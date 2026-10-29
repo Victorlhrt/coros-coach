@@ -46,7 +46,49 @@ onboardingRoutes.get('/pick', async (c) => {
 })
 
 const StartBody = z.object({ variantId: z.string().min(1), preview: z.boolean().optional(), inviteCode: z.string().max(60).optional() })
-const ProgressBody = z.object({ answers: z.record(z.string(), z.unknown()), stepReached: z.number().int().min(0).max(100) })
+const ProgressBody = z.object({
+  answers: z.record(z.string(), z.unknown()),
+  stepReached: z.number().int().min(0).max(100),
+  stepId: z.string().max(40).optional(),
+})
+const LeadBody = z.object({
+  sessionId: z.string().uuid(),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  email: z.string().trim().toLowerCase().email().max(200),
+})
+
+/** Ville et photo choisies, reprises des réponses sur la fiche lead. */
+const answerText = (a: Record<string, unknown>, key: string) => {
+  const v = a[key]
+  return typeof v === 'string' && v.trim() ? v.trim().slice(0, 500) : null
+}
+
+/**
+ * Lead capté à la première étape (prénom, nom, e-mail) : une fiche par e-mail, mise à jour si la personne recommence.
+ * Les aperçus des admins ne créent pas de lead.
+ */
+onboardingRoutes.post('/leads', async (c) => {
+  const parsed = LeadBody.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Check your name and email.' }, 400)
+  const { sessionId, firstName, lastName, email } = parsed.data
+  const [s] = await db<{ is_preview: boolean; invite_code: string | null; user_id: string | null; step_reached: number }[]>`
+    select is_preview, invite_code, user_id, step_reached from onboarding_sessions where id = ${sessionId} and completed_at is null`
+  if (!s) return c.json({ error: 'Onboarding session not found' }, 404)
+  if (s.is_preview) return c.json({ ok: true, preview: true })
+  const [existingUser] = await db<{ id: string }[]>`select id from users where email = ${email}`
+  await db`
+    insert into leads (email, first_name, last_name, source, invite_code, onboarding_session_id, step_reached, last_step, user_id)
+    values (${email}, ${firstName}, ${lastName}, ${s.invite_code ? 'invite' : 'onboarding'}, ${s.invite_code}, ${sessionId},
+            ${s.step_reached}, 'identity', ${s.user_id ?? existingUser?.id ?? null})
+    on conflict (email) do update set
+      first_name = excluded.first_name, last_name = excluded.last_name,
+      invite_code = coalesce(excluded.invite_code, leads.invite_code),
+      onboarding_session_id = excluded.onboarding_session_id,
+      user_id = coalesce(leads.user_id, excluded.user_id),
+      updated_at = now()`
+  return c.json({ ok: true })
+})
 
 onboardingRoutes.post('/sessions', async (c) => {
   const parsed = StartBody.safeParse(await c.req.json().catch(() => null))
@@ -66,13 +108,23 @@ onboardingRoutes.post('/sessions', async (c) => {
 onboardingRoutes.patch('/sessions/:id', async (c) => {
   const parsed = ProgressBody.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: 'Invalid request' }, 400)
-  const { answers, stepReached } = parsed.data
+  const { answers, stepReached, stepId } = parsed.data
   const [row] = await db`
     update onboarding_sessions
     set answers = ${db.json(answers as never)}, step_reached = greatest(step_reached, ${stepReached}), updated_at = now()
     where id = ${c.req.param('id')} and completed_at is null
     returning id`
-  return row ? c.json({ ok: true }) : c.json({ error: 'Onboarding session not found or already finished' }, 404)
+  if (!row) return c.json({ error: 'Onboarding session not found or already finished' }, 404)
+  // Avancement du lead rattaché à ce parcours (s'il y en a un).
+  await db`
+    update leads set
+      step_reached = greatest(step_reached, ${stepReached}),
+      last_step = coalesce(${stepId ?? null}, last_step),
+      city = coalesce(${answerText(answers, 'city')}, city),
+      photo_url = case when ${'photoUrl' in answers} then ${answerText(answers, 'photoUrl')} else photo_url end,
+      updated_at = now()
+    where onboarding_session_id = ${c.req.param('id')}`
+  return c.json({ ok: true })
 })
 
 onboardingRoutes.post('/sessions/:id/complete', async (c) => {
@@ -87,6 +139,9 @@ onboardingRoutes.post('/sessions/:id/complete', async (c) => {
   if (!row) return c.json({ error: 'Onboarding flow not found' }, 404)
   // Un usage du code est compté une fois, à la fin du parcours.
   if (row.first && row.invite_code && !row.is_preview) await db`update invite_codes set uses = uses + 1 where code = ${row.invite_code}`
+  await db`
+    update leads set completed_at = coalesce(completed_at, now()), last_step = 'completed', user_id = coalesce(user_id, ${row.user_id}), updated_at = now()
+    where onboarding_session_id = ${id}`
   if (row.user_id && !row.is_preview) {
     await createPlanFromSession(id, row.user_id)
     await db`update wearable_connections set user_id = ${row.user_id} where onboarding_session_id = ${id} and user_id is null`

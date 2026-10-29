@@ -44,7 +44,10 @@ export async function currentUser(c: Context): Promise<SessionUser | null> {
     select u.id, u.email, u.name, u.role, u.status
     from user_sessions s join users u on u.id = s.user_id
     where s.token_hash = ${hashToken(token)} and s.expires_at > now()`
-  return user ?? null
+  if (!user) return null
+  // Seuls les e-mails d'ADMIN_EMAILS sont administrateurs, même si un rôle admin traîne en base.
+  if (user.role === 'admin' && !config.adminEmails.includes(user.email.toLowerCase())) user.role = 'runner'
+  return user
 }
 
 type Env = { Variables: { user: SessionUser } }
@@ -59,7 +62,8 @@ export const requireUser: MiddlewareHandler<Env> = async (c, next) => {
 export const requireAdmin: MiddlewareHandler<Env> = async (c, next) => {
   const user = await currentUser(c)
   if (!user || user.status !== 'active') return c.json({ error: 'Not logged in' }, 401)
-  if (user.role !== 'admin') return c.json({ error: 'Admins only' }, 403)
+  // Le back office est réservé aux e-mails d'ADMIN_EMAILS, quel que soit le rôle en base.
+  if (user.role !== 'admin' || !config.adminEmails.includes(user.email.toLowerCase())) return c.json({ error: 'Admins only' }, 403)
   c.set('user', user)
   await next()
 }
@@ -134,6 +138,8 @@ platformAuthRoutes.post('/signup', async (c) => {
       await db`update wearable_connections set user_id = ${user.id} where onboarding_session_id = ${body.onboardingSessionId} and user_id is null`
     }
   }
+  // Le lead capté pendant l'onboarding est rattaché au compte.
+  await db`update leads set user_id = ${user.id}, updated_at = now() where email = ${body.email} and user_id is null`
   await audit(user.id, 'user.signup', body.email, { status, source: body.source ?? 'direct' })
 
   if (status === 'active') {
@@ -162,6 +168,8 @@ platformAuthRoutes.post('/login', async (c) => {
   if (config.adminEmails.includes(email) && (user.role !== 'admin' || user.status !== 'active')) {
     await db`update users set role = 'admin', status = 'active' where id = ${user.id}`
     user.status = 'active'
+  } else if (!config.adminEmails.includes(email) && user.role === 'admin') {
+    await db`update users set role = 'runner' where id = ${user.id}`
   }
   if (user.status === 'waitlist') return c.json({ error: 'Your account is on the waitlist: we’ll let you know as soon as it’s open.' }, 403)
   if (user.status === 'suspended') return c.json({ error: 'This account is suspended.' }, 403)

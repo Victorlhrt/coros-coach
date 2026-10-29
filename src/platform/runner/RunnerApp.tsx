@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, UserIcon } from 'lucide-react'
+import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, TrophyIcon, UserIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { RunnerAvatar } from './RunnerAvatar'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Combobox } from '@/components/arc/combobox/combobox'
@@ -37,6 +37,7 @@ import { LockScreen } from '@/components/LockScreen'
 import { Toaster } from '@/components/Toaster'
 import { formatDay } from '@/lib/coach/dates'
 import { useAutoLink } from '@/lib/coach/links'
+import { usePlanEnglish } from '@/lib/coach/translate'
 import { useWeeklyReview } from '@/lib/coach/review'
 import { useCorosCallback } from '@/lib/coros/callback'
 import { initVault, setupAutoLock, useVault } from '@/lib/lock/vault'
@@ -52,8 +53,11 @@ import { SettingsPage as CoachSettingsPage } from '@/pages/SettingsPage'
 import { AnalyticsDashboards, HomeTab, PlanTab } from './CoachTabs'
 import { BrandLogo } from './brands'
 import { CoachChat } from './CoachChat'
+import { FitnessDashboard } from './Fitness'
 import { Integrations } from './Integrations'
+import { LeaderboardPage, useRunSync } from './Leaderboard'
 import { Panel as RPanel, PanelHeader as RPanelHeader } from '@/components/raice/panel'
+import { TrackLoader } from '@/components/raice/track-loader'
 
 /**
  * Espace coureur (app.raice.run/account) : barre latérale avec Plan, Analytics, Coach et Equipment,
@@ -68,6 +72,7 @@ const NAV = [
   { title: 'Home', path: '/account/home', icon: <HomeIcon /> },
   { title: 'Plan', path: '/account/plan', icon: <CalendarDaysIcon /> },
   { title: 'Analytics', path: '/account/analytics', icon: <BarChart3Icon /> },
+  { title: 'Leaderboard', path: '/account/leaderboard', icon: <TrophyIcon /> },
   { title: 'Coach', path: '/account/coach', icon: <MessageCircleIcon /> },
   { title: 'Equipment', path: '/account/equipment', icon: <FootprintsIcon /> },
 ]
@@ -162,7 +167,7 @@ export default function RunnerApp() {
         )}
         <div className="flex w-full flex-1 flex-col p-4 md:p-8">
           {coros.status === 'pending' || (active && !synced) ? (
-            <p className="text-muted-foreground text-sm">{coros.status === 'pending' ? 'Connecting to COROS…' : 'Loading your plan…'}</p>
+            <TrackLoader label={coros.status === 'pending' ? 'Connecting to COROS' : 'Loading your plan'} />
           ) : (
             <CoachRoutes />
           )}
@@ -177,14 +182,18 @@ export default function RunnerApp() {
 function CoachRoutes() {
   useAutoLink()
   usePlanRepair()
+  usePlanEnglish()
   useWeeklyReview()
+  useRunSync()
   const hasPlan = usePlan((s) => !!s.plan)
   return (
     <Routes>
       <Route index element={<Navigate to="home" replace />} />
       <Route path="home" element={hasPlan ? <HomeTab /> : <OnboardingPlanPage />} />
       <Route path="plan" element={hasPlan ? <PlanTab /> : <CoachPlanPage />} />
-      <Route path="analytics" element={<AnalyticsTab />} />
+      <Route path="analytics" element={<Navigate to="runs" replace />} />
+      <Route path="analytics/:view" element={<AnalyticsTab />} />
+      <Route path="leaderboard" element={<LeaderboardPage />} />
       <Route path="coach" element={<CoachTab />} />
       <Route path="equipment" element={<EquipmentPage />} />
       <Route path="profile" element={<ProfilePage />} />
@@ -197,12 +206,38 @@ function CoachRoutes() {
   )
 }
 
+const ANALYTICS_VIEWS = [
+  { value: 'runs', label: 'Runs' },
+  { value: 'fitness', label: 'Fitness' },
+] as const
+
+/** Analytics en deux sous-menus : Runs (volume, sorties, journal) et Fitness (VO2max, prédicteurs de course). */
 function AnalyticsTab() {
   const { data } = useOverview()
+  const { pathname } = useLocation()
+  const view = pathname.endsWith('/fitness') ? 'fitness' : 'runs'
   return (
-    <div className="flex w-full flex-col gap-8">
-      <AnalyticsDashboards />
-      {data?.answers && <OnboardingAnalytics />}
+    <div className="flex w-full flex-col gap-4">
+      <nav aria-label="Analytics" className="inline-flex self-start rounded-full border bg-foreground/[0.04] p-1">
+        {ANALYTICS_VIEWS.map((v) => (
+          <Link
+            key={v.value}
+            to={`/account/analytics/${v.value}`}
+            aria-current={view === v.value ? 'page' : undefined}
+            className={cn('rounded-full px-4 py-1.5 text-sm transition-colors', view === v.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {v.label}
+          </Link>
+        ))}
+      </nav>
+      {view === 'fitness' ? (
+        <FitnessDashboard />
+      ) : (
+        <>
+          <AnalyticsDashboards />
+          {data?.answers && <OnboardingAnalytics />}
+        </>
+      )}
     </div>
   )
 }
@@ -261,7 +296,7 @@ function RunnerSidebar() {
         </SidebarMenu>
         {me && (
           <div className="flex items-center gap-2 px-2 pt-2 group-data-[collapsible=icon]:hidden">
-            <Avatar name={me.name} size="sm" />
+            <RunnerAvatar name={me.name} size="sm" />
             <div className="min-w-0">
               <p className="truncate text-sm">{me.name}</p>
               <p className="truncate text-muted-foreground text-xs">{me.email}</p>
@@ -645,13 +680,14 @@ function ProfilePage() {
     ['E-mail', me.email],
     ['Sex', a?.about?.sex === 'f' ? 'Female' : a?.about?.sex === 'm' ? 'Male' : null],
     ['Year of birth', a?.about?.birthYear ? String(a.about.birthYear) : null],
+    ['City', a?.city],
     ['Level', a?.level ? LEVELS[a.level] : null],
     ['UTMB profile', a?.utmb?.name ? `${a.utmb.name}${a.utmb.index ? ` · index ${a.utmb.index}` : ''}` : null],
   ]
   return (
     <>
       <div className="mb-6 flex items-center gap-4">
-        <Avatar name={me.name} size="lg" />
+        <RunnerAvatar name={me.name} size="lg" />
         <div>
           <h1 className="font-heading text-2xl">{me.name}</h1>
           <p className="text-muted-foreground text-sm">Runner on {BRAND.name}</p>
