@@ -1,13 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BarChart } from '@/components/arc/bar-chart/bar-chart'
 import { ActivityTerrain } from '@/components/raice/activity-terrain'
+import { MetricsDashboard, type Kpi } from '@/components/raice/metrics-dashboard'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { RefreshButton } from '@/components/raice/stretch-refresh'
 import { WeekPicker, type PickerDay } from '@/components/raice/week-picker'
 import { TypeBadge } from '@/components/TypeBadge'
+import { WeekView } from './WeekView'
 import { CoachAvatar } from '../onboarding/CoachAvatar'
 import { WorkoutChart } from '@/components/WorkoutChart'
 import { Button } from '@/components/shadcn/button'
@@ -18,13 +20,15 @@ import { ROUTES } from '@/lib/coach/routes'
 import type { Session, Week } from '@/lib/coach/schema'
 import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
 import { useActivities } from '@/lib/coros/activity-hooks'
+import { useCorosAuth } from '@/lib/coros/auth-store'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
-import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, planTerrain, weekDays, weekRings } from './coach-data'
+import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weekRings, weeklyMetrics } from './coach-data'
 
 /**
  * Onglets du coach dans l'espace coureur, construits avec les panneaux Raice (style Arc) :
- * Home (séance du jour, objectif, anneaux de la semaine) et Plan (semaine jour par jour, terrain du plan).
+ * Home (séance du jour, objectif, anneaux de la semaine), Plan (semaine jour par jour, terrain du plan)
+ * et Analytics › Runs (indicateurs, journal).
  */
 
 const RING_COLORS = { volume: '#6c7cf5', sessions: '#f2a33a', time: '#43b581' }
@@ -553,6 +557,183 @@ export function PlanTab() {
         )}
       </div>
     </>
+  )
+}
+
+// ---------- Analytics ----------
+
+const RANGES = [
+  { value: '4', label: '4W' },
+  { value: '6', label: '6W' },
+]
+
+export function AnalyticsDashboards() {
+  const { plan, zones } = usePlan()
+  const connected = useCorosAuth((s) => s.connected)
+  const units = useSettings((s) => s.units)
+  const activities = useActivities()
+  const [range, setRange] = useState('6')
+  const [now] = useState(today)
+  const acts = activities.data?.activities ?? []
+  const weeks = weeklyMetrics(lastWeeks(now, Number(range)), acts, plan, zones)
+  const last = weeks.at(-1)
+  const prev = weeks.at(-2)
+  const delta = (a?: number, b?: number) => (a !== undefined && b ? `${Math.abs(Math.round(((a - b) / b) * 100))}%` : undefined)
+  const trend = (a?: number, b?: number): Kpi['trend'] => (a === undefined || b === undefined || a === b ? 'flat' : a > b ? 'up' : 'down')
+
+  const kpis: Kpi[] = [
+    {
+      id: 'km',
+      label: 'Volume',
+      value: `${formatNumber(Math.round((last?.km ?? 0) * 10) / 10)} km`,
+      delta: delta(last?.km, prev?.km),
+      trend: trend(last?.km, prev?.km),
+      goodWhen: 'up',
+      points: weeks.map((w) => ({ x: w.label, y: Math.round(w.km * 10) / 10 })),
+      compare: plan ? weeks.map((w) => ({ x: w.label, y: Math.round(w.plannedKm * 10) / 10 })) : undefined,
+      format: (v) => `${formatNumber(v)} km`,
+    },
+    {
+      id: 'time',
+      label: 'Time',
+      value: formatDuration((last?.hours ?? 0) * 3600),
+      delta: delta(last?.hours, prev?.hours),
+      trend: trend(last?.hours, prev?.hours),
+      goodWhen: 'up',
+      points: weeks.map((w) => ({ x: w.label, y: Math.round(w.hours * 10) / 10 })),
+      format: (v) => formatDuration(v * 3600),
+    },
+    {
+      id: 'runs',
+      label: 'Runs',
+      value: String(last?.runs ?? 0),
+      delta: delta(last?.runs, prev?.runs),
+      trend: trend(last?.runs, prev?.runs),
+      goodWhen: 'up',
+      points: weeks.map((w) => ({ x: w.label, y: w.runs })),
+      compare: plan ? weeks.map((w) => ({ x: w.label, y: w.plannedRuns })) : undefined,
+      format: (v) => String(Math.round(v)),
+    },
+    {
+      id: 'pace',
+      label: 'Avg pace',
+      value: last?.pace ? `${formatPace(last.pace, units)}` : '—',
+      delta: delta(last?.pace || undefined, prev?.pace || undefined),
+      trend: trend(last?.pace || undefined, prev?.pace || undefined),
+      goodWhen: 'down',
+      points: weeks.filter((w) => w.pace > 0).map((w) => ({ x: w.label, y: Math.round(w.pace) })),
+      format: (v) => formatPace(v, units),
+    },
+  ]
+
+  const longest = [...acts].sort((a, b) => (b.meters ?? 0) - (a.meters ?? 0)).slice(0, 5)
+  const byType = plan
+    ? (Object.keys(TYPE_META) as (keyof typeof TYPE_META)[])
+        .filter((t) => t !== 'rest')
+        .map((t) => ({ label: TYPE_META[t].label, value: allSessions(plan).filter((s) => s.type === t).length }))
+        .filter((r) => r.value > 0)
+        .sort((a, b) => b.value - a.value)
+    : []
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <MetricsDashboard
+        title="Analytics"
+                kpis={kpis}
+        ranges={RANGES}
+        range={range}
+        onRangeChange={setRange}
+        compareLabel="Compare to plan"
+        emptyLabel={connected ? 'No runs in this period' : 'COROS isn’t connected'}
+        lists={[
+          {
+            title: 'Longest runs',
+            columnLabel: 'Distance',
+            rows: longest.map((a) => ({ label: `${formatDay(a.date, { day: 'numeric', month: 'short' })} · ${a.name}`, value: a.meters ?? 0, display: formatDistance(a.meters ?? 0, units) })),
+          },
+          { title: 'Plan sessions', columnLabel: 'Count', rows: byType },
+        ]}
+        actions={
+          !connected ? (
+            <Button asChild variant="outline" size="sm">
+              <Link to={ROUTES.settings}>Connect COROS</Link>
+            </Button>
+          ) : undefined
+        }
+      />
+      <WeekView />
+      <ActivityLog />
+    </div>
+  )
+}
+
+/** Journal des 6 dernières semaines : chaque sortie COROS, la séance du plan liée, l'écart au prévu, et les séances manquées. */
+function ActivityLog() {
+  const { plan, zones, links, feedback } = usePlan()
+  const units = useSettings((s) => s.units)
+  const activities = useActivities()
+  const [now] = useState(today)
+  const [open, setOpen] = useState(false)
+  const acts = activities.data?.activities ?? []
+  const byLabel = new Map(allSessions(plan).flatMap((s) => (links[s.id]?.labelId ? [[links[s.id].labelId as string, s] as const] : [])))
+  const missed = allSessions(plan).filter((s) => s.date < now && s.date >= addDays(now, -42) && isRun(s) && !isDone(s, links, feedback))
+  const rows = [
+    ...acts.map((a) => ({ date: a.date, activity: a, session: byLabel.get(a.labelId) })),
+    ...missed.map((s) => ({ date: s.date, activity: undefined, session: s })),
+  ].sort((a, b) => b.date.localeCompare(a.date))
+  if (!rows.length) return null
+  const done = rows.filter((r) => r.activity).length
+  const missedCount = rows.length - done
+  return (
+    <Panel>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between gap-4 text-left transition-colors hover:bg-foreground/[0.02]">
+        <PanelHeader
+          title="Log"
+          subtitle={`${done} run${done > 1 ? 's' : ''}${missedCount ? ` · ${missedCount} missed` : ''} `}
+          className="flex-1"
+        />
+        <ChevronDown className={`mr-6 size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+      <div className="divide-y border-t">
+        {rows.map((r, i) => {
+          const target = r.session ? sessionTotals(r.session, zones) : null
+          const delta = r.activity?.meters && target?.meters ? Math.round(((r.activity.meters - target.meters) / target.meters) * 100) : null
+          const body = (
+            <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-4 px-6 py-3.5 sm:grid-cols-[6.5rem_minmax(0,1fr)_5rem_5rem_5rem_4.5rem]">
+              <span className="text-muted-foreground text-sm capitalize">{formatDay(r.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span className="h-7 w-1 shrink-0 rounded-full" style={{ background: r.session ? TYPE_META[r.session.type].color : 'var(--border)' }} />
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-sm">{r.session?.title ?? r.activity?.name}</span>
+                  <span className="block truncate text-muted-foreground text-xs">{r.session ? TYPE_META[r.session.type].label : 'Off plan'}</span>
+                </span>
+              </span>
+              {r.activity ? (
+                <>
+                  <span className="text-right text-sm tabular-nums">{r.activity.meters ? formatDistance(r.activity.meters, units) : '—'}</span>
+                  <span className="hidden text-right text-muted-foreground text-sm tabular-nums sm:block">{r.activity.seconds ? formatDuration(r.activity.seconds) : '—'}</span>
+                  <span className="hidden text-right text-muted-foreground text-sm tabular-nums sm:block">{r.activity.paceSecPerKm ? formatPace(r.activity.paceSecPerKm, units) : '—'}</span>
+                  <span className={`hidden text-right text-xs tabular-nums sm:block ${delta === null ? 'text-muted-foreground' : Math.abs(delta) <= 10 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {delta === null ? '' : `${delta > 0 ? '+' : ''}${delta}%`}
+                  </span>
+                </>
+              ) : (
+                <span className="text-right text-red-400 text-sm sm:col-span-4">Missed</span>
+              )}
+            </div>
+          )
+          return r.session ? (
+            <Link key={i} to={ROUTES.session(r.session.id)} className="block transition-colors hover:bg-foreground/[0.03]">
+              {body}
+            </Link>
+          ) : (
+            <div key={i}>{body}</div>
+          )
+        })}
+      </div>
+      )}
+    </Panel>
   )
 }
 

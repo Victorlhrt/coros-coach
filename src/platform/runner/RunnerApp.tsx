@@ -54,8 +54,7 @@ import { OnboardingPage as GoalPage } from '@/pages/OnboardingPage'
 import { PlanPage as CoachPlanPage } from '@/pages/PlanPage'
 import { SessionPage } from '@/pages/SessionPage'
 import { SettingsPage as CoachSettingsPage } from '@/pages/SettingsPage'
-import { HomeTab, PlanTab } from './CoachTabs'
-import { RunsFeed } from './RunsFeed'
+import { AnalyticsDashboards, HomeTab, PlanTab } from './CoachTabs'
 import { BrandLogo } from './brands'
 import { CoachChat } from './CoachChat'
 import { FitnessDashboard } from './Fitness'
@@ -235,7 +234,7 @@ function AnalyticsTab() {
         <FitnessDashboard />
       ) : (
         <>
-          <RunsFeed />
+          <AnalyticsDashboards />
           {data?.answers && <OnboardingAnalytics />}
         </>
       )}

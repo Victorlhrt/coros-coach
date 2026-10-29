@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Tooltip } from '@/components/arc/tooltip/tooltip'
 import { Panel } from '@/components/raice/panel'
 import { Button } from '@/components/shadcn/button'
 import { Skeleton } from '@/components/shadcn/skeleton'
@@ -19,24 +19,22 @@ import { cn } from '@/lib/utils'
 import { isDone, lastWeeks, weeklyMetrics } from './coach-data'
 
 /**
- * Analytics › Runs, façon Strava : volume des 12 dernières semaines en tête, puis une carte par semaine
- * (la plus récente d'abord) avec ses totaux, la frise lundi → dimanche et ses sorties, séances manquées comprises.
+ * Analytics › Runs : vue d'une semaine à la fois, façon Strava (totaux, frise lundi → dimanche, sorties
+ * et séances manquées), sous le tableau de bord. Flèches pour passer d'une semaine à l'autre.
  */
 
 const HISTORY_WEEKS = 16
-const CHART_WEEKS = 12
-const PAGE = 6
 
 type Row = { date: string; activity?: Activity; session?: Session }
 
-export function RunsFeed() {
+export function WeekView() {
   const { plan, zones, links, feedback } = usePlan()
   const connected = useCorosAuth((s) => s.connected)
   const units = useSettings((s) => s.units)
   const history = useActivityHistory()
   const [now] = useState(today)
-  const [visible, setVisible] = useState(PAGE)
-  const [target, setTarget] = useState<string | null>(null)
+  // 0 = semaine en cours, 1 = la précédente…
+  const [back, setBack] = useState(0)
   const acts = useMemo(() => history.data ?? [], [history.data])
 
   const weeks = useMemo(() => {
@@ -58,75 +56,28 @@ export function RunsFeed() {
     })
   }, [acts, plan, zones, links, feedback, now])
 
-  // Plus grosse journée de l'historique : échelle commune des pastilles de toutes les semaines.
+  // Plus grosse journée de l'historique : échelle commune des pastilles, d'une semaine à l'autre.
   const maxDay = useMemo(() => {
     const perDay = new Map<string, number>()
     for (const a of acts) perDay.set(a.date, (perDay.get(a.date) ?? 0) + (a.meters ?? 0))
     return Math.max(1, ...perDay.values())
   }, [acts])
 
-  // Clic sur une barre : on déplie jusqu'à la semaine visée, puis on y descend une fois rendue.
-  useEffect(() => {
-    if (!target) return
-    document.getElementById(`week-${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    setTarget(null)
-  }, [target, visible])
+  if (!connected) return null
+  if (history.isPending) return <Skeleton className="h-[320px] rounded-[28px]" />
 
-  if (!connected) {
-    return (
-      <Panel className="flex flex-col items-center gap-4 px-6 py-12 text-center">
-        <p className="text-muted-foreground text-sm">COROS isn’t connected</p>
-        <Button asChild variant="outline" size="sm">
-          <Link to={ROUTES.settings}>Connect COROS</Link>
-        </Button>
-      </Panel>
-    )
-  }
-
-  if (history.isPending) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Skeleton className="h-[236px] rounded-[28px]" />
-        <Skeleton className="h-[320px] rounded-[28px]" />
-      </div>
-    )
-  }
-
-  const feed = [...weeks].reverse()
-  const current = weeks.at(-1)!
-  const jumpTo = (start: string) => {
-    const index = feed.findIndex((w) => w.start === start)
-    if (index >= visible) setVisible(index + 1)
-    setTarget(start)
-  }
-
-  return (
-    <div className="flex w-full flex-col gap-4">
-      <Panel className="grid gap-6 p-6 md:grid-cols-[auto_minmax(0,1fr)] md:items-end md:gap-10">
-        <div>
-          <h1 className="font-medium text-[17px] tracking-tight">This week</h1>
-          <div className="mt-4 grid grid-cols-3 gap-6 md:gap-8">
-            <Stat label="Distance" value={formatDistance(current.meters, units)} big />
-            <Stat label="Time" value={current.seconds ? formatDuration(current.seconds) : '—'} big />
-            <Stat label="Runs" value={String(current.runs)} big />
-          </div>
-        </div>
-        <VolumeChart weeks={weeks.slice(-CHART_WEEKS)} current={current.start} units={units} onSelect={jumpTo} />
-      </Panel>
-
-      {acts.length === 0 && !plan && <Panel className="px-6 py-12 text-center text-muted-foreground text-sm">No runs yet</Panel>}
-
-      {feed.slice(0, visible).map((w) => (
-        <WeekCard key={w.start} week={w} now={now} maxDay={maxDay} units={units} />
-      ))}
-
-      {visible < feed.length && (
-        <Button variant="outline" className="self-center rounded-full" onClick={() => setVisible((v) => Math.min(feed.length, v + PAGE))}>
-          Show more weeks
-        </Button>
-      )}
+  const week = weeks[weeks.length - 1 - back]
+  const nav = (
+    <div className="flex items-center gap-1">
+      <Button variant="outline" size="icon" className="size-8 rounded-full" aria-label="Previous week" disabled={back >= weeks.length - 1} onClick={() => setBack((b) => b + 1)}>
+        <ChevronLeft />
+      </Button>
+      <Button variant="outline" size="icon" className="size-8 rounded-full" aria-label="Next week" disabled={back === 0} onClick={() => setBack((b) => b - 1)}>
+        <ChevronRight />
+      </Button>
     </div>
   )
+  return <WeekCard week={week} now={now} maxDay={maxDay} units={units} title={back === 0 ? 'This week' : undefined} nav={nav} />
 }
 
 type FeedWeek = ReturnType<typeof weeklyMetrics>[number] & { meters: number; seconds: number; rows: Row[]; upcoming: Set<string> }
@@ -140,54 +91,21 @@ function Stat({ label, value, big }: { label: string; value: string; big?: boole
   )
 }
 
-/** Volume par semaine ; la semaine en cours ressort, survol = totaux, clic = descendre à la semaine. */
-function VolumeChart({ weeks, current, units, onSelect }: { weeks: FeedWeek[]; current: string; units: Units; onSelect: (start: string) => void }) {
-  const max = Math.max(1, ...weeks.map((w) => w.meters))
-  return (
-    <div className="min-w-0">
-      <div className="flex h-24 items-end gap-1.5 sm:gap-2">
-        {weeks.map((w) => {
-          const label = `${formatDay(w.start, { day: 'numeric', month: 'short' })} · ${formatDistance(w.meters, units)} · ${w.seconds ? formatDuration(w.seconds) : '0 min'} · ${w.runs} run${w.runs === 1 ? '' : 's'}`
-          return (
-            <Tooltip key={w.start} content={<span className="whitespace-nowrap tabular-nums">{label}</span>}>
-              <button type="button" aria-label={label} onClick={() => onSelect(w.start)} className="group flex h-full min-w-0 flex-1 items-end">
-                <span
-                  className={cn(
-                    'w-full rounded-[4px] transition-colors',
-                    w.start === current ? 'bg-foreground' : 'bg-foreground/20 group-hover:bg-foreground/45',
-                  )}
-                  style={{ height: w.meters ? `${Math.max(4, (w.meters / max) * 100)}%` : 2 }}
-                />
-              </button>
-            </Tooltip>
-          )
-        })}
-      </div>
-      <div className="mt-2 flex gap-1.5 sm:gap-2">
-        {weeks.map((w, i) => {
-          // Un repère par mois, sous la première semaine qui y commence.
-          const month = formatDay(w.start, { month: 'short' })
-          const show = i === 0 || month !== formatDay(weeks[i - 1].start, { month: 'short' })
-          return (
-            <span key={w.start} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-muted-foreground text-xs">
-              {show ? month : ''}
-            </span>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function WeekCard({ week, now, maxDay, units }: { week: FeedWeek; now: string; maxDay: number; units: Units }) {
+function WeekCard({ week, now, maxDay, units, title, nav }: { week: FeedWeek; now: string; maxDay: number; units: Units; title?: string; nav?: React.ReactNode }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(week.start, i))
   const unit = distanceUnit(units)
   const empty = week.rows.length === 0 && week.upcoming.size === 0
   return (
-    <Panel id={`week-${week.start}`} className="scroll-mt-4">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-6 pt-5 pb-4">
-        <h2 className="font-medium text-[17px] tracking-tight">Week of {formatDay(week.start, { day: 'numeric', month: 'short' })}</h2>
-        {empty && <span className="text-muted-foreground text-sm">No runs</span>}
+    <Panel>
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 pt-5 pb-4">
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-medium text-[17px] tracking-tight">{title ?? `Week of ${formatDay(week.start, { day: 'numeric', month: 'short' })}`}</h2>
+          <span className="text-muted-foreground text-sm">
+            {formatDay(week.start, { day: 'numeric', month: 'short' })} – {formatDay(addDays(week.start, 6), { day: 'numeric', month: 'short' })}
+            {empty && ' · No runs'}
+          </span>
+        </div>
+        {nav}
       </header>
       {!empty && (
         <>
