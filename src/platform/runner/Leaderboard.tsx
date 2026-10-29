@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckIcon, CrownIcon, MapPinIcon, RouteIcon, SparklesIcon, TrendingUpIcon, TrophyIcon, UserPlusIcon, UsersIcon, XIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { CheckIcon, CrownIcon, MapPinIcon, PencilIcon, RouteIcon, SparklesIcon, TrendingUpIcon, TrophyIcon, UserPlusIcon, UsersIcon, XIcon } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
+import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { CopyButton } from '@/components/arc/copy-button/copy-button'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Input } from '@/components/arc/input/input'
@@ -61,7 +62,11 @@ export function useRunSync() {
     if (signature === lastSynced) return
     lastSynced = signature
     api('/account/runs/daily', { body: { from, days } })
-      .then(() => qc.invalidateQueries({ queryKey: ['leaderboard'] }))
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: ['leaderboard'] })
+        // Kilométrage des chaussures recalculé côté serveur à partir de ces totaux.
+        void qc.invalidateQueries({ queryKey: ['account', 'overview'] })
+      })
       .catch(() => {
         lastSynced = ''
       })
@@ -92,7 +97,6 @@ export function LeaderboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl">Leaderboard</h1>
-          <p className="mt-1 text-muted-foreground text-sm">Your distance this {period}, against your friends and the runners of your city.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl label="Period" options={PERIODS} value={period} onValueChange={(v) => setPeriod(v as Period)} />
@@ -298,24 +302,164 @@ function RankingSkeleton() {
 
 // ---------- Ville ----------
 
+/** Villes proposées, comme à l'onboarding (« Other » ouvre un champ libre). */
+const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille', 'Toulouse', 'Nantes', 'Annecy', 'Chamonix', 'Grenoble']
+const OTHER_CITY = '__other'
+
+/** Enregistre la ville sans repasser par l'onboarding, puis rafraîchit l'espace et les classements. */
+function useSaveCity(onDone?: () => void) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (city: string) => api<{ city: string }>('/account/city', { method: 'PUT', body: { city } }),
+    onSuccess: (r) => {
+      toast.success(`You now run in ${r.city}.`)
+      void qc.invalidateQueries({ queryKey: ['account', 'overview'] })
+      void qc.invalidateQueries({ queryKey: ['leaderboard'] })
+      onDone?.()
+    },
+  })
+}
+
+/** Choix de la ville : pastilles des villes courantes, ou saisie libre. */
+function CityPicker({ initial, submitLabel, onSaved, className }: { initial?: string | null; submitLabel: string; onSaved?: () => void; className?: string }) {
+  const start = initial?.trim() ?? ''
+  const [other, setOther] = useState(!!start && !CITIES.includes(start))
+  const [city, setCity] = useState(start)
+  const save = useSaveCity(onSaved)
+  const value = city.trim()
+  const valid = value.length >= 2 && value.length <= 80
+  return (
+    <form
+      className={cn('flex flex-col gap-4', className)}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (valid) save.mutate(value)
+      }}
+    >
+      <ChipGroup
+        label="City you run in"
+        multiple={false}
+        options={[...CITIES.map((c) => ({ value: c, label: c })), { value: OTHER_CITY, label: 'Other' }]}
+        value={other ? [OTHER_CITY] : city ? [city] : []}
+        onValueChange={([v]) => {
+          save.reset()
+          setOther(v === OTHER_CITY)
+          setCity(v && v !== OTHER_CITY ? v : '')
+        }}
+      />
+      {other && (
+        <Input label="Your city" autoComplete="address-level2" placeholder="E.g. Montpellier" maxLength={80} autoFocus value={city} onChange={(e) => setCity(e.target.value)} error={save.error?.message} />
+      )}
+      {!other && save.error && <p className="text-destructive text-sm">{save.error.message}</p>}
+      <div>
+        <Button type="submit" size="sm" loading={save.isPending} disabled={!valid || value === start}>
+          <MapPinIcon className="size-4" /> {submitLabel}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function CitySheet({ open, city, onClose }: { open: boolean; city: string | null; onClose: () => void }) {
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full gap-0 sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <SheetHeader className="border-b p-6">
+          <SheetTitle>Change your city</SheetTitle>
+          <SheetDescription>You’ll be ranked against the runners of your new city from now on.</SheetDescription>
+        </SheetHeader>
+        {/* Remonté à chaque ouverture pour repartir de la ville enregistrée. */}
+        {open && <CityPicker key={city ?? ''} initial={city} submitLabel="Save city" onSaved={onClose} className="p-6" />}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+// Carte statique : tuiles Esri « World Dark Gray Base » (données OpenStreetMap, sans clé d'API) en niveaux de gris,
+// centrées sur la ville, sans bibliothèque. Les tuiles CARTO exigent désormais une clé (« API key required »).
+const TILE = 256
+const MAP_ZOOM = 12
+/** Tuiles de part et d'autre de celle du centre : de quoi couvrir un panneau pleine largeur. */
+const SPAN_X = 3
+const SPAN_Y = 1
+/** Centre de la ville : en haut à droite sur mobile pour laisser la place au nom, au centre au-delà. */
+const PIN_AT = 'top-[32%] left-[72%] sm:top-1/2 sm:left-1/2'
+const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile'
+
+function worldPixel(lat: number, lon: number, z: number) {
+  const size = TILE * 2 ** z
+  const s = Math.sin((Math.max(-85, Math.min(85, lat)) * Math.PI) / 180)
+  return { x: ((lon + 180) / 360) * size, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * size }
+}
+
+function CityMap({ city, children }: { city: string; children?: ReactNode }) {
+  const geo = useQuery({
+    queryKey: ['geocode', city.toLowerCase()],
+    queryFn: () => api<{ lat: number | null; lon: number | null }>(`/lookup/geocode?q=${encodeURIComponent(city)}`),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  })
+  const tiles = useMemo(() => {
+    const { lat, lon } = geo.data ?? {}
+    if (lat == null || lon == null) return null
+    const p = worldPixel(lat, lon, MAP_ZOOM)
+    const cx = Math.floor(p.x / TILE)
+    const cy = Math.floor(p.y / TILE)
+    const n = 2 ** MAP_ZOOM
+    const list: { key: string; src: string; left: number; top: number }[] = []
+    for (let dy = -SPAN_Y; dy <= SPAN_Y; dy++) {
+      for (let dx = -SPAN_X; dx <= SPAN_X; dx++) {
+        const x = (((cx + dx) % n) + n) % n
+        const y = cy + dy
+        if (y < 0 || y >= n) continue
+        list.push({ key: `${x}-${y}`, src: `${TILE_URL}/${MAP_ZOOM}/${y}/${x}`, left: (cx + dx) * TILE - p.x, top: y * TILE - p.y })
+      }
+    }
+    return list
+  }, [geo.data])
+
+  return (
+    <div className="relative h-52 overflow-hidden rounded-[28px] border bg-[#0b0b0b]">
+      {tiles && (
+        <div aria-hidden="true" className={cn('pointer-events-none absolute select-none [filter:grayscale(1)_brightness(0.95)_contrast(1.08)]', PIN_AT)}>
+          {tiles.map((t) => (
+            <img key={t.key} src={t.src} alt="" width={TILE} height={TILE} draggable={false} className="absolute max-w-none" style={{ left: t.left, top: t.top, width: TILE, height: TILE }} />
+          ))}
+        </div>
+      )}
+      {/* Fondu vers le bas pour la lisibilité du texte, épingle discrète au centre. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      {tiles && (
+        <span aria-hidden="true" className={cn('pointer-events-none absolute -translate-x-1/2 -translate-y-1/2', PIN_AT)}>
+          <span className="absolute -inset-3 rounded-full bg-white/10 ring-1 ring-white/15" />
+          <span className="relative block size-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(0,0,0,0.6)]" />
+        </span>
+      )}
+      <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-3 p-5 sm:p-6">{children}</div>
+      {tiles && (
+        <p className="absolute top-2 right-3 text-[10px] text-white/45">
+          Esri, HERE, Garmin · ©{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="hover:text-white/80">
+            OpenStreetMap
+          </a>{' '}
+          contributors
+        </p>
+      )}
+    </div>
+  )
+}
+
 function CityTab({ period }: { period: Period }) {
   const board = useQuery({ queryKey: ['leaderboard', 'city', period], queryFn: () => api<CityBoard>(`/account/leaderboard/city?period=${period}`) })
+  const [changing, setChanging] = useState(false)
   const d = board.data
 
   if (d && !d.city) {
     return (
       <Panel>
-        <PanelSection>
-          <EmptyState
-            icon={<MapPinIcon width={24} height={24} strokeWidth={1.5} />}
-            title="Where do you run?"
-            description="Tell us the city you run in most and we’ll rank you against the runners there."
-            action={
-              <LinkButton asChild size="sm">
-                <Link to="/onboarding">Add my city</Link>
-              </LinkButton>
-            }
-          />
+        <PanelHeader title="Where do you run?" subtitle="Pick the city you run in most and we’ll rank you against the runners there." />
+        <PanelSection divided>
+          <CityPicker submitLabel="Add my city" />
         </PanelSection>
       </Panel>
     )
@@ -325,25 +469,40 @@ function CityTab({ period }: { period: Period }) {
   const rows = d?.rows ?? []
   const cut = rows.findIndex((r, i) => i > 0 && (r.n ?? 0) > (rows[i - 1]!.n ?? 0) + 1)
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Panel className="self-start">
-        <PanelHeader
-          title={d ? `Runners in ${d.city}` : 'Your city'}
-          subtitle={d ? `${rangeLabel(d)} · ${d.runners} runner${d.runners === 1 ? '' : 's'} ranked` : ' '}
-          actions={d && <Badge icon={<MapPinIcon className="size-3" />}>{d.city}</Badge>}
-        />
-        {d ? (
-          <>
-            <Ranking rows={rows} gapBefore={cut > 0 ? cut : undefined} />
-            <PanelFooter>
-              <p className="text-muted-foreground text-xs">Runners outside your friends show as first name and initial.</p>
-            </PanelFooter>
-          </>
-        ) : (
-          <RankingSkeleton />
-        )}
-      </Panel>
-      <SegmentsPanel city={d?.city ?? null} />
+    <div className="flex flex-col gap-4">
+      {d?.city && (
+        <CityMap city={d.city}>
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-white/60 text-xs">
+              <MapPinIcon className="size-3.5" /> Your city
+            </p>
+            <h2 className="mt-1 truncate font-heading text-2xl text-white tracking-tight">{d.city}</h2>
+            <p className="mt-0.5 text-sm text-white/60">
+              {d.runners} runner{d.runners === 1 ? '' : 's'} ranked · {rangeLabel(d)}
+            </p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setChanging(true)}>
+            <PencilIcon className="size-3.5" /> Change
+          </Button>
+        </CityMap>
+      )}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Panel className="self-start">
+          <PanelHeader
+            title={d ? `Runners in ${d.city}` : 'Your city'}
+            subtitle={d ? `${rangeLabel(d)} · ${d.runners} runner${d.runners === 1 ? '' : 's'} ranked` : ' '}
+          />
+          {d ? (
+            <>
+              <Ranking rows={rows} gapBefore={cut > 0 ? cut : undefined} />
+            </>
+          ) : (
+            <RankingSkeleton />
+          )}
+        </Panel>
+        <SegmentsPanel city={d?.city ?? null} />
+      </div>
+      <CitySheet open={changing} city={d?.city ?? null} onClose={() => setChanging(false)} />
     </div>
   )
 }

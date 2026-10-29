@@ -23,6 +23,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
 } from '@/components/shadcn/sidebar'
 import { cn } from '@/lib/utils'
@@ -35,7 +38,7 @@ import { useLogout, useMe } from '../session'
 import { ConfirmSheet } from '@/components/ConfirmSheet'
 import { LockScreen } from '@/components/LockScreen'
 import { Toaster } from '@/components/Toaster'
-import { formatDay } from '@/lib/coach/dates'
+import { formatDay, toIso } from '@/lib/coach/dates'
 import { useAutoLink } from '@/lib/coach/links'
 import { usePlanEnglish } from '@/lib/coach/translate'
 import { useWeeklyReview } from '@/lib/coach/review'
@@ -54,6 +57,7 @@ import { AnalyticsDashboards, HomeTab, PlanTab } from './CoachTabs'
 import { BrandLogo } from './brands'
 import { CoachChat } from './CoachChat'
 import { FitnessDashboard } from './Fitness'
+import { MobileSubNav, MobileTabBar } from './MobileTabBar'
 import { Integrations } from './Integrations'
 import { LeaderboardPage, useRunSync } from './Leaderboard'
 import { Panel as RPanel, PanelHeader as RPanelHeader } from '@/components/raice/panel'
@@ -66,17 +70,27 @@ import { TrackLoader } from '@/components/raice/track-loader'
  */
 
 type Plan = { id: string; title: string; goal_distance: string; goal_date: string | null; level: string | null; weeks: number | null; sessions_per_week: number | null; status: string }
-type Overview = { answers: CompleteAnswers | null; completedAt: string | null; plans: Plan[] }
+type Overview = { answers: CompleteAnswers | null; completedAt: string | null; plans: Plan[]; shoes?: Shoe[] }
 
-const NAV = [
+type NavItem = { title: string; path: string; icon: ReactNode; children?: { title: string; path: string }[] }
+
+const NAV: NavItem[] = [
   { title: 'Home', path: '/account/home', icon: <HomeIcon /> },
   { title: 'Plan', path: '/account/plan', icon: <CalendarDaysIcon /> },
-  { title: 'Analytics', path: '/account/analytics', icon: <BarChart3Icon /> },
+  {
+    title: 'Analytics',
+    path: '/account/analytics',
+    icon: <BarChart3Icon />,
+    children: [
+      { title: 'Runs', path: '/account/analytics/runs' },
+      { title: 'Fitness', path: '/account/analytics/fitness' },
+    ],
+  },
   { title: 'Leaderboard', path: '/account/leaderboard', icon: <TrophyIcon /> },
   { title: 'Coach', path: '/account/coach', icon: <MessageCircleIcon /> },
   { title: 'Equipment', path: '/account/equipment', icon: <FootprintsIcon /> },
 ]
-const FOOTER_NAV = [
+const FOOTER_NAV: NavItem[] = [
   { title: 'Profile', path: '/account/profile', icon: <UserIcon /> },
   { title: 'Settings', path: '/account/settings', icon: <SettingsIcon /> },
 ]
@@ -165,7 +179,7 @@ export default function RunnerApp() {
             </button>
           </div>
         )}
-        <div className="flex w-full flex-1 flex-col p-4 md:p-8">
+        <div className="flex w-full flex-1 flex-col p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-8">
           {coros.status === 'pending' || (active && !synced) ? (
             <TrackLoader label={coros.status === 'pending' ? 'Connecting to COROS' : 'Loading your plan'} />
           ) : (
@@ -175,6 +189,7 @@ export default function RunnerApp() {
       </SidebarInset>
       <ConfirmSheet />
       <Toaster />
+      <RunnerTabBar />
     </SidebarProvider>
   )
 }
@@ -206,30 +221,14 @@ function CoachRoutes() {
   )
 }
 
-const ANALYTICS_VIEWS = [
-  { value: 'runs', label: 'Runs' },
-  { value: 'fitness', label: 'Fitness' },
-] as const
-
-/** Analytics en deux sous-menus : Runs (volume, sorties, journal) et Fitness (VO2max, prédicteurs de course). */
+/** Analytics en deux sous-menus (barre latérale) : Runs (volume, sorties, journal) et Fitness (VO2max, prédicteurs de course). */
 function AnalyticsTab() {
   const { data } = useOverview()
   const { pathname } = useLocation()
   const view = pathname.endsWith('/fitness') ? 'fitness' : 'runs'
   return (
     <div className="flex w-full flex-col gap-4">
-      <nav aria-label="Analytics" className="inline-flex self-start rounded-full border bg-foreground/[0.04] p-1">
-        {ANALYTICS_VIEWS.map((v) => (
-          <Link
-            key={v.value}
-            to={`/account/analytics/${v.value}`}
-            aria-current={view === v.value ? 'page' : undefined}
-            className={cn('rounded-full px-4 py-1.5 text-sm transition-colors', view === v.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-          >
-            {v.label}
-          </Link>
-        ))}
-      </nav>
+      <MobileSubNav items={NAV.find((n) => n.children)?.children ?? []} />
       {view === 'fitness' ? (
         <FitnessDashboard />
       ) : (
@@ -257,14 +256,25 @@ function SettingsTab() {
 function RunnerSidebar() {
   const { pathname } = useLocation()
   const me = useMe().data
-  const item = (n: (typeof NAV)[number], small?: boolean) => (
+  const item = (n: NavItem, small?: boolean) => (
     <SidebarMenuItem key={n.path}>
-      <SidebarMenuButton asChild isActive={pathname.startsWith(n.path)} tooltip={n.title} size={small ? 'sm' : 'default'}>
-        <Link to={n.path}>
+      <SidebarMenuButton asChild isActive={pathname.startsWith(n.path) && !n.children} tooltip={n.title} size={small ? 'sm' : 'default'}>
+        <Link to={n.children ? n.children[0].path : n.path}>
           {n.icon}
           <span>{n.title}</span>
         </Link>
       </SidebarMenuButton>
+      {n.children && (
+        <SidebarMenuSub>
+          {n.children.map((c) => (
+            <SidebarMenuSubItem key={c.path}>
+              <SidebarMenuSubButton asChild isActive={pathname.startsWith(c.path)}>
+                <Link to={c.path}>{c.title}</Link>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          ))}
+        </SidebarMenuSub>
+      )}
     </SidebarMenuItem>
   )
   return (
@@ -308,15 +318,30 @@ function RunnerSidebar() {
   )
 }
 
+/** Mobile : barre d'onglets en bas ; « More » regroupe les pages hors des quatre onglets. */
+function RunnerTabBar() {
+  const me = useMe().data
+  const more = [
+    ...NAV.filter((n) => ['Leaderboard', 'Equipment'].includes(n.title)),
+    ...FOOTER_NAV,
+    ...(me?.role === 'admin' ? [{ title: 'Back office', path: '/admin', icon: <ShieldIcon /> }] : []),
+  ]
+  return <MobileTabBar more={more} />
+}
+
 function RunnerHeader() {
   const { pathname } = useLocation()
   const page = [...NAV, ...FOOTER_NAV].find((n) => pathname.startsWith(n.path))
+  const sub = page?.children?.find((c) => pathname.startsWith(c.path))
   return (
     <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-sm md:px-8">
-      <CustomSidebarTrigger />
+      <span className="hidden md:contents">
+        <CustomSidebarTrigger />
+      </span>
       <span className="flex items-center gap-2 font-medium text-sm [&>svg]:size-4">
         {page?.icon}
         {page?.title}
+        {sub && <span className="text-muted-foreground">/ {sub.title}</span>}
       </span>
     </header>
   )
@@ -479,7 +504,7 @@ function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
-  return <CoachChat firstName={first} className="mx-auto h-[calc(100dvh-7.5rem)] w-full max-w-4xl md:h-[calc(100dvh-8.5rem)]" />
+  return <CoachChat firstName={first} className="mx-auto h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] w-full max-w-4xl md:h-[calc(100dvh-8.5rem)]" />
 }
 
 // ---------- Equipment ----------
@@ -487,7 +512,11 @@ function CoachTab() {
 /** Durée de vie indicative d'une paire, pour la jauge d'usure. */
 const SHOE_LIFE_KM = 800
 
-type Shoe = { brand: string; model: string; km: number; rotation: boolean }
+/**
+ * Paire telle que renvoyée par le serveur : `km` = kilométrage courant (`baseKm` saisi + sorties synchronisées
+ * après `since`, ajoutées à la paire `credited` : celle par défaut, sinon la première en rotation).
+ */
+type Shoe = { brand: string; model: string; km: number; rotation: boolean; default?: boolean; baseKm?: number; since?: string; credited?: boolean }
 
 function EquipmentPage() {
   const { data, isPending } = useOverview()
@@ -496,7 +525,7 @@ function EquipmentPage() {
   const a = data?.answers as (CompleteAnswers & { shoes?: Shoe[] }) | null | undefined
   if (!a) return <NoOnboarding />
   const g = a.gear
-  const shoes: Shoe[] = a.shoes ?? (g?.brand ? [{ brand: g.brand, model: g.model, km: g.shoeKm, rotation: g.rotation }] : [])
+  const shoes: Shoe[] = data?.shoes ?? a.shoes ?? (g?.brand ? [{ brand: g.brand, model: g.model, km: g.shoeKm, rotation: g.rotation }] : [])
   const watches = (a.wearables ?? []).filter((w) => w !== 'none')
   return (
     <>
@@ -557,19 +586,24 @@ function ShoeSheet({ shoes, index, onClose }: { shoes: Shoe[]; index: number | '
   // Recharge le brouillon à chaque ouverture sur une autre paire.
   if (open && shown !== index) {
     setShown(index)
-    setDraft(current ?? { brand: '', model: '', km: 0, rotation: false })
+    // La paire qui reçoit déjà les sorties sans être cochée apparaît cochée : l'enregistrer ne change rien.
+    setDraft(current ? { ...current, default: !!current.default || (!!current.credited && !shoes.some((s) => s.default)) } : { brand: '', model: '', km: 0, rotation: false })
   }
   if (!open && shown !== null) setShown(null)
   const brands = useQuery({ queryKey: ['shoe-brands'], queryFn: () => api<string[]>('/lookup/shoe-brands'), enabled: open, staleTime: Infinity })
   const models = useQuery({ queryKey: ['shoes'], queryFn: () => api<{ brand: string; model: string }[]>('/lookup/shoes'), enabled: open, staleTime: Infinity })
   const save = useMutation({
-    mutationFn: (next: Shoe[]) => api<{ shoes: Shoe[] }>('/account/shoes', { method: 'PUT', body: { shoes: next } }),
+    mutationFn: (next: Shoe[]) => api<{ shoes: Shoe[] }>('/account/shoes', { method: 'PUT', body: { shoes: next, today: toIso(new Date()) } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['account', 'overview'] })
       onClose()
     },
   })
-  const commit = () => save.mutate(typeof index === 'number' ? shoes.map((s, i) => (i === index ? draft : s)) : [...shoes, draft])
+  // Une seule paire par défaut : la cocher la retire des autres.
+  const commit = () => {
+    const next = typeof index === 'number' ? shoes.map((s, i) => (i === index ? draft : s)) : [...shoes, draft]
+    save.mutate(draft.default ? next.map((s) => (s === draft ? s : { ...s, default: false })) : next)
+  }
   const remove = () => typeof index === 'number' && save.mutate(shoes.filter((_, i) => i !== index))
   const modelOptions = (models.data ?? []).filter((m) => m.brand === draft.brand).map((m) => m.model)
 
@@ -578,7 +612,7 @@ function ShoeSheet({ shoes, index, onClose }: { shoes: Shoe[]; index: number | '
       <SheetContent side="right" className="w-full gap-0 sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader className="border-b p-6">
           <SheetTitle>{current ? 'Edit pair' : 'Add a pair'}</SheetTitle>
-          <SheetDescription>Brand, model and the distance already on the shoes.</SheetDescription>
+          <SheetDescription>Brand, model and the distance on the shoes today. Runs synced after today are added to the default pair.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
           <div className="flex h-24 items-center justify-center rounded-2xl border bg-card">
@@ -613,6 +647,13 @@ function ShoeSheet({ shoes, index, onClose }: { shoes: Shoe[]; index: number | '
             </span>
             <input type="checkbox" className="size-5 accent-[var(--accent)]" checked={draft.rotation} onChange={(e) => setDraft((d) => ({ ...d, rotation: e.target.checked }))} />
           </label>
+          <label className="flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm">
+            <span>
+              <span className="block font-medium">Default pair</span>
+              <span className="block text-muted-foreground text-xs">New runs are added to it.</span>
+            </span>
+            <input type="checkbox" className="size-5 accent-[var(--accent)]" checked={!!draft.default} onChange={(e) => setDraft((d) => ({ ...d, default: e.target.checked }))} />
+          </label>
           {save.error && <p className="text-destructive text-sm">{save.error.message}</p>}
         </div>
         <SheetFooter className="flex-row gap-2 border-t p-6">
@@ -638,11 +679,18 @@ function ShoeCard({ shoe: s, onEdit }: { shoe: Shoe; onEdit: () => void }) {
     <button type="button" onClick={onEdit} aria-label={`Edit ${s.brand} ${s.model}`} className="flex flex-col overflow-hidden rounded-[28px] border bg-card text-left transition-colors hover:border-foreground/30">
       <div className="relative flex h-32 w-full items-center justify-center sm:h-40 bg-[radial-gradient(80%_90%_at_50%_100%,--theme(--color-foreground/.09),transparent)]">
         <BrandLogo brand={s.brand} className="max-h-12 max-w-[55%] text-4xl" />
-        {s.rotation && (
-          <Badge size="sm" tone="info" className="absolute top-4 right-4">
-            In rotation
-          </Badge>
-        )}
+        <div className="absolute top-4 right-4 flex gap-1.5">
+          {s.credited && (
+            <Badge size="sm" tone="success">
+              Default
+            </Badge>
+          )}
+          {s.rotation && (
+            <Badge size="sm" tone="info">
+              In rotation
+            </Badge>
+          )}
+        </div>
       </div>
       <div className="flex w-full flex-1 flex-col gap-4 border-t p-6">
         <div className="flex items-start justify-between gap-3">
@@ -655,10 +703,10 @@ function ShoeCard({ shoe: s, onEdit }: { shoe: Shoe; onEdit: () => void }) {
         <div className="mt-auto">
           <div className="flex items-baseline justify-between">
             <p className="font-medium text-3xl tabular-nums tracking-tight">
-              {s.km}
+              {Math.round(s.km)}
               <span className="ml-1 text-muted-foreground text-sm">km</span>
             </p>
-            <p className="text-muted-foreground text-xs tabular-nums">{wear >= 1 ? 'Time to replace' : `~${SHOE_LIFE_KM - s.km} km left`}</p>
+            <p className="text-muted-foreground text-xs tabular-nums">{wear >= 1 ? 'Time to replace' : `~${Math.round(SHOE_LIFE_KM - s.km)} km left`}</p>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10">
             <div className="h-full rounded-full" style={{ width: `${Math.max(2, wear * 100)}%`, background: color }} />

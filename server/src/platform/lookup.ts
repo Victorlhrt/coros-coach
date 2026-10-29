@@ -235,6 +235,65 @@ lookupRoutes.get('/shoe-brands', (c) =>
   c.json([...new Set([...SHOES.map((s) => s.brand), ...EXTRA_BRANDS])].sort((a, b) => a.localeCompare(b, 'fr'))),
 )
 
+// ---------- Géocodage des villes (carte du Leaderboard) ----------
+
+/** Villes proposées à l'onboarding : coordonnées fixes, sans appel à Nominatim. */
+const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
+  paris: { lat: 48.8566, lon: 2.3522 },
+  lyon: { lat: 45.764, lon: 4.8357 },
+  marseille: { lat: 43.2965, lon: 5.3698 },
+  bordeaux: { lat: 44.8378, lon: -0.5792 },
+  lille: { lat: 50.6292, lon: 3.0573 },
+  toulouse: { lat: 43.6047, lon: 1.4442 },
+  nantes: { lat: 47.2184, lon: -1.5536 },
+  annecy: { lat: 45.8992, lon: 6.1294 },
+  chamonix: { lat: 45.9237, lon: 6.8694 },
+  grenoble: { lat: 45.1885, lon: 5.7245 },
+}
+
+// Nominatim : une requête par seconde au plus pour tout le serveur, résultats gardés 30 jours (échecs compris).
+const geoCache = new Map<string, { at: number; value: { lat: number; lon: number } | null }>()
+let nominatimQueue: Promise<unknown> = Promise.resolve()
+function nominatim(q: string) {
+  const run = nominatimQueue.then(async () => {
+    const started = Date.now()
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, {
+        headers: { 'user-agent': 'Raice.run (contact@raice.run)', 'accept-language': 'en' },
+        signal: AbortSignal.timeout(6000),
+      })
+      if (!res.ok) throw new Error(`Nominatim ${res.status}`)
+      const [hit] = (await res.json()) as { lat: string; lon: string }[]
+      const lat = Number(hit?.lat)
+      const lon = Number(hit?.lon)
+      return hit && Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
+    } finally {
+      await new Promise((r) => setTimeout(r, Math.max(0, 1100 - (Date.now() - started))))
+    }
+  })
+  nominatimQueue = run.catch(() => undefined)
+  return run
+}
+
+lookupRoutes.get('/geocode', async (c) => {
+  const q = (c.req.query('q') ?? '').trim().slice(0, 80)
+  if (q.length < 2) return c.json({ lat: null, lon: null })
+  const key = normalize(q).replace(/\s+/g, ' ')
+  const preset = CITY_COORDS[key.split(',')[0]!.trim()]
+  if (preset) return c.json(preset)
+  const hit = geoCache.get(key)
+  if (hit && Date.now() - hit.at < 30 * 86_400_000) return c.json(hit.value ?? { lat: null, lon: null })
+  if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
+  try {
+    const value = await nominatim(q)
+    geoCache.set(key, { at: Date.now(), value })
+    if (geoCache.size > 5000) geoCache.delete(geoCache.keys().next().value as string)
+    return c.json(value ?? { lat: null, lon: null })
+  } catch {
+    return c.json({ error: 'Map lookup is unavailable right now.' }, 502)
+  }
+})
+
 // ---------- Statistiques de la communauté ----------
 
 /**

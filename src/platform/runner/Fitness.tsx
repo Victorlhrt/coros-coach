@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDownRight, ArrowUpRight, ChevronDown, Minus } from 'lucide-react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LineChart, type Kpi } from '@/components/raice/metrics-dashboard'
@@ -86,7 +85,7 @@ export function FitnessDashboard() {
   const records = usePlan((s) => s.records)
   const activities = useLongActivities()
   const [range, setRange] = useState('16')
-  const [open, setOpen] = useState<string | null>('vo2')
+  const [open, setOpen] = useState('vo2')
   const [now] = useState(today)
   const acts = activities.data ?? []
   const weeks = weeklyFitness(lastWeeks(now, Number(range)), acts)
@@ -155,11 +154,11 @@ export function FitnessDashboard() {
       points: rolling.map((p) => ({ x: p.x, y: predictTime(p.y, predictMeters) })),
       format: (v) => formatClock(v),
       extra: current ? (
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           {RECORD_DISTANCES.map((d) => (
-            <div key={d.key} className="bg-card px-4 py-3">
+            <div key={d.key}>
               <p className="text-muted-foreground text-xs">{d.label}</p>
-              <p className="mt-0.5 font-medium tabular-nums">{formatClock(predictTime(current, d.meters))}</p>
+              <p className="font-medium text-sm tabular-nums">{formatClock(predictTime(current, d.meters))}</p>
             </div>
           ))}
         </div>
@@ -239,56 +238,84 @@ export function FitnessDashboard() {
           </>
         }
       />
-      <div className="divide-y border-t">
-        {rows.map((r) => (
-          <FitnessRow key={r.id} row={r} open={open === r.id} onToggle={() => setOpen(open === r.id ? null : r.id)} empty={connected ? 'Not enough runs in this period' : 'COROS isn’t connected'} />
-        ))}
-      </div>
+      {(() => {
+        const empty = connected ? 'Not enough runs in this period' : 'COROS isn’t connected'
+        const active = rows.find((r) => r.id === open) ?? rows[0]
+        const span: Record<string, string> = { vo2: 'col-span-2', predict: 'col-span-2', load: 'col-span-2 lg:col-span-1' }
+        return (
+          <div className="grid grid-cols-2 gap-3 border-t p-4 sm:p-6 lg:grid-cols-4">
+            {rows.map((r) => (
+              <MetricTile key={r.id} row={r} active={active.id === r.id} big={r.id === 'vo2' || r.id === 'predict'} className={span[r.id]} onSelect={() => setOpen(r.id)} />
+            ))}
+            <div className="col-span-2 flex min-w-0 flex-col gap-3 rounded-[20px] border p-4 lg:col-span-3">
+              <p className="font-medium text-sm">{active.label}</p>
+              <LineChart kpi={active} showCompare={false} emptyLabel={empty} />
+            </div>
+          </div>
+        )
+      })()}
     </Panel>
   )
 }
 
-function FitnessRow({ row, open, onToggle, empty }: { row: Row; open: boolean; onToggle: () => void; empty: string }) {
-  const reduce = useReducedMotion()
+/** Tuile du bento : indicateur, valeur, variation et petite courbe ; la tuile choisie s'ouvre en grand dans le graphique. */
+function MetricTile({ row, active, big, className, onSelect }: { row: Row; active: boolean; big?: boolean; className?: string; onSelect: () => void }) {
   const t = row.trend ?? 'flat'
-  const tone = t === 'flat' ? 'text-muted-foreground' : t === (row.goodWhen ?? 'up') ? 'text-emerald-400' : 'text-red-400'
+  const good = t !== 'flat' && t === (row.goodWhen ?? 'up')
+  const tone = t === 'flat' ? 'text-muted-foreground' : good ? 'text-emerald-400' : 'text-red-400'
   const Icon = t === 'up' ? ArrowUpRight : t === 'down' ? ArrowDownRight : Minus
   return (
-    <div>
-      <button type="button" onClick={onToggle} aria-expanded={open} title={row.hint} className={cn('flex w-full items-center gap-4 px-6 py-4 text-left transition-colors', open ? 'bg-foreground/[0.03]' : 'hover:bg-foreground/[0.02]')}>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm">{row.label}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="font-medium text-xl tabular-nums tracking-tight">
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      title={row.hint}
+      className={cn(
+        'flex min-w-0 flex-col gap-3 rounded-[20px] border p-4 text-left transition-colors',
+        active ? 'border-foreground/40 bg-foreground/[0.04]' : 'hover:border-foreground/20 hover:bg-foreground/[0.02]',
+        className,
+      )}
+    >
+      <p className="truncate text-muted-foreground text-sm">{row.label}</p>
+      <div className={cn('flex flex-wrap items-end justify-between gap-x-4 gap-y-3', !big && 'flex-col items-start')}>
+        <div className="min-w-0">
+          <p className={cn('font-medium tabular-nums tracking-tight', big ? 'text-4xl' : 'text-2xl')}>
             {row.value}
             {row.unit && <span className="ml-1 font-normal text-muted-foreground text-xs">{row.unit}</span>}
           </p>
-          {row.delta && (
-            <p className={cn('inline-flex items-center gap-1 text-xs tabular-nums', tone)}>
+          {row.delta ? (
+            <p className={cn('mt-1 inline-flex items-center gap-1 text-xs tabular-nums', tone)}>
               <Icon className="size-3" aria-hidden />
               {row.delta}
             </p>
+          ) : (
+            <p className="mt-1 h-4" />
           )}
         </div>
-        <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={reduce ? false : { height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={reduce ? undefined : { height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="flex flex-col gap-4 px-6 pt-2 pb-6">
-              <LineChart kpi={row} showCompare={false} emptyLabel={empty} />
-              {row.extra}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        {big && row.extra}
+      </div>
+      <Spark points={row.points.map((p) => p.y)} invert={row.goodWhen === 'down'} className={cn('mt-auto', big ? 'h-12' : 'h-9')} />
+    </button>
+  )
+}
+
+/** Petite courbe sans axes ; le point final marque la dernière valeur. `invert` met « mieux » en haut (allures, chronos). */
+function Spark({ points, invert, className }: { points: number[]; invert?: boolean; className?: string }) {
+  if (points.length < 2) return <div className={cn('w-full rounded-full border-t border-dashed opacity-40', className)} />
+  const lo = Math.min(...points)
+  const hi = Math.max(...points)
+  const span = hi - lo || 1
+  const xy = points.map((v, i) => {
+    const n = (v - lo) / span
+    return [(i / (points.length - 1)) * 100, (invert ? n : 1 - n) * 90 + 5] as const
+  })
+  const [lx, ly] = xy[xy.length - 1]
+  return (
+    <div className={cn('relative w-full', className)} aria-hidden>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
+        <polyline points={xy.map(([x, y]) => `${x},${y}`).join(' ')} fill="none" stroke="currentColor" strokeOpacity={0.7} strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      </svg>
+      <span className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" style={{ left: `${lx}%`, top: `${ly}%` }} />
     </div>
   )
 }
