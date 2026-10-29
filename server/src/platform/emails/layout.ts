@@ -6,7 +6,8 @@
 
 import { config } from '../../config.js'
 
-export type Email = { subject: string; html: string; text: string }
+/** `headers` : en-têtes ajoutés à l'envoi (List-Unsubscribe des e-mails de relance). */
+export type Email = { subject: string; html: string; text: string; headers?: Record<string, string> }
 
 const FONT = "Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif"
 const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
@@ -33,6 +34,7 @@ export type Block =
   | { kind: 'metrics'; items: { label: string; value: string }[] }
   | { kind: 'note'; text: string }
   | { kind: 'code'; text: string }
+  | { kind: 'list'; items: string[] }
 
 function block(b: Block): string {
   switch (b.kind) {
@@ -55,6 +57,13 @@ function block(b: Block): string {
     </td>
   </tr></table>
 </td></tr>`
+    case 'list':
+      // Puces discrètes en tableau (les <ul> sont mal tenus par Outlook).
+      return `<tr><td style="padding:0 0 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${b.items
+        .map(
+          (t) => `<tr><td valign="top" style="width:20px;padding:0 0 10px;font-family:${FONT};font-size:16px;line-height:24px;color:${C.muted};">&bull;</td><td style="padding:0 0 10px;font-family:${FONT};font-size:15px;line-height:24px;color:${C.foreground};">${escape(t)}</td></tr>`,
+        )
+        .join('')}</table></td></tr>`
     case 'metrics': {
       // Comme la MetricCard d'Arc : libellé discret au-dessus, valeur grande et serrée.
       const cells = b.items
@@ -78,12 +87,27 @@ function blockText(b: Block): string {
       return `${b.label} : ${b.href}`
     case 'metrics':
       return b.items.map((m) => `${m.label} : ${m.value}`).join('\n')
+    case 'list':
+      return b.items.map((t) => `- ${t}`).join('\n')
     default:
       return b.text
   }
 }
 
-export function render({ subject, preheader, blocks, footer }: { subject: string; preheader: string; blocks: Block[]; footer?: string }): Email {
+export function render({
+  subject,
+  preheader,
+  blocks,
+  footer,
+  unsubscribeUrl,
+}: {
+  subject: string
+  preheader: string
+  blocks: Block[]
+  footer?: string
+  /** E-mails de relance : lien de désinscription dans le pied de page et en-têtes List-Unsubscribe. */
+  unsubscribeUrl?: string
+}): Email {
   const foot = footer ?? 'You’re receiving this email because you have a Raice.run account.'
   const html = `<!doctype html>
 <html lang="en">
@@ -110,12 +134,13 @@ export function render({ subject, preheader, blocks, footer }: { subject: string
 ${blocks.map(block).join('\n')}
       </table>
     </td></tr>
-    <tr><td style="padding:24px 8px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted};">${escape(foot)}<br>Raice.run · your running plan, written by AI, synced to your watch.</td></tr>
+    <tr><td style="padding:24px 8px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted};">${escape(foot)}${unsubscribeUrl ? ` <a href="${escape(unsubscribeUrl)}" target="_blank" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a>` : ''}<br>Raice.run · your running plan, written by AI, synced to your watch.</td></tr>
   </table>
 </td></tr>
 </table>
 </body>
 </html>`
-  const text = [...blocks.map(blockText), '', '—', foot, 'Raice.run'].join('\n\n')
-  return { subject, html, text }
+  const text = [...blocks.map(blockText), '', '—', foot, ...(unsubscribeUrl ? [`Unsubscribe: ${unsubscribeUrl}`] : []), 'Raice.run'].join('\n\n')
+  if (!unsubscribeUrl) return { subject, html, text }
+  return { subject, html, text, headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }
 }

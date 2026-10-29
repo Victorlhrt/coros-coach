@@ -10,6 +10,8 @@ type Settings = {
   signupMode: 'open' | 'waitlist' | 'closed'
   billingEnforced: boolean
   billingConfigured: boolean
+  onboardingReminders: boolean
+  emailConfigured: boolean
   admins: { id: string; email: string; name: string; last_login_at: string | null }[] }
 
 const MODES = [
@@ -30,11 +32,16 @@ export function SettingsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'settings'] }),
   })
 
+  const setReminders = useMutation({
+    mutationFn: (onboardingReminders: boolean) => api('/admin/settings', { method: 'PUT', body: { onboardingReminders } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'settings'] }),
+  })
+
   return (
     <>
       <PageTitle title="Access & settings" description="Sign-up availability and the admin team." />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <ErrorNote error={settings.error ?? setMode.error ?? setEnforced.error} />
+        <ErrorNote error={settings.error ?? setMode.error ?? setEnforced.error ?? setReminders.error} />
         <Panel title="Sign-ups">
           {settings.data && (
             <RadioCards aria-label="Sign-up mode" layout="list" options={MODES} value={settings.data.signupMode} onValueChange={(v) => setMode.mutate(v)} />
@@ -45,6 +52,18 @@ export function SettingsPage() {
             <label className="flex items-center justify-between gap-4 text-sm">
               <span className="font-medium">Enforce plan limits</span>
               <Switch checked={settings.data.billingEnforced} disabled={setEnforced.isPending} onCheckedChange={(v) => setEnforced.mutate(v)} aria-label="Enforce plan limits" />
+            </label>
+          )}
+        </Panel>
+        <Panel
+          title="Onboarding reminders"
+          description="One email, 3 hours after someone stops the onboarding without finishing (up to 7 days). It links back to the step they were on."
+          actions={settings.data && <Badge size="sm" tone={settings.data.emailConfigured ? 'success' : 'warning'}>{settings.data.emailConfigured ? 'Resend connected' : 'No Resend key'}</Badge>}
+        >
+          {settings.data && (
+            <label className="flex items-center justify-between gap-4 text-sm">
+              <span className="font-medium">Send reminders</span>
+              <Switch checked={settings.data.onboardingReminders} disabled={setReminders.isPending} onCheckedChange={(v) => setReminders.mutate(v)} aria-label="Send onboarding reminders" />
             </label>
           )}
         </Panel>

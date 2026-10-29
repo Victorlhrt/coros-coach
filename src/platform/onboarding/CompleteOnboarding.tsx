@@ -43,6 +43,8 @@ import { api, type Variant } from '../api'
 import { connectGarminOnboarding, type GarminExpiry } from '@/lib/garmin/client'
 import { GarminKeyForm } from '../runner/GarminConnect'
 import { CoachAvatar } from './CoachAvatar'
+import { CoachBubble, TypingBubble, UserBubble } from './ChatBubbles'
+import { CodeStep } from './CodeStep'
 import { readStravaExport, type StravaSummary } from './strava'
 import { InsightTiles, hasInsights, watchName, watchPerformances, type WatchInsights } from './WatchInsights'
 import { distanceCategory, formatDuration, formatPace, parseDuration, predict, type Performance } from './estimate'
@@ -150,6 +152,7 @@ export type CompleteAnswers = {
 }
 
 const STEPS = [
+  { id: 'code', label: 'Invite' },
   { id: 'identity', label: 'You' },
   { id: 'reason', label: 'Motivation' },
   { id: 'watch', label: 'Watch' },
@@ -322,12 +325,77 @@ const MANUAL_DISTANCES = [
   { value: '42.195', label: 'Marathon' },
 ]
 
+/** Accès sur invitation : la question du code, posée avant que le parcours existe côté serveur. */
+export type InviteGateProps = {
+  /** Code validé (gardé pour la visite), null tant qu'il n'y en a pas. */
+  code: string | null
+  /** Code reçu par lien (`?code=`), vérifié tout seul. */
+  initialCode: string | null
+  /** Lien de parrainage d'un ami (`?ref=`), repris par la liste d'attente. */
+  referrer: string | null
+  /** Erreur au démarrage du parcours (code épuisé entre-temps…) : retour à la question du code. */
+  error?: string
+  onValid: (code: string) => void
+}
+
+/** Parcours de test du back office (`?flow=`, aperçus seulement) : réponses de branche données d'avance. */
+export const PREVIEW_FLOWS: Record<string, { answers: Partial<CompleteAnswers>; at: string }> = {
+  coros: { answers: { has_watch: 'yes', wearables: ['coros'] }, at: 'connect' },
+  garmin: { answers: { has_watch: 'yes', wearables: ['garmin'] }, at: 'connect' },
+  strava: { answers: { has_watch: 'no', wearables: [], data_source: 'strava' }, at: 'strava' },
+}
+/** Réponses de test des premières étapes, pour arriver vite sur la branche testée (toujours modifiables). */
+const PREVIEW_BASE: Partial<CompleteAnswers> = {
+  identity: { firstName: 'Test', lastName: 'Runner', email: 'preview@raice.run' },
+  reason: 'race',
+}
+
+/** Fil des questions selon les réponses (la question du code n'existe que pour les visiteurs sans compte). */
+function flowFor(a: CompleteAnswers, gated: boolean) {
+  // « M'entraîner » n'a pas de course à choisir : l'étape Course disparaît du fil.
+  return STEPS.filter((s) => {
+    if (s.id === 'code') return gated
+    if (s.id === 'target') return a.goal?.type !== 'train'
+    if (s.id === 'wearables') return a.has_watch === 'yes'
+    if (s.id === 'connect') return a.has_watch === 'yes' && (a.wearables ?? []).some((w) => w === 'coros' || w === 'garmin')
+    if (s.id === 'nowatch') return a.has_watch === 'no'
+    if (s.id === 'strava') return a.has_watch === 'no' && a.data_source === 'strava'
+    return true
+  })
+}
+
+/** Point de départ : reprise d'un parcours (question suivant la dernière réponse), parcours de test, ou code déjà validé. */
+function initialState({ gate, preset, resume }: { gate?: InviteGateProps; preset?: string | null; resume?: ResumeState | null }) {
+  const empty: CompleteAnswers = { wearables: [], performances: [] }
+  if (resume) {
+    const answers = { ...empty, ...resume.answers }
+    const f = flowFor(answers, false)
+    const next = resume.nextStepId ? f.findIndex((s) => s.id === resume.nextStepId) : -1
+    if (next >= 0) return { answers, index: next }
+    const at = resume.stepId ? f.findIndex((s) => s.id === resume.stepId) : -1
+    return { answers, index: at >= 0 ? Math.min(at + 1, f.length - 1) : 0 }
+  }
+  const flow = preset ? PREVIEW_FLOWS[preset] : undefined
+  if (flow) {
+    const answers = { ...empty, ...PREVIEW_BASE, ...flow.answers }
+    return { answers, index: Math.max(0, flowFor(answers, false).findIndex((s) => s.id === flow.at)) }
+  }
+  return { answers: empty, index: gate?.code ? 1 : 0 }
+}
+
+/** Parcours repris depuis le lien de relance : réponses enregistrées et dernière question répondue. */
+export type ResumeState = { answers: CompleteAnswers; stepId: string | null; nextStepId?: string | null }
+
 export function CompleteOnboarding({
   sessionId,
   preview,
   ready,
   onSave,
   onComplete,
+  gate,
+  preset,
+  resume,
+  notice,
 }: {
   variant: Variant
   sessionId: string | null
@@ -335,12 +403,17 @@ export function CompleteOnboarding({
   ready: boolean
   onSave: (answers: CompleteAnswers, stepReached: number, stepId: string) => Promise<void>
   onComplete: (answers: CompleteAnswers) => Promise<void>
+  /** Visiteur sans compte : le code d'invitation est la première question. */
+  gate?: InviteGateProps
+  /** Aperçu seulement : parcours de test (`coros`, `garmin`, `strava`). */
+  preset?: string | null
+  resume?: ResumeState | null
+  /** Petit mot de Pacer avant la première question (lien de relance expiré…). */
+  notice?: string
 }) {
-  const [index, setIndex] = useState(0)
-  const [a, setA] = useState<CompleteAnswers>({
-    wearables: [],
-    performances: [],
-  })
+  const [init] = useState(() => initialState({ gate, preset, resume }))
+  const [index, setIndex] = useState(init.index)
+  const [a, setA] = useState<CompleteAnswers>(init.answers)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const patch = (p: Partial<CompleteAnswers>) => setA((cur) => ({ ...cur, ...p }))
@@ -357,18 +430,21 @@ export function CompleteOnboarding({
     void qc.prefetchQuery(gravatarQuery(person.email))
     void qc.prefetchQuery(webProfileQuery(sessionId, person))
   }
-  // « M'entraîner » n'a pas de course à choisir : l'étape Course disparaît du fil.
-  const flow = STEPS.filter((s) => {
-    if (s.id === 'target') return a.goal?.type !== 'train'
-    if (s.id === 'wearables') return a.has_watch === 'yes'
-    if (s.id === 'connect') return a.has_watch === 'yes' && (a.wearables ?? []).some((w) => w === 'coros' || w === 'garmin')
-    if (s.id === 'nowatch') return a.has_watch === 'no'
-    if (s.id === 'strava') return a.has_watch === 'no' && a.data_source === 'strava'
-    return true
-  })
+  const gated = !!gate
+  const flow = flowFor(a, gated)
   const step = flow[Math.min(index, flow.length - 1)]
+  // Numéro d'étape enregistré (statistiques) : la question du code, posée avant le parcours, n'est pas comptée.
+  const offset = gated ? 1 : 0
+  // Pas de retour vers la question du code une fois validé.
+  const canBack = index > 0 && flow[index - 1]?.id !== 'code'
+
+  // Code refusé au démarrage du parcours (épuisé entre-temps) : retour à la question du code.
+  useEffect(() => {
+    if (gate && !gate.code && index > 0) setIndex(0)
+  }, [gate?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const valid: Record<string, boolean> = {
+    code: !!gate?.code,
     reason: !!a.reason,
     wearables: (a.wearables?.length ?? 0) > 0,
     connect: true,
@@ -396,7 +472,7 @@ export function CompleteOnboarding({
     try {
       const flat = withPlanFields({ ...a, ...extra })
       if (step.id === 'identity' && flat.identity) await captureLead(flat.identity)
-      await onSave(flat, index + 1, step.id)
+      await onSave(flat, index + 1 - offset, step.id)
       setA(flat)
       setIndex(index + 1)
     } catch (e) {
@@ -414,7 +490,7 @@ export function CompleteOnboarding({
     enabled: weeklyKm !== undefined,
     staleTime: 600_000,
   })
-  const ctx = { weeklyPct: weeklyStat.data?.percentile ?? null }
+  const ctx = { weeklyPct: weeklyStat.data?.percentile ?? null, gated, referred: !!gate?.referrer }
 
   /**
    * Dès qu'une montre est connectée, son aperçu est lu en arrière-plan pendant que la conversation continue.
@@ -449,7 +525,11 @@ export function CompleteOnboarding({
     ) : null
 
   // Pacer écrit ses bulles une à une, avec un temps de frappe ; la zone de réponse vient ensuite.
-  const lines = coachLines(step.id, a, ctx)
+  const linesFor = (id: string) => {
+    const l = coachLines(id, a, ctx)
+    return notice && id === flow[0]?.id ? [l[0], notice, ...l.slice(1)] : l
+  }
+  const lines = linesFor(step.id)
   const [shown, setShown] = useState(0)
   const [typing, setTyping] = useState(true)
   useEffect(() => {
@@ -489,13 +569,13 @@ export function CompleteOnboarding({
       {/* Échanges passés : les bulles du coach, puis la réponse résumée */}
       {flow.slice(0, index).map((s) => (
         <div key={s.id} className="flex flex-col gap-2">
-          {coachLines(s.id, a, ctx).map((line, i) => (
+          {linesFor(s.id).map((line, i) => (
             <CoachBubble key={i} first={i === 0}>
               {line}
             </CoachBubble>
           ))}
           {insightCard(s.id)}
-          <UserBubble>{summarize(s.id, a)}</UserBubble>
+          <UserBubble>{s.id === 'code' ? `Code ${gate?.code ?? ''} ✓` : summarize(s.id, a)}</UserBubble>
         </div>
       ))}
 
@@ -511,7 +591,17 @@ export function CompleteOnboarding({
       </div>
 
       {ready2 &&
-        (step.id === 'generate' ? (
+        (step.id === 'code' && gate ? (
+          <CodeStep
+            initialCode={gate.initialCode}
+            referrer={gate.referrer}
+            error={gate.error}
+            onValid={(code) => {
+              gate.onValid(code)
+              setIndex(1)
+            }}
+          />
+        ) : step.id === 'generate' ? (
           <div className="animate-[fade-in_300ms_ease-out] rounded-[26px] border bg-card p-5">
             <GenerateStep answers={a} preview={preview} onDone={() => onComplete(withPlanFields(a))} />
           </div>
@@ -520,7 +610,7 @@ export function CompleteOnboarding({
             options={QUICK[step.id].options}
             disabled={!ready || busy}
             onPick={(value) => void next(QUICK[step.id].answer(value))}
-            onBack={index > 0 ? () => setIndex(index - 1) : undefined}
+            onBack={canBack ? () => setIndex(index - 1) : undefined}
           />
         ) : (
           <>
@@ -544,7 +634,7 @@ export function CompleteOnboarding({
               }}
             >
               {step.id === 'wearables' && <WearablesStep answers={a} patch={patch} />}
-              {step.id === 'connect' && <ConnectStep answers={a} patch={patch} sessionId={sessionId} />}
+              {step.id === 'connect' && <ConnectStep answers={a} patch={patch} sessionId={sessionId} guideOpen={preset === 'garmin'} />}
               {step.id === 'strava' && <StravaImport answers={a} patch={patch} />}
               {step.id === 'identity' && <IdentityStep answers={a} patch={patch} />}
               {step.id === 'profile' && <ProfileStep answers={a} patch={patch} sessionId={sessionId} />}
@@ -562,7 +652,7 @@ export function CompleteOnboarding({
                 </p>
               )}
               <div className="flex items-center justify-between gap-3 border-t pt-4">
-                <Button type="button" variant="ghost" size="sm" disabled={index === 0 || busy} onClick={() => setIndex(index - 1)}>
+                <Button type="button" variant="ghost" size="sm" disabled={!canBack || busy} onClick={() => setIndex(index - 1)}>
                   <ArrowLeftIcon className="size-4" /> Edit
                 </Button>
                 <Button type="submit" loading={busy} disabled={!ready || !valid[step.id]}>
@@ -635,13 +725,23 @@ function volumePraise(km: number, pct: number | null) {
 }
 
 /** Répliques de Pacer : un petit mot sur la réponse précédente, puis la question. */
-function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number | null }): string[] {
+function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number | null; gated: boolean; referred: boolean }): string[] {
   const first = a.identity?.firstName.trim()
   const race = a.goal?.race
   const h = a.health
   switch (step) {
+    case 'code':
+      return [
+        'Hi! I’m Pacer, your running coach.',
+        ctx.referred
+          ? 'A friend sent you here. Raice.run is invite-only for now: what’s your invite code?'
+          : 'Raice.run is invite-only for now, opening in small waves. What’s your invite code?',
+      ]
     case 'identity':
-      return ['Hi! I’m Pacer, your running coach.', 'First, let’s get to know each other: your first name, last name and email.']
+      return [
+        ctx.gated ? 'You’re in, welcome!' : 'Hi! I’m Pacer, your running coach.',
+        'First, let’s get to know each other: your first name, last name and email.',
+      ]
     case 'reason':
       return [`Nice to meet you${first ? `, ${first}` : ''}!`, 'Before I build your plan, tell me: what brings you here?']
     case 'watch':
@@ -652,7 +752,7 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
       const w = a.wearables ?? []
       return w.includes('coros')
         ? ['COROS, great choice.', 'Connect your account: I’ll pull your history while we chat.']
-        : ['Garmin, noted.', 'Garmin sync is coming very soon: we’re waiting for Garmin’s approval. I’ll let you know as soon as it’s ready.']
+        : ['Garmin, noted.', 'Connect it with a Personal API key from Garmin Connect: follow the steps, it takes a minute.']
     }
     case 'nowatch':
       return ['No problem.', 'Do you log your runs on Strava, or do you run without tracking anything?']
@@ -826,32 +926,6 @@ function summarize(step: string, a: CompleteAnswers): string {
   }
 }
 
-function CoachBubble({ children, first }: { children: React.ReactNode; first: boolean }) {
-  return (
-    <div className="flex animate-[fade-in_300ms_ease-out] items-end gap-2">
-      <span className="w-9 shrink-0">{first && <CoachAvatar />}</span>
-      <p className="max-w-[85%] rounded-2xl rounded-bl-md border bg-card px-4 py-2.5 text-sm leading-relaxed">{children}</p>
-    </div>
-  )
-}
-
-function UserBubble({ children }: { children: React.ReactNode }) {
-  return <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-background text-sm">{children}</p>
-}
-
-function TypingBubble({ avatar }: { avatar: boolean }) {
-  return (
-    <div className="flex items-end gap-2">
-      <span className="w-9 shrink-0">{avatar && <CoachAvatar />}</span>
-      <span className="flex gap-1 rounded-2xl rounded-bl-md border bg-card px-4 py-3.5">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${i * 120}ms` }} />
-        ))}
-      </span>
-    </div>
-  )
-}
-
 /** Champs à plat attendus par la demande de plan (distance, date, volume). */
 function withPlanFields(a: CompleteAnswers): CompleteAnswers {
   const race = a.goal?.race
@@ -957,13 +1031,13 @@ function StravaImport({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 }
 
 /** Connexion des montres : COROS par OAuth dans une nouvelle fenêtre, Garmin par la clé Personal API collée ici. */
-function ConnectStep({ answers, patch, sessionId }: StepProps & { sessionId: string | null }) {
+function ConnectStep({ answers, patch, sessionId, guideOpen }: StepProps & { sessionId: string | null; guideOpen?: boolean }) {
   const w = answers.wearables ?? []
   const connected = answers.connected ?? []
   const [opening, setOpening] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState('')
-  const [garminOpen, setGarminOpen] = useState(false)
+  const [garminOpen, setGarminOpen] = useState(!!guideOpen)
   const [garminPending, setGarminPending] = useState(false)
   const [garminError, setGarminError] = useState('')
 

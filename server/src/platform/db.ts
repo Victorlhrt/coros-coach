@@ -154,6 +154,10 @@ export async function migratePlatform() {
       updated_at timestamptz not null default now()
     )`
   await db`create unique index if not exists wearable_connections_session_idx on wearable_connections (provider, onboarding_session_id)`
+  // Connexions faites pendant un aperçu admin : détachées du compte de l'admin (elles n'y ont jamais été destinées).
+  await db`
+    update wearable_connections w set user_id = null
+    from onboarding_sessions s where s.id = w.onboarding_session_id and s.is_preview and w.user_id is not null`
   await db`
     create table if not exists oauth_pending (
       state text primary key,
@@ -186,6 +190,10 @@ export async function migratePlatform() {
     )`
   await db`create index if not exists leads_created_idx on leads (created_at desc)`
   await db`create index if not exists leads_session_idx on leads (onboarding_session_id)`
+  // Relance des onboardings abandonnés : dernière étape validée du parcours (reprise), relance unique, désinscription.
+  await db`alter table onboarding_sessions add column if not exists last_step_id text`
+  await db`alter table leads add column if not exists reminder_sent_at timestamptz`
+  await db`alter table leads add column if not exists unsubscribed_at timestamptz`
   // Classements : totaux de course par jour (poussés par l'app depuis COROS) et amitiés entre coureurs.
   await db`
     create table if not exists run_days (
@@ -275,6 +283,8 @@ export async function migratePlatform() {
   }
   await db`insert into app_settings (key, value) values ('signup_mode', ${db.json('open')}) on conflict (key) do nothing`
   await db`insert into app_settings (key, value) values ('billing_enforced', ${db.json(false)}) on conflict (key) do nothing`
+  // Relances d'onboarding : seulement les parcours abandonnés après la mise en service (pas les anciens leads).
+  await db`insert into app_settings (key, value) values ('onboarding_reminders_since', ${db.json(new Date().toISOString())}) on conflict (key) do nothing`
   await db`delete from user_sessions where expires_at < now()`
   await db`delete from password_resets where expires_at < now() - interval '1 day'`
 }

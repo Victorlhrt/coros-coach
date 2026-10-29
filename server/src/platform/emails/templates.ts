@@ -110,6 +110,56 @@ export function invited(p: { name: string; app: string; code: string }): Email {
   })
 }
 
+/** Étape où la personne s'est arrêtée, telle qu'on la nomme dans la relance (ids de STEPS, CompleteOnboarding.tsx). */
+const STOPPED_AT: Record<string, string> = {
+  reason: 'You stopped at why you run.',
+  watch: 'You stopped at your watch.',
+  wearables: 'You stopped at your watch model.',
+  connect: 'You stopped at connecting your watch.',
+  nowatch: 'You stopped at your training data.',
+  strava: 'You stopped at your Strava import.',
+  profile: 'You stopped at your profile.',
+  about: 'You stopped at a few details about you.',
+  experience: 'You stopped at your running experience.',
+  goal: 'You stopped at your goal.',
+  target: 'You stopped at your race.',
+  estimate: 'You stopped at your time estimate.',
+  volume: 'You stopped at your weekly volume.',
+  pains: 'You stopped at aches and pains.',
+  events: 'You stopped at your recent races.',
+  days: 'You stopped at your availability.',
+  duration: 'You stopped at your session length.',
+  gear: 'You stopped at your gear.',
+  generate: 'You were one step away from your plan.',
+}
+
+/** Relance unique, 3 h après un onboarding commencé mais pas terminé. `stepId` = étape où reprendre. */
+export function onboardingReminder(p: { firstName: string; resumeUrl: string; unsubscribeUrl: string; stepId: string | null }): Email {
+  const name = first(p.firstName)
+  const stopped = p.stepId ? STOPPED_AT[p.stepId] : undefined
+  return render({
+    subject: name === 'there' ? 'Your plan is waiting' : `Your plan is waiting, ${name}`,
+    preheader: 'Your answers are saved. Pick up right where you left off.',
+    footer: 'You’re receiving this email because you started building a plan on Raice.run. This is the only reminder we’ll send.',
+    unsubscribeUrl: p.unsubscribeUrl,
+    blocks: [
+      { kind: 'eyebrow', text: 'Your plan' },
+      { kind: 'title', text: `Hi ${name}, let’s finish your plan.` },
+      { kind: 'paragraph', text: `${stopped ? `${stopped} ` : ''}Your answers are saved, so it only takes a few minutes to finish.` },
+      {
+        kind: 'list',
+        items: [
+          'A plan built around your race, your days and your real paces.',
+          'Your watch data (COROS, Garmin or a Strava import) read automatically.',
+          'Your plan adapts every week from how you felt.',
+          'Free during early access.',
+        ],
+      },
+      { kind: 'button', label: 'Continue where you left off', href: p.resumeUrl },
+    ],
+  })
+}
+
 export const CATALOG = {
   'waitlist-joined': {
     label: 'Waitlist (referral)',
@@ -128,6 +178,12 @@ export const CATALOG = {
     label: 'Password reset',
     when: 'A password reset is requested',
     sample: (app: string) => passwordReset({ name: 'Camille Martin', url: `${app}/reset-password?token=exemple`, minutes: 60 }),
+  },
+  'onboarding-reminder': {
+    label: 'Onboarding reminder',
+    when: '3 h after an onboarding is started but not finished (once per lead)',
+    sample: (app: string) =>
+      onboardingReminder({ firstName: 'Camille', resumeUrl: `${app}/onboarding?resume=exemple`, unsubscribeUrl: `${app}/api/platform/emails/unsubscribe?token=exemple`, stepId: 'volume' }),
   },
   'plan-ready': {
     label: 'Plan ready',

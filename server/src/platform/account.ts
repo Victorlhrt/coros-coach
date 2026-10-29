@@ -31,7 +31,9 @@ accountRoutes.get('/overview', async (c) => {
   const plans = await db`
     select id, title, goal_distance, to_char(goal_date, 'YYYY-MM-DD') goal_date, level, weeks, sessions_per_week, status, created_at
     from plans where user_id = ${userId} order by created_at desc`
-  const connections = await db<{ provider: string }[]>`select distinct provider from wearable_connections where user_id = ${userId}`
+  const connections = await db<{ provider: string }[]>`
+    select distinct w.provider from wearable_connections w
+    where w.user_id = ${userId} and not exists (select 1 from onboarding_sessions s where s.id = w.onboarding_session_id and s.is_preview)`
   // `shoes` : paires avec le kilométrage courant (saisi + sorties synchronisées depuis).
   const shoes = await loadShoes(userId, session ?? null)
   // `photoUpdatedAt` : photo envoyée depuis le profil (servie par /account/photo/:userId), sinon `answers.photoUrl`.

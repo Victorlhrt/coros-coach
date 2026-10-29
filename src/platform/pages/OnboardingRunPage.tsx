@@ -10,10 +10,10 @@ import { RadioCards } from '@/components/arc/radio-cards/radio-cards'
 import { Logo } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
 import { api, type OnboardingStep, type Variant } from '../api'
-import { CompleteOnboarding, type CompleteAnswers } from '../onboarding/CompleteOnboarding'
+import { CompleteOnboarding, PREVIEW_FLOWS, type CompleteAnswers, type ResumeState } from '../onboarding/CompleteOnboarding'
 import { useMe } from '../session'
 import { siteHref } from '../brand'
-import { InviteGate, storedInviteCode } from '../invite/InviteGate'
+import { forgetInviteCode, rememberInviteCode, storedInviteCode } from '../invite/invite'
 
 /** Identifiant du parcours en cours, relu par l'inscription pour rattacher les réponses au compte. */
 export const ONBOARDING_KEY = 'platform.onboardingSession'
@@ -31,21 +31,37 @@ function isAnswered(step: OnboardingStep, value: unknown) {
   return typeof value === 'string' && value.trim() !== ''
 }
 
+/** Parcours repris depuis le lien de l'e-mail de relance (`?resume=`). */
+type Resumed = { sessionId: string; variantId: string; answers: CompleteAnswers; stepId: string | null; nextStepId?: string | null; inviteCode: string | null }
+
 /**
  * Déroule un parcours d'onboarding : tiré au sort parmi les parcours en ligne (test A/B),
  * ou forcé avec `?variant=` (aperçu depuis le back office avec `&preview=1`, exclu des statistiques).
+ * `?resume=` reprend un parcours laissé en route (lien de relance) ; `?flow=` (aperçu) saute à une branche de test.
  */
 export function OnboardingRunPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const me = useMe()
-  // L'onboarding est toujours le parcours Complet (en conversation avec le coach), sauf parcours forcé.
-  const forced = params.get('variant') ?? 'complet'
   const preview = params.get('preview') === '1'
+  const resumeToken = preview ? null : params.get('resume')
+  const resume = useQuery({
+    queryKey: ['onboarding', 'resume', resumeToken],
+    queryFn: () => api<Resumed>(`/onboarding/resume?token=${encodeURIComponent(resumeToken ?? '')}`),
+    enabled: !!resumeToken,
+    staleTime: Infinity,
+    retry: false,
+  })
+  const resuming = !!resumeToken && resume.isPending
+  // Lien expiré ou déjà utilisé : nouveau départ, Pacer le dit.
+  const resumeFailed = !!resumeToken && resume.isError
+  // L'onboarding est toujours le parcours Complet (en conversation avec le coach), sauf parcours forcé.
+  const forced = resume.data?.variantId ?? params.get('variant') ?? 'complet'
 
   const variant = useQuery({
     queryKey: ['onboarding', 'pick', forced],
     queryFn: () => api<Variant>(`/onboarding/pick${forced ? `?variant=${encodeURIComponent(forced)}` : ''}`),
+    enabled: !resuming,
     staleTime: Infinity,
   })
   // L'onboarding ne se fait qu'une fois : un coureur connecté qui l'a terminé retourne à son espace (aperçus admin exceptés).
@@ -63,11 +79,29 @@ export function OnboardingRunPage() {
   const [error, setError] = useState('')
   const [finished, setFinished] = useState(false)
   const started = useRef(false)
-  // Accès sur invitation : un code est demandé, sauf aux coureurs connectés (le serveur vérifie aussi).
+  // Accès sur invitation : un code est demandé, sauf aux coureurs connectés et aux aperçus (le serveur vérifie aussi).
   const [inviteCode, setInviteCode] = useState<string | null>(() => storedInviteCode())
-  const needsCode = !me.isPending && !me.data && !inviteCode
+  const gated = !me.isPending && !me.data && !preview && !resume.data
+
+  // Reprise : le parcours existe déjà (avec son code), on le rouvre au lieu d'en créer un.
+  useEffect(() => {
+    const r = resume.data
+    if (!r || started.current) return
+    started.current = true
+    if (r.inviteCode) {
+      rememberInviteCode(r.inviteCode)
+      setInviteCode(r.inviteCode)
+    }
+    setSessionId(r.sessionId)
+    try {
+      sessionStorage.setItem(ONBOARDING_KEY, r.sessionId)
+    } catch {
+      /* sans stockage, le parcours ne sera pas rattaché au compte */
+    }
+  }, [resume.data])
 
   useEffect(() => {
+    if (resuming || resume.data) return
     if (!variant.data || started.current || me.isPending || checking || onboarded || (!me.data && !inviteCode)) return
     started.current = true
     api<{ id: string }>('/onboarding/sessions', { body: { variantId: variant.data.id, preview, inviteCode: inviteCode ?? undefined } })
@@ -82,31 +116,18 @@ export function OnboardingRunPage() {
         }
       })
       .catch((e: unknown) => {
-        // Code périmé ou épuisé entre-temps : retour à l'écran d'invitation.
+        // Code périmé ou épuisé entre-temps : retour à la question du code.
         if (!me.data) {
-          try {
-            sessionStorage.removeItem('platform.inviteCode')
-          } catch {
-            /* rien à nettoyer */
-          }
+          forgetInviteCode()
           started.current = false
           setInviteCode(null)
         }
         setError(e instanceof Error ? e.message : String(e))
       })
-  }, [variant.data, preview, me.isPending, me.data, inviteCode, checking, onboarded])
+  }, [variant.data, preview, me.isPending, me.data, inviteCode, checking, onboarded, resuming, resume.data])
 
   // Pas pendant un parcours en cours : sa fin rafraîchit la vue d'ensemble avant la redirection prévue.
   if (onboarded && !sessionId) return <Navigate to="/account/home" replace />
-
-  if (needsCode) {
-    return (
-      <Frame>
-        {error && <p className="text-destructive text-sm">{error}</p>}
-        <InviteGate initialCode={params.get('code')} referrer={params.get('ref')} onValid={(code) => { setError(''); setInviteCode(code) }} />
-      </Frame>
-    )
-  }
 
   if (variant.isError) {
     return (
@@ -115,10 +136,13 @@ export function OnboardingRunPage() {
       </Frame>
     )
   }
-  if (!variant.data) return <Frame />
+  // Le chat attend de savoir qui est là (question du code ou non) et, en reprise, l'identifiant du parcours.
+  if (!variant.data || me.isPending || resuming || (resume.data && !sessionId)) return <Frame />
 
   if (variant.data.id === 'complet') {
     const v = variant.data
+    const flow = params.get('flow')
+    const resumed: ResumeState | null = resume.data ? { answers: resume.data.answers, stepId: resume.data.stepId, nextStepId: resume.data.nextStepId } : null
     return (
       <Frame banner={preview ? `Preview of the “${v.name}” flow: not counted in stats` : undefined}>
         <CompleteOnboarding
@@ -126,6 +150,23 @@ export function OnboardingRunPage() {
           sessionId={sessionId}
           preview={preview}
           ready={!!sessionId}
+          preset={preview && flow && PREVIEW_FLOWS[flow] ? flow : null}
+          resume={resumed}
+          notice={resumeFailed ? 'That link has expired, let’s start again.' : undefined}
+          gate={
+            gated
+              ? {
+                  code: inviteCode,
+                  initialCode: params.get('code'),
+                  referrer: params.get('ref'),
+                  error,
+                  onValid: (code) => {
+                    setError('')
+                    setInviteCode(code)
+                  },
+                }
+              : undefined
+          }
           onSave={async (answers, stepReached, stepId) => {
             await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached, stepId } })
           }}
@@ -142,6 +183,18 @@ export function OnboardingRunPage() {
             window.setTimeout(() => navigate(res.needsAccount ? '/signup' : '/account'), 1200)
           }}
         />
+      </Frame>
+    )
+  }
+
+  // Anciens parcours (formulaire pas à pas) : sans compte, ils demandent un code déjà validé.
+  if (gated && !inviteCode) {
+    return (
+      <Frame>
+        <p className="text-muted-foreground">This flow needs an invite code.</p>
+        <Button asChild className="self-start">
+          <Link to="/onboarding">Enter my code</Link>
+        </Button>
       </Frame>
     )
   }

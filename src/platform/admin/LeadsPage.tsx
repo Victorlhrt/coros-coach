@@ -24,9 +24,13 @@ type LeadRow = {
   photo_url: string | null
   signed_up: boolean
   web_results: number
+  reminder_sent_at: string | null
+  unsubscribed_at: string | null
   created_at: string
   updated_at: string
 }
+
+const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
 
 /** Leads : prénom, nom et e-mail captés à la première étape de l'onboarding, inscrits ou non. */
 export function LeadsPage() {
@@ -63,6 +67,17 @@ export function LeadsPage() {
       sortable: true,
       render: (_, l) =>
         l.completed_at ? <Badge tone="success">Completed</Badge> : <span className="text-sm">{l.last_step ?? '—'} · step {l.step_reached}</span>,
+    },
+    {
+      key: 'reminder_sent_at',
+      label: 'Reminder',
+      sortable: true,
+      render: (_, l) => (
+        <div className="flex flex-wrap gap-1">
+          {l.reminder_sent_at ? <Badge tone="info" size="sm">Reminded {shortDate.format(new Date(l.reminder_sent_at))}</Badge> : <span className="text-muted-foreground text-sm">—</span>}
+          {l.unsubscribed_at && <Badge tone="warning" size="sm">Unsubscribed</Badge>}
+        </div>
+      ),
     },
     { key: 'signed_up', label: 'Account', sortable: true, render: (v) => (v ? <Badge tone="success">Signed up</Badge> : <Badge>Lead</Badge>) },
     { key: 'web_results', label: 'Online results', sortable: true, numeric: true },

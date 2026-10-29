@@ -23,6 +23,7 @@ export async function sendEmail(to: string, template: string, email: Email): Pro
           html: email.html,
           text: email.text,
           ...(config.emailReplyTo ? { reply_to: config.emailReplyTo } : {}),
+          ...(email.headers ? { headers: email.headers } : {}),
           tags: [{ name: 'template', value: template.replace(/[^a-zA-Z0-9_-]/g, '_') }],
         }),
       })
@@ -40,6 +41,8 @@ export async function sendEmail(to: string, template: string, email: Email): Pro
     }
   } else {
     console.log(`[e-mail non envoyé, RESEND_API_KEY absente] ${template} → ${to} : ${email.subject}`)
+    // En local, le texte (avec ses liens) est affiché pour pouvoir suivre les parcours sans boîte mail.
+    if (!config.production) console.log(email.text)
   }
 
   await db`

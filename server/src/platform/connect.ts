@@ -135,10 +135,13 @@ connectRoutes.get('/coros/callback', async (c) => {
     console.error('[coros] échange du code', e)
     return c.html(page('Connection declined', 'COROS didn’t approve the connection. Go back to Raice.run to try again.'), 502)
   }
-  const [session] = await db<{ user_id: string | null }[]>`select user_id from onboarding_sessions where id = ${pending.onboarding_session_id}`
+  // Aperçu admin : la connexion reste sur le parcours de test, jamais rattachée au compte de l'admin.
+  const [session] = await db<{ user_id: string | null; is_preview: boolean }[]>`
+    select user_id, is_preview from onboarding_sessions where id = ${pending.onboarding_session_id}`
+  const userId = session && !session.is_preview ? session.user_id : null
   await db`
     insert into wearable_connections (provider, onboarding_session_id, user_id, tokens)
-    values ('coros', ${pending.onboarding_session_id}, ${session?.user_id ?? null}, ${db.json(provider.tokensValue as never)})
+    values ('coros', ${pending.onboarding_session_id}, ${userId}, ${db.json(provider.tokensValue as never)})
     on conflict (provider, onboarding_session_id) do update set tokens = excluded.tokens, updated_at = now()`
   return c.html(page('COROS connected', 'You can close this window and go back to your chat with Pacer.'))
 })

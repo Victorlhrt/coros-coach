@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { currentUser } from './auth.js'
 import { db } from './db.js'
 import { validCode } from './invites.js'
+import { resumeHandler } from './resume.js'
 import type { OnboardingStep } from './onboarding-defaults.js'
 
 type Variant = { id: string; name: string; description: string; status: string; weight: number; steps: OnboardingStep[] }
@@ -29,6 +30,9 @@ export async function createPlanFromSession(sessionId: string, userId: string) {
 }
 
 export const onboardingRoutes = new Hono()
+
+// Reprise d'un parcours depuis le lien signé de l'e-mail de relance.
+onboardingRoutes.get('/resume', resumeHandler)
 
 /** Tire un parcours `live` au hasard selon les poids (test A/B). `?variant=` force un parcours, même brouillon (aperçu). */
 onboardingRoutes.get('/pick', async (c) => {
@@ -116,7 +120,8 @@ onboardingRoutes.patch('/sessions/:id', async (c) => {
   const { answers, stepReached, stepId } = parsed.data
   const [row] = await db`
     update onboarding_sessions
-    set answers = ${db.json(answers as never)}, step_reached = greatest(step_reached, ${stepReached}), updated_at = now()
+    set answers = ${db.json(answers as never)}, step_reached = greatest(step_reached, ${stepReached}),
+        last_step_id = coalesce(${stepId ?? null}, last_step_id), updated_at = now()
     where id = ${c.req.param('id')} and completed_at is null
     returning id`
   if (!row) return c.json({ error: 'Onboarding session not found or already finished' }, 404)

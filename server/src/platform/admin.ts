@@ -5,6 +5,7 @@ import { config } from '../config.js'
 import { audit, db, getSetting } from './db.js'
 import { sendEmail, sendEmailLater } from './email.js'
 import { CATALOG, accountApproved, invited, planReady, type TemplateId } from './emails/templates.js'
+import { REMINDERS_SETTING, runOnboardingReminders } from './reminders.js'
 import { makeCode, normalizeCode } from './invites.js'
 
 type Env = { Variables: { user: SessionUser } }
@@ -141,7 +142,7 @@ adminRoutes.get('/leads', async (c) => {
   const rows = await db`
     select l.id, l.email, l.first_name, l.last_name, l.city, l.source, l.invite_code, l.step_reached, l.last_step,
            l.completed_at, l.photo_url, l.user_id, (l.user_id is not null) signed_up, l.created_at, l.updated_at,
-           coalesce(jsonb_array_length(l.web_profile->'results'), 0)::int web_results
+           coalesce(jsonb_array_length(l.web_profile->'results'), 0)::int web_results, l.reminder_sent_at, l.unsubscribed_at
     from leads l order by l.created_at desc limit 2000`
   return c.json(rows)
 })
@@ -299,16 +300,22 @@ adminRoutes.get('/settings', async (c) => {
     signupMode: await getSetting('signup_mode', 'open'),
     billingEnforced: (await getSetting<boolean>('billing_enforced', false)) === true,
     billingConfigured: !!config.stripeSecretKey,
+    onboardingReminders: (await getSetting<boolean>(REMINDERS_SETTING, true)) !== false,
+    emailConfigured: !!config.resendApiKey,
     admins,
   })
 })
 
-const SettingsPatch = z.object({ signupMode: z.enum(['open', 'waitlist', 'closed']).optional(), billingEnforced: z.boolean().optional() })
+const SettingsPatch = z.object({
+  signupMode: z.enum(['open', 'waitlist', 'closed']).optional(),
+  billingEnforced: z.boolean().optional(),
+  onboardingReminders: z.boolean().optional(),
+})
 
 adminRoutes.put('/settings', async (c) => {
   const parsed = SettingsPatch.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: 'Invalid setting' }, 400)
-  const { signupMode, billingEnforced } = parsed.data
+  const { signupMode, billingEnforced, onboardingReminders } = parsed.data
   const save = (key: string, value: unknown) => db`
     insert into app_settings (key, value, updated_at) values (${key}, ${db.json(value as never)}, now())
     on conflict (key) do update set value = excluded.value, updated_at = now()`
@@ -320,7 +327,18 @@ adminRoutes.put('/settings', async (c) => {
     await save('billing_enforced', billingEnforced)
     await audit(c.get('user').id, 'settings.billing_enforced', null, { billingEnforced })
   }
+  if (onboardingReminders !== undefined) {
+    await save(REMINDERS_SETTING, onboardingReminders)
+    await audit(c.get('user').id, 'settings.onboarding_reminders', null, { onboardingReminders })
+  }
   return c.json({ ok: true })
+})
+
+// Passage immédiat du job de relance (sans attendre les 10 min), pour vérifier les envois.
+adminRoutes.post('/reminders/run', async (c) => {
+  const res = await runOnboardingReminders()
+  await audit(c.get('user').id, 'reminders.run', null, res)
+  return c.json(res)
 })
 
 adminRoutes.get('/audit', async (c) => {

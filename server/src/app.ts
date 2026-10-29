@@ -18,6 +18,7 @@ import { inviteRoutes } from './platform/invites.js'
 import { connectRoutes } from './platform/connect.js'
 import { garminAccountRoutes, garminOnboardingRoutes } from './platform/garmin.js'
 import { onboardingRoutes } from './platform/onboarding.js'
+import { emailRoutes, startOnboardingReminders } from './platform/reminders.js'
 import { requireCoachAccess, stateRoutes } from './state.js'
 
 const app = new Hono()
@@ -50,6 +51,7 @@ app.route('/api/claude', claudeRoutes)
 app.use('/api/platform/*', bodyLimit({ maxSize: 256 * 1024 }))
 app.route('/api/platform/auth', platformAuthRoutes)
 app.route('/api/platform/onboarding', onboardingRoutes)
+app.route('/api/platform/emails', emailRoutes)
 app.route('/api/platform/lookup', lookupRoutes)
 app.route('/api/platform/invites', inviteRoutes)
 // Garmin (clé Personal API) : avant les routes génériques de connexion et du compte.
@@ -73,6 +75,8 @@ app.get('*', serveStatic({ path: './dist/index.html' }))
 await migrate()
 await migratePlatform()
 await migrateAiUsage()
+// Relance des onboardings abandonnés (une seule instance l'exécute grâce au verrou Postgres).
+startOnboardingReminders()
 serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`Coach COROS sur :${info.port} (origine ${config.origin}, rpID ${config.rpID})`)
 })

@@ -40,6 +40,10 @@ export const config = {
   stripeApiUrl: process.env.STRIPE_API_URL ?? '',
   /** Jours d'essai offerts au premier abonnement (0 = pas d'essai). */
   stripeTrialDays: Math.max(0, Math.floor(Number(process.env.STRIPE_TRIAL_DAYS ?? 0) || 0)),
+  /** Signature des liens envoyés par e-mail (reprise d'onboarding, désinscription). Sans valeur, dérivée de DATABASE_URL (avertissement au démarrage). */
+  resumeTokenSecret: process.env.RESUME_TOKEN_SECRET ?? '',
+  /** Période du job de relance des onboardings abandonnés (10 min par défaut ; réduite en test local). */
+  reminderIntervalMs: Math.max(1000, Number(process.env.REMINDER_INTERVAL_MS ?? 10 * 60_000) || 10 * 60_000),
   origin,
   rpID: new URL(origin).hostname,
   rpName: 'Coach COROS',

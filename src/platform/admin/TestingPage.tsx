@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { BugIcon, ExternalLinkIcon, MonitorIcon, RotateCcwIcon, SmartphoneIcon } from 'lucide-react'
+import { BugIcon, ExternalLinkIcon, MessageCircleIcon, MonitorIcon, RotateCcwIcon, SmartphoneIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Badge } from '@/components/arc/badge/badge'
 import { RadioCards } from '@/components/arc/radio-cards/radio-cards'
@@ -12,6 +12,15 @@ import { ErrorNote, PageTitle, Panel } from './ui'
 
 type VariantRow = { id: string; name: string; description: string; status: 'draft' | 'live' | 'archived'; steps: number }
 
+const logo = (src: string, invert = false) => <img src={src} alt="" className={`size-5 rounded-[5px] object-contain ${invert ? 'invert' : ''}`} />
+/** Branches du parcours Complet ouvertes directement (`flow=`) : les premières réponses sont données d'avance. */
+const WORKFLOWS = [
+  { value: 'default', label: 'Default', icon: <MessageCircleIcon className="size-5 text-muted-foreground" /> },
+  { value: 'coros', label: 'COROS', icon: logo('/partners/coros.png') },
+  { value: 'garmin', label: 'Garmin', icon: logo('/partners/garmin.png', true) },
+  { value: 'strava', label: 'Strava (no watch)', icon: logo('/partners/strava.png') },
+]
+
 /**
  * Banc d'essai des onboardings : choisir un parcours et le dérouler ici même, en format téléphone ou ordinateur.
  * Toujours en aperçu (`preview=1`) : rien n'est compté dans les statistiques ni rattaché à un compte.
@@ -22,8 +31,11 @@ export function TestingPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [device, setDevice] = useState<'phone' | 'desktop'>('phone')
   const [run, setRun] = useState(0)
+  const [workflow, setWorkflow] = useState('default')
   const current = usable.find((v) => v.id === selected) ?? usable.find((v) => v.id === 'complet') ?? usable[0]
-  const url = current ? `/onboarding?variant=${encodeURIComponent(current.id)}&preview=1` : null
+  // Les branches de test n'existent que dans le parcours Complet (conversation avec Pacer).
+  const flow = current?.id === 'complet' && workflow !== 'default' ? workflow : null
+  const url = current ? `/onboarding?variant=${encodeURIComponent(current.id)}&preview=1${flow ? `&flow=${flow}` : ''}` : null
 
   return (
     <>
@@ -65,6 +77,21 @@ export function TestingPage() {
               }))}
             />
           )}
+          {current?.id === 'complet' && (
+            <div className="mt-4 border-t pt-4">
+              <p className="mb-3 font-medium text-sm">Workflow</p>
+              <RadioCards
+                aria-label="Workflow to test"
+                layout="list"
+                value={workflow}
+                onValueChange={(w) => {
+                  setWorkflow(w)
+                  setRun((r) => r + 1)
+                }}
+                options={WORKFLOWS}
+              />
+            </div>
+          )}
           <div className="mt-4 border-t pt-4">
             <p className="font-medium text-sm">COROS MCP</p>
             <p className="mt-1 text-muted-foreground text-xs">Call the COROS MCP tools by hand with your own connected account and inspect the raw responses.</p>
@@ -93,7 +120,7 @@ export function TestingPage() {
           {url && (
             <div className="flex justify-center rounded-xl border bg-black/40 p-4">
               <iframe
-                key={`${current?.id}-${run}`}
+                key={`${current?.id}-${flow}-${run}`}
                 title={`Preview of flow ${current?.name}`}
                 src={url}
                 className={cn(

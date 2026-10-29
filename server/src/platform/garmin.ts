@@ -112,11 +112,13 @@ async function saveTokens(conn: GarminConnection, patch: Partial<GarminTokens>) 
   await db`update wearable_connections set tokens = ${db.json(conn.tokens as never)}, updated_at = now() where id = ${conn.id}`
 }
 
-/** Connexion Garmin d'un compte (la plus récente si l'onboarding en a rattaché une seconde). */
+/** Connexion Garmin d'un compte (la plus récente si l'onboarding en a rattaché une seconde). Celles des aperçus admin sont ignorées. */
 export async function garminConnectionForUser(userId: string) {
   const [row] = await db<GarminConnection[]>`
-    select id, user_id, onboarding_session_id, tokens from wearable_connections
-    where provider = 'garmin' and user_id = ${userId} order by updated_at desc limit 1`
+    select w.id, w.user_id, w.onboarding_session_id, w.tokens from wearable_connections w
+    where w.provider = 'garmin' and w.user_id = ${userId}
+      and not exists (select 1 from onboarding_sessions s where s.id = w.onboarding_session_id and s.is_preview)
+    order by w.updated_at desc limit 1`
   return row ?? null
 }
 
@@ -411,14 +413,17 @@ garminOnboardingRoutes.post('/', async (c) => {
   if (limited(`session:${sessionId}`, 6, 10 * 60_000) || limited(`ip:${ip}`, 20, 10 * 60_000)) {
     return c.json({ error: 'Too many attempts, try again in a few minutes.', code: 'rate_limited' }, 429)
   }
-  const [session] = await db<{ user_id: string | null }[]>`select user_id from onboarding_sessions where id = ${sessionId} and completed_at is null`
+  const [session] = await db<{ user_id: string | null; is_preview: boolean }[]>`
+    select user_id, is_preview from onboarding_sessions where id = ${sessionId} and completed_at is null`
   if (!session) return c.json({ error: 'Onboarding session not found or already finished' }, 404)
+  // Aperçu admin : la clé reste sur le parcours de test, jamais rattachée au compte de l'admin.
+  const userId = session.is_preview ? null : session.user_id
   try {
     const tokens = await validateKey(apiKey, expiryDays ?? 365)
     // Rattachée au parcours ; l'inscription (auth.ts) ou la fin du parcours (onboarding.ts) la passe au compte.
     await db`
       insert into wearable_connections (provider, onboarding_session_id, user_id, tokens)
-      values ('garmin', ${sessionId}, ${session.user_id ?? null}, ${db.json(tokens as never)})
+      values ('garmin', ${sessionId}, ${userId}, ${db.json(tokens as never)})
       on conflict (provider, onboarding_session_id) do update set tokens = excluded.tokens, updated_at = now()`
     return c.json({ connected: true, expiresAt: tokens.keyExpiresAt })
   } catch (e) {
