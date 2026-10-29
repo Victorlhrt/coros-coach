@@ -228,7 +228,6 @@ export function FitnessDashboard() {
     <Panel>
       <PanelHeader
         title="Fitness"
-        subtitle={connected ? `Race predictors over your last ${range} weeks, from COROS` : 'Connect COROS to follow your fitness'}
         actions={
           <>
             <Segmented value={range} options={RANGES} onChange={setRange} label="Period" />
@@ -256,10 +255,9 @@ function FitnessRow({ row, open, onToggle, empty }: { row: Row; open: boolean; o
   const Icon = t === 'up' ? ArrowUpRight : t === 'down' ? ArrowDownRight : Minus
   return (
     <div>
-      <button type="button" onClick={onToggle} aria-expanded={open} className={cn('flex w-full items-center gap-4 px-6 py-4 text-left transition-colors', open ? 'bg-foreground/[0.03]' : 'hover:bg-foreground/[0.02]')}>
+      <button type="button" onClick={onToggle} aria-expanded={open} title={row.hint} className={cn('flex w-full items-center gap-4 px-6 py-4 text-left transition-colors', open ? 'bg-foreground/[0.03]' : 'hover:bg-foreground/[0.02]')}>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-sm">{row.label}</p>
-          <p className="truncate text-muted-foreground text-xs">{row.hint}</p>
         </div>
         <div className="shrink-0 text-right">
           <p className="font-medium text-xl tabular-nums tracking-tight">

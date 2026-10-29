@@ -439,7 +439,7 @@ function OnboardingAnalytics() {
   if (!st && !perfs.length) return null
   return (
     <RPanel>
-      <RPanelHeader title="Imported history" subtitle={st ? `From your Strava export · ${st.runs} runs` : 'Times you entered during onboarding'} />
+      <RPanelHeader title="Imported history" subtitle={st ? `${st.runs} runs` : undefined} />
       {st && (
         <div className="grid grid-cols-2 divide-x border-t sm:grid-cols-4">
           {[

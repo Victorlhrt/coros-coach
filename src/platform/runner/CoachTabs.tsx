@@ -6,7 +6,7 @@ import { BarChart } from '@/components/arc/bar-chart/bar-chart'
 import { ActivityTerrain } from '@/components/raice/activity-terrain'
 import { MetricsDashboard, type Kpi } from '@/components/raice/metrics-dashboard'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
-import { RefreshButton, StretchRefresh } from '@/components/raice/stretch-refresh'
+import { RefreshButton } from '@/components/raice/stretch-refresh'
 import { WeekPicker, type PickerDay } from '@/components/raice/week-picker'
 import { TypeBadge } from '@/components/TypeBadge'
 import { CoachAvatar } from '../onboarding/CoachAvatar'
@@ -70,7 +70,7 @@ export function HomeTab() {
   const next = allSessions(plan).find((s) => s.date > now)
 
   return (
-    <StretchRefresh onRefresh={refresh}>
+    <>
       <div className="flex w-full flex-col gap-4">
         <header className="flex items-end justify-between gap-4 pb-2">
           <div>
@@ -133,7 +133,7 @@ export function HomeTab() {
 
         {week && <ThisWeek week={week} now={now} />}
       </div>
-    </StretchRefresh>
+    </>
   )
 }
 
@@ -159,7 +159,7 @@ function ThisWeek({ week, now }: { week: Week; now: string }) {
     <Panel>
       <PanelHeader
         title={`Week ${week.number} · ${PHASE_LABEL[week.phase]}`}
-        subtitle={`${formatDay(days[0], { day: 'numeric', month: 'short' })} – ${formatDay(days[6], { day: 'numeric', month: 'short' })} · ${week.focus}`}
+        subtitle={`${formatDay(days[0], { day: 'numeric', month: 'short' })} – ${formatDay(days[6], { day: 'numeric', month: 'short' })}`}
         actions={
           <Button asChild variant="outline" size="sm">
             <Link to={ROUTES.adjust}>
@@ -434,7 +434,7 @@ export function PlanTab() {
   const fmtMin = (v: number) => formatDuration(v * 60)
 
   return (
-    <StretchRefresh onRefresh={refresh}>
+    <>
       <div className="flex w-full flex-col gap-4">
         <header className="flex flex-wrap items-end justify-between gap-4 pb-2">
           <div>
@@ -450,7 +450,7 @@ export function PlanTab() {
 
         <WeekPicker
           title={`Week ${week.number} · ${formatDay(days[0], { day: 'numeric', month: 'short' })} – ${formatDay(days[6], { day: 'numeric', month: 'short' })}`}
-          subtitle={`${PHASE_LABEL[week.phase]} · ${formatDistance(volumes[week.number - 1], units, 0)} planned · ${week.sessions.length} session${week.sessions.length > 1 ? 's' : ''} · ${week.focus}`}
+          subtitle={`${PHASE_LABEL[week.phase]} · ${formatDistance(volumes[week.number - 1], units, 0)} planned · ${week.sessions.length} session${week.sessions.length > 1 ? 's' : ''}`}
           actions={
             <>
               <Button variant="outline" size="icon" aria-label="Previous week" disabled={week.number <= 1} onClick={() => goWeek(week.number - 1)}>
@@ -483,7 +483,7 @@ export function PlanTab() {
 
         <div className="grid gap-4 xl:grid-cols-2">
           <Panel className="flex flex-col">
-            <PanelHeader title="Plan volume" subtitle="Planned distance, week by week" />
+            <PanelHeader title="Plan volume" />
             <PanelSection divided>
               <BarChart
                 data={plan.weeks.map((w, i) => ({ key: String(w.number), label: `Week ${w.number}`, axisLabel: `W${w.number}`, value: distanceValue(volumes[i], units) }))}
@@ -517,8 +517,7 @@ export function PlanTab() {
 
           <ActivityTerrain
             title="The shape of your plan"
-            subtitle={`Every day of every week, W1 to W${plan.weeks.length}`}
-            rowLabels={terrain.rowLabels}
+                        rowLabels={terrain.rowLabels}
             colLabels={terrain.colLabels}
             metrics={[
               { id: 'distance', label: 'Distance', values: terrain.distance, format: fmtKm },
@@ -544,7 +543,7 @@ export function PlanTab() {
 
         {(plan.raceStrategy || goal?.course) && (
           <Panel>
-            <PanelHeader title="Race strategy" subtitle={goal?.course ? `${formatNumber(goal.course.distanceKm)} km · ${goal.course.gain} m elevation gain` : 'How Pacer sees race day'} />
+            <PanelHeader title="Race strategy" subtitle={goal?.course ? `${formatNumber(goal.course.distanceKm)} km · ${goal.course.gain} m elevation gain` : undefined} />
             {plan.raceStrategy && (
               <PanelSection divided className="flex gap-4">
                 <CoachAvatar className="size-10 shrink-0" />
@@ -557,7 +556,7 @@ export function PlanTab() {
           </Panel>
         )}
       </div>
-    </StretchRefresh>
+    </>
   )
 }
 
@@ -640,8 +639,7 @@ export function AnalyticsDashboards() {
     <div className="flex w-full flex-col gap-4">
       <MetricsDashboard
         title="Analytics"
-        subtitle={connected ? `Your last ${range} weeks, from COROS` : 'Connect COROS to track your runs'}
-        kpis={kpis}
+                kpis={kpis}
         ranges={RANGES}
         range={range}
         onRangeChange={setRange}
@@ -690,7 +688,7 @@ function ActivityLog() {
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between gap-4 text-left transition-colors hover:bg-foreground/[0.02]">
         <PanelHeader
           title="Log"
-          subtitle={`${done} run${done > 1 ? 's' : ''}${missedCount ? ` · ${missedCount} missed` : ''} over the last 6 weeks, compared to the plan`}
+          subtitle={`${done} run${done > 1 ? 's' : ''}${missedCount ? ` · ${missedCount} missed` : ''} `}
           className="flex-1"
         />
         <ChevronDown className={`mr-6 size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />

@@ -160,7 +160,7 @@ function FriendsBoard({ period, onAdd }: { period: Period; onAdd: () => void }) 
       <div className="flex min-w-0 flex-col gap-4">
         {f && f.incoming.length > 0 && (
           <Panel>
-            <PanelHeader title="Friend requests" subtitle={`${f.incoming.length} runner${f.incoming.length > 1 ? 's want' : ' wants'} to compare runs with you`} />
+            <PanelHeader title="Friend requests" subtitle={String(f.incoming.length)} />
             <ul className="divide-y border-t">
               {f.incoming.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 px-6 py-3">
@@ -354,14 +354,13 @@ function CityTab({ period }: { period: Period }) {
  */
 function SegmentsPanel({ city }: { city: string | null }) {
   const cards = [
-    { icon: <TrophyIcon className="size-4" />, title: 'Where you’re strong', body: 'Segments where you rank highest among local runners.' },
-    { icon: <TrendingUpIcon className="size-4" />, title: 'Where you improved', body: 'Segments where your time dropped the most over the last weeks.' },
+    { icon: <TrophyIcon className="size-4" />, title: 'Where you’re strong' },
+    { icon: <TrendingUpIcon className="size-4" />, title: 'Where you improved' },
   ]
   return (
     <Panel className="self-start">
       <PanelHeader
         title="Segments"
-        subtitle={city ? `Your best stretches of road in ${city}` : 'Your best stretches of road'}
         actions={<Badge tone="info" icon={<SparklesIcon className="size-3" />}>Coming soon</Badge>}
       />
       <PanelSection divided className="grid gap-3 sm:grid-cols-2">
@@ -371,7 +370,6 @@ function SegmentsPanel({ city }: { city: string | null }) {
               {c.icon}
               {c.title}
             </span>
-            <p className="text-muted-foreground text-xs">{c.body}</p>
             <div className="flex flex-col gap-2" aria-hidden="true">
               {[72, 54, 38].map((w) => (
                 <div key={w} className="flex items-center gap-2">
@@ -384,9 +382,7 @@ function SegmentsPanel({ city }: { city: string | null }) {
         ))}
       </PanelSection>
       <PanelFooter>
-        <p className="max-w-prose text-muted-foreground text-sm">
-          Segments need the GPS track of each run. Your COROS sync brings distance, time and pace for now; as soon as routes sync, we’ll match your runs to {city ?? 'your city'}’s segments and show them here.
-        </p>
+        <p className="text-muted-foreground text-sm">Needs GPS tracks from {city ?? 'your city'}.</p>
       </PanelFooter>
     </Panel>
   )

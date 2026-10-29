@@ -29,7 +29,7 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
   const logout = useMutation({ mutationFn: disconnectCoros })
   return (
     <Panel>
-      <PanelHeader title="Watches & apps" subtitle="Connect your watch so Pacer reads your runs and sends sessions to your wrist." />
+      <PanelHeader title="Watches & apps" />
       <ul className="grid grid-cols-1 gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-3">
         <Tile brand="COROS" detail={connected ? 'Connected · activities, sleep, HRV' : 'Activities, sleep, HRV, workouts to watch'} live>
           {connected ? (

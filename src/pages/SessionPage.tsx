@@ -15,7 +15,10 @@ import { INTENSITY } from '@/platform/runner/coach-data'
 import { formatDay, today } from '@/lib/coach/dates'
 import { formatDistance, formatDuration, formatPace, paceUnit, type Units } from '@/lib/coach/format'
 import { flatten, sessionTotals } from '@/lib/coach/metrics'
-import type { Block, Step, Zone } from '@/lib/coach/schema'
+import type { Block, Session, Step, Zone } from '@/lib/coach/schema'
+import { linkedActivity } from '@/lib/coach/links'
+import { useActivities } from '@/lib/coros/activity-hooks'
+import { useLaps } from '@/lib/coros/laps'
 import { STEP_LABEL, zoneColor } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
 import { syncStatus } from '@/lib/coros/sync'
@@ -84,7 +87,7 @@ export function SessionPage() {
           </div>
           {session.blocks.length > 0 && (
             <PanelSection divided>
-              <SessionProfileChart blocks={session.blocks} zones={zones} units={units} />
+              <SessionProfile session={session} zones={zones} units={units} />
             </PanelSection>
           )}
           {session.blocks.length > 0 && (
@@ -116,7 +119,7 @@ export function SessionPage() {
 
         <div className="flex flex-col gap-4 xl:[&>*:last-child]:flex-1">
           <Panel>
-            <PanelHeader title="Watch" subtitle={status === 'app-only' ? 'Strength sessions are tracked in the app.' : 'Sending this session to your COROS watch'} actions={<SyncBadge status={status} />} />
+            <PanelHeader title="Watch" actions={<SyncBadge status={status} />} />
           </Panel>
           {session.blocks.length > 0 && <ZoneSplit blocks={session.blocks} zones={zones} />}
           {session.type !== 'strength' && <ActivityLinkCard session={session} />}
@@ -124,6 +127,22 @@ export function SessionPage() {
       </div>
       {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
     </div>
+  )
+}
+
+/** Profil prévu, avec la courbe réelle (tours de l'activité COROS liée) par-dessus une fois la séance faite. */
+function SessionProfile({ session, zones, units }: { session: Session; zones: Zone[]; units: Units }) {
+  const links = usePlan((s) => s.links)
+  const { data } = useActivities()
+  const activity = linkedActivity(session, links, data?.activities ?? [])
+  const laps = useLaps(activity?.labelId, activity?.sportType, activity?.meters)
+  return (
+    <>
+      <SessionProfileChart blocks={session.blocks} zones={zones} units={units} laps={laps.data?.laps} />
+      {activity && laps.data && !laps.data.laps.some((l) => l.paceSecPerKm) && (
+        <p className="mt-2 text-muted-foreground text-xs">No splits from COROS for this run, so only the planned profile is shown.</p>
+      )}
+    </>
   )
 }
 

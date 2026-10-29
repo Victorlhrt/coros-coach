@@ -8,6 +8,8 @@ export interface Activity {
   meters: number | null
   seconds: number | null
   paceSecPerKm: number | null
+  /** Lieu de départ donné par COROS (« Saint-Denis »), pour reconnaître une sortie. */
+  place: string | null
   /** Fréquence cardiaque moyenne (bpm), quand COROS la donne. */
   avgHr: number | null
 }
@@ -118,12 +120,17 @@ export function normalizeActivities(raw: unknown): Activity[] {
       if (!date) return null
       const meters = parseMeters(o)
       const seconds = parseSeconds(o)
+      const name = String(pick(o, /name|title|sport.?name/i) ?? 'Run')
+      // COROS nomme toutes les sorties « Outdoor Run » : le lieu (« Saint-Denis Course ») aide à s'y retrouver.
+      const rawPlace = pick(o, /^location$|^city$|^place$/i)
+      const place = typeof rawPlace === 'string' && rawPlace.trim() ? rawPlace.trim().replace(/\s+(course|run)$/i, '') : null
       const pace = clock(pick(o, /pace/i)) ?? (meters && seconds ? seconds / (meters / 1000) : null)
       return {
         labelId: String(o.labelId),
         sportType: Number(o.sportType ?? 100),
         date,
-        name: String(pick(o, /name|title|sport.?name/i) ?? 'Run'),
+        name: place ? `${name} · ${place}` : name,
+        place,
         meters,
         seconds,
         paceSecPerKm: pace,
