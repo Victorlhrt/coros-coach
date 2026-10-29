@@ -4,7 +4,8 @@ import { useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { Panel, PanelHeader, PanelSection, Segmented } from './panel'
 
-export type MetricPoint = { x: string; y: number }
+/** Point d'une courbe ; `label` (date complète) et `info` (détail) enrichissent l'infobulle. */
+export type MetricPoint = { x: string; y: number; label?: string; info?: string }
 
 export type Kpi = {
   id: string
@@ -348,13 +349,14 @@ export function LineChart({ kpi, showCompare, emptyLabel }: { kpi: Kpi; showComp
       {hp && (
         <div
           className="pointer-events-none absolute z-10 rounded-lg border bg-popover px-2.5 py-1.5 text-xs shadow-lg"
-          style={{ left: Math.min(Math.max(hx, 70), width - 70), top: Math.max(0, hy - 64), transform: 'translateX(-50%)' }}
+          style={{ left: Math.min(Math.max(hx, 90), width - 90), top: Math.max(0, hy - 80), transform: 'translateX(-50%)' }}
         >
-          <div className="text-muted-foreground">{hp.x}</div>
+          <div className="whitespace-nowrap text-muted-foreground">{hp.label ?? hp.x}</div>
           <div className="font-medium tabular-nums">
             {fmt(hp.y)}
             {kpi.unit && <span className="ml-0.5 text-muted-foreground">{kpi.unit}</span>}
           </div>
+          {hp.info && <div className="whitespace-nowrap text-muted-foreground tabular-nums">{hp.info}</div>}
           {cmpVal && <div className="text-muted-foreground tabular-nums">vs {fmt(cmpVal.y)}</div>}
         </div>
       )}

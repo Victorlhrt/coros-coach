@@ -1,8 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { LineChart, type Kpi } from '@/components/raice/metrics-dashboard'
+import { LineChart, type Kpi, type MetricPoint } from '@/components/raice/metrics-dashboard'
 import { Panel, PanelHeader, Segmented } from '@/components/raice/panel'
 import { Button } from '@/components/shadcn/button'
 import { addDays, formatDay, today } from '@/lib/coach/dates'
@@ -10,9 +9,9 @@ import { formatClock, formatNumber, formatPace, paceUnit } from '@/lib/coach/for
 import { ROUTES } from '@/lib/coach/routes'
 import { DISTANCES } from '@/lib/coach/schema'
 import { RECORD_DISTANCES, predictTime, thresholdPace, vdot } from '@/lib/coach/vdot'
-import { normalizeActivities, type Activity } from '@/lib/coros/activities'
+import type { Activity } from '@/lib/coros/activities'
+import { useActivityHistory } from '@/lib/coros/activity-hooks'
 import { useCorosAuth } from '@/lib/coros/auth-store'
-import { fetchRunRecords } from '@/lib/coros/data'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
@@ -28,17 +27,6 @@ const RANGES = [
   { value: '16', label: '16W' },
 ]
 const GOAL_METERS: Record<keyof typeof DISTANCES, number> = { '5k': 5000, '10k': 10000, half: 21097.5, marathon: 42195, trail: 0 }
-
-/** 16 semaines d'activités : plus long que l'onglet Runs, pour voir la forme évoluer. */
-function useLongActivities() {
-  const connected = useCorosAuth((s) => s.connected)
-  return useQuery({
-    queryKey: ['coros', 'activities', 112],
-    queryFn: async () => normalizeActivities(await fetchRunRecords(112)),
-    enabled: connected,
-    staleTime: 10 * 60 * 1000,
-  })
-}
 
 /** VDOT d'une sortie, seulement si elle est assez longue pour être parlante (≥ 3 km et ≥ 12 min). */
 function runVdot(a: Activity) {
@@ -67,6 +55,9 @@ function weeklyFitness(starts: string[], acts: Activity[]) {
     return {
       start,
       label: formatDay(start, { day: 'numeric', month: 'short' }),
+      // Infobulle : semaine complète et ce qui y a été couru.
+      full: `${formatDay(start, { day: 'numeric', month: 'short' })} – ${formatDay(end, { day: 'numeric', month: 'short' })}`,
+      info: week.length ? `${week.length} run${week.length > 1 ? 's' : ''} · ${formatNumber(Math.round(sum(week.map((a) => a.meters ?? 0)) / 100) / 10)} km` : 'No runs',
       vdot: vdots.length ? Math.max(...vdots) : 0,
       km: sum(week.map((a) => a.meters ?? 0)) / 1000,
       pace: meters ? seconds / (meters / 1000) : 0,
@@ -83,7 +74,7 @@ export function FitnessDashboard() {
   const units = useSettings((s) => s.units)
   const goal = usePlan((s) => s.goal)
   const records = usePlan((s) => s.records)
-  const activities = useLongActivities()
+  const activities = useActivityHistory()
   const [range, setRange] = useState('16')
   const [open, setOpen] = useState('vo2')
   const [now] = useState(today)
@@ -99,7 +90,7 @@ export function FitnessDashboard() {
   const before = weeks.slice(0, 4).map((w) => w.vdot).filter(Boolean)
   const past = before.length ? Math.max(...before) : 0
   // VDOT courante semaine par semaine : meilleure valeur des 4 semaines glissantes, pour lisser les semaines sans effort.
-  const rolling = weeks.map((w, i) => ({ x: w.label, y: round1(Math.max(0, ...weeks.slice(Math.max(0, i - 3), i + 1).map((x) => x.vdot))) })).filter((p) => p.y > 0)
+  const rolling = weeks.map((w, i) => ({ x: w.label, label: w.full, info: w.info, y: round1(Math.max(0, ...weeks.slice(Math.max(0, i - 3), i + 1).map((x) => x.vdot))) })).filter((p) => p.y > 0)
 
   const goalMeters = goal ? (goal.distance === 'trail' ? (goal.courseKm ?? 0) * 1000 : GOAL_METERS[goal.distance]) : 0
   const predictMeters = goalMeters || 10000
@@ -108,7 +99,7 @@ export function FitnessDashboard() {
   const pct = (a: number, b: number) => (a && b ? `${Math.abs(Math.round(((a - b) / b) * 1000) / 10)}%` : undefined)
   const trend = (a: number, b: number): Kpi['trend'] => (!a || !b || Math.abs(a - b) < 1e-6 ? 'flat' : a > b ? 'up' : 'down')
   const series = (f: (w: (typeof weeks)[number]) => number, digits = 1) =>
-    weeks.filter((w) => f(w) > 0).map((w) => ({ x: w.label, y: Math.round(f(w) * 10 ** digits) / 10 ** digits }))
+    weeks.filter((w) => f(w) > 0).map((w) => ({ x: w.label, label: w.full, info: w.info, y: Math.round(f(w) * 10 ** digits) / 10 ** digits }))
   const firstLast = (pts: { y: number }[]) => [pts.at(-1)?.y ?? 0, pts[0]?.y ?? 0] as const
 
   const pacePts = series((w) => w.pace, 0)
@@ -128,7 +119,7 @@ export function FitnessDashboard() {
   const loadPts = weeks.map((w, i) => {
     const prev = weeks.slice(Math.max(0, i - 4), i)
     const base = prev.length ? sum(prev.map((x) => x.km)) / prev.length : 0
-    return { x: w.label, y: base ? Math.round((w.km / base) * 100) / 100 : 0 }
+    return { x: w.label, label: w.full, info: w.info, y: base ? Math.round((w.km / base) * 100) / 100 : 0 }
   }).filter((p, i) => i >= 1 && p.y > 0)
 
   const rows: Row[] = [
@@ -151,7 +142,7 @@ export function FitnessDashboard() {
       trend: trend(predicted, predictedPast),
       goodWhen: 'down',
       hint: goal?.distance === 'trail' ? 'Flat-equivalent time from your VO2max, elevation not included' : 'What your current VO2max is worth on race day',
-      points: rolling.map((p) => ({ x: p.x, y: predictTime(p.y, predictMeters) })),
+      points: rolling.map((p) => ({ ...p, y: predictTime(p.y, predictMeters) })),
       format: (v) => formatClock(v),
       extra: current ? (
         <div className="grid grid-cols-4 gap-4">
@@ -173,7 +164,7 @@ export function FitnessDashboard() {
       trend: trend(current ? thresholdPace(current) : 0, past ? thresholdPace(past) : 0),
       goodWhen: 'down',
       hint: 'The pace you can hold for about an hour, from your VO2max',
-      points: rolling.map((p) => ({ x: p.x, y: thresholdPace(p.y) })),
+      points: rolling.map((p) => ({ ...p, y: thresholdPace(p.y) })),
       format: (v) => formatPace(v, units),
     },
     {
@@ -294,28 +285,49 @@ function MetricTile({ row, active, big, className, onSelect }: { row: Row; activ
         </div>
         {big && row.extra}
       </div>
-      <Spark points={row.points.map((p) => p.y)} invert={row.goodWhen === 'down'} className={cn('mt-auto', big ? 'h-12' : 'h-9')} />
+      <Spark points={row.points} format={row.format} invert={row.goodWhen === 'down'} className={cn('mt-auto', big ? 'h-12' : 'h-9')} />
     </button>
   )
 }
 
-/** Petite courbe sans axes ; le point final marque la dernière valeur. `invert` met « mieux » en haut (allures, chronos). */
-function Spark({ points, invert, className }: { points: number[]; invert?: boolean; className?: string }) {
+/** Petite courbe sans axes ; le point final marque la dernière valeur. `invert` met « mieux » en haut (allures, chronos). Survol : date et valeur. */
+function Spark({ points, format, invert, className }: { points: MetricPoint[]; format?: (v: number) => string; invert?: boolean; className?: string }) {
+  const [hover, setHover] = useState<number | null>(null)
   if (points.length < 2) return <div className={cn('w-full rounded-full border-t border-dashed opacity-40', className)} />
-  const lo = Math.min(...points)
-  const hi = Math.max(...points)
+  const ys = points.map((p) => p.y)
+  const lo = Math.min(...ys)
+  const hi = Math.max(...ys)
   const span = hi - lo || 1
-  const xy = points.map((v, i) => {
+  const xy = ys.map((v, i) => {
     const n = (v - lo) / span
-    return [(i / (points.length - 1)) * 100, (invert ? n : 1 - n) * 90 + 5] as const
+    return [(i / (ys.length - 1)) * 100, (invert ? n : 1 - n) * 90 + 5] as const
   })
-  const [lx, ly] = xy[xy.length - 1]
+  const at = hover ?? xy.length - 1
+  const [dx, dy] = xy[at]
+  const hp = hover !== null ? points[hover] : null
   return (
-    <div className={cn('relative w-full', className)} aria-hidden>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
+    <div
+      className={cn('relative w-full', className)}
+      onPointerMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect()
+        setHover(Math.min(ys.length - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * (ys.length - 1)))))
+      }}
+      onPointerLeave={() => setHover(null)}
+    >
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden>
         <polyline points={xy.map(([x, y]) => `${x},${y}`).join(' ')} fill="none" stroke="currentColor" strokeOpacity={0.7} strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
       </svg>
-      <span className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" style={{ left: `${lx}%`, top: `${ly}%` }} />
+      <span className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" style={{ left: `${dx}%`, top: `${dy}%` }} />
+      {hp && (
+        <span
+          className="pointer-events-none absolute bottom-full z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border bg-popover px-2 py-1 text-[11px] shadow-lg"
+          style={{ left: `${Math.min(80, Math.max(20, dx))}%` }}
+        >
+          <span className="block text-muted-foreground">{hp.label ?? hp.x}</span>
+          <span className="block font-medium tabular-nums">{format ? format(hp.y) : hp.y}</span>
+          {hp.info && <span className="block text-muted-foreground">{hp.info}</span>}
+        </span>
+      )}
     </div>
   )
 }

@@ -140,7 +140,7 @@ function SessionProfile({ session, zones, units }: { session: Session; zones: Zo
     <>
       <SessionProfileChart blocks={session.blocks} zones={zones} units={units} laps={laps.data?.laps} />
       {activity && laps.data && !laps.data.laps.some((l) => l.paceSecPerKm) && (
-        <p className="mt-2 text-muted-foreground text-xs">No splits from COROS for this run, so only the planned profile is shown.</p>
+        <p className="mt-2 text-muted-foreground text-xs">No COROS splits</p>
       )}
     </>
   )

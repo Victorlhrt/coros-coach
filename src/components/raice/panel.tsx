@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
  * en-tête titre + sous-titre + actions, sections séparées par des filets pleine largeur.
  */
 export function Panel({ className, ...props }: HTMLAttributes<HTMLElement>) {
-  return <section className={cn('min-w-0 overflow-hidden rounded-[28px] border bg-card text-card-foreground', className)} {...props} />
+  return <section className={cn('animate-blur-in min-w-0 overflow-hidden rounded-[28px] border bg-card text-card-foreground', className)} {...props} />
 }
 
 export function PanelHeader({ title, subtitle, actions, className }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; className?: string }) {

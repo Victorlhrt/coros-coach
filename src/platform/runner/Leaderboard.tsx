@@ -13,7 +13,7 @@ import SegmentedControl from '@/components/arc/segmented-control/segmented-contr
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { Button as LinkButton } from '@/components/shadcn/button'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
 import { formatDay, toIso } from '@/lib/coach/dates'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { useActivities } from '@/lib/coros/activity-hooks'
@@ -189,7 +189,6 @@ function FriendsBoard({ period, onAdd }: { period: Period; onAdd: () => void }) 
               <Ranking rows={board.data.rows} />
               {alone && (
                 <PanelFooter>
-                  <p className="text-muted-foreground text-sm">Add friends to turn your week into a race.</p>
                   <Button size="sm" variant="secondary" onClick={onAdd}>
                     <UserPlusIcon className="size-4" /> Add a friend
                   </Button>
@@ -206,7 +205,7 @@ function FriendsBoard({ period, onAdd }: { period: Period; onAdd: () => void }) 
         <PanelHeader title="Your friends" subtitle={f ? `${f.friends.length} friend${f.friends.length === 1 ? '' : 's'}` : ' '} />
         {f && f.friends.length === 0 && f.outgoing.length === 0 ? (
           <PanelSection divided>
-            <EmptyState icon={<UsersIcon width={24} height={24} strokeWidth={1.5} />} title="No friends yet" description="Add a friend with their email or invite code." action={<Button size="sm" onClick={onAdd}>Add a friend</Button>} />
+            <EmptyState icon={<UsersIcon width={24} height={24} strokeWidth={1.5} />} title="No friends yet" description="" action={<Button size="sm" onClick={onAdd}>Add a friend</Button>} />
           </PanelSection>
         ) : (
           <ul className="divide-y border-t">
@@ -366,7 +365,6 @@ function CitySheet({ open, city, onClose }: { open: boolean; city: string | null
       <SheetContent side="right" className="w-full gap-0 sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader className="border-b p-6">
           <SheetTitle>Change your city</SheetTitle>
-          <SheetDescription>You’ll be ranked against the runners of your new city from now on.</SheetDescription>
         </SheetHeader>
         {/* Remonté à chaque ouverture pour repartir de la ville enregistrée. */}
         {open && <CityPicker key={city ?? ''} initial={city} submitLabel="Save city" onSaved={onClose} className="p-6" />}
@@ -457,7 +455,7 @@ function CityTab({ period }: { period: Period }) {
   if (d && !d.city) {
     return (
       <Panel>
-        <PanelHeader title="Where do you run?" subtitle="Pick the city you run in most and we’ll rank you against the runners there." />
+        <PanelHeader title="Where do you run?" />
         <PanelSection divided>
           <CityPicker submitLabel="Add my city" />
         </PanelSection>
@@ -575,7 +573,6 @@ function AddFriendSheet({ open, onClose }: { open: boolean; onClose: () => void 
       <SheetContent side="right" className="w-full gap-0 sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader className="border-b p-6">
           <SheetTitle>Add a friend</SheetTitle>
-          <SheetDescription>They’ll get a request; once accepted you’ll see each other in the rankings.</SheetDescription>
         </SheetHeader>
         <form
           className="flex flex-1 flex-col gap-5 overflow-y-auto p-6"

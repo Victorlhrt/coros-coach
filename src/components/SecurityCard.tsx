@@ -6,7 +6,7 @@ import { addPasskey, changePin, disableLock, enableLock, lockNow, removePasskey,
 import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
 import { Button } from './ui/button'
-import { Card, CardDescription, CardTitle } from './ui/card'
+import { Card, CardTitle } from './ui/card'
 import { Chip } from './ui/chip'
 import { Input } from './ui/input'
 
@@ -57,10 +57,6 @@ export function SecurityCard() {
         <CardTitle className="flex items-center gap-2">
           <Lock className="size-5 text-accent" /> Lock
         </CardTitle>
-        <CardDescription className="mt-1">
-          Encrypts your API key and COROS connection on this device. A backup code is required; Face ID can be added after.
-          Forgetting the code erases these secrets (your plan is kept).
-        </CardDescription>
         {pinForm}
       </Card>
     )

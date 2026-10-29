@@ -279,7 +279,6 @@ export function CoachChat({ firstName, className }: { firstName?: string; classN
         <CoachAvatar className="size-9" />
         <div className="min-w-0 flex-1">
           <p className="font-medium text-sm">Pacer</p>
-          <p className="text-muted-foreground text-xs">Your AI coach</p>
         </div>
         <Badge size="sm" tone="info" icon={<Sparkles className="size-3" />}>
           Full chat soon

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeftIcon, ArrowRightIcon, WatchIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Input } from '@/components/arc/input/input'
 import { NumberField } from '@/components/arc/number-field/number-field'
@@ -48,6 +48,14 @@ export function OnboardingRunPage() {
     queryFn: () => api<Variant>(`/onboarding/pick${forced ? `?variant=${encodeURIComponent(forced)}` : ''}`),
     staleTime: Infinity,
   })
+  // L'onboarding ne se fait qu'une fois : un coureur connecté qui l'a terminé retourne à son espace (aperçus admin exceptés).
+  const done = useQuery({
+    queryKey: ['account', 'overview'],
+    queryFn: () => api<{ completedAt: string | null }>('/account/overview'),
+    enabled: !!me.data && !preview,
+  })
+  const checking = !!me.data && !preview && done.isPending
+  const onboarded = !!me.data && !preview && !!done.data?.completedAt
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<Answers>({})
@@ -60,7 +68,7 @@ export function OnboardingRunPage() {
   const needsCode = !me.isPending && !me.data && !inviteCode
 
   useEffect(() => {
-    if (!variant.data || started.current || me.isPending || (!me.data && !inviteCode)) return
+    if (!variant.data || started.current || me.isPending || checking || onboarded || (!me.data && !inviteCode)) return
     started.current = true
     api<{ id: string }>('/onboarding/sessions', { body: { variantId: variant.data.id, preview, inviteCode: inviteCode ?? undefined } })
       .then(({ id }) => {
@@ -86,7 +94,10 @@ export function OnboardingRunPage() {
         }
         setError(e instanceof Error ? e.message : String(e))
       })
-  }, [variant.data, preview, me.isPending, me.data, inviteCode])
+  }, [variant.data, preview, me.isPending, me.data, inviteCode, checking, onboarded])
+
+  // Pas pendant un parcours en cours : sa fin rafraîchit la vue d'ensemble avant la redirection prévue.
+  if (onboarded && !sessionId) return <Navigate to="/account/home" replace />
 
   if (needsCode) {
     return (

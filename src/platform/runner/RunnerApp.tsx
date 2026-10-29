@@ -3,11 +3,12 @@ import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { RunnerAvatar } from './RunnerAvatar'
+import { ProfileHeader, ProfileSheet } from './ProfileEdit'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Combobox } from '@/components/arc/combobox/combobox'
 import { Input } from '@/components/arc/input/input'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
 import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Button as LinkButton } from '@/components/shadcn/button'
@@ -53,7 +54,8 @@ import { OnboardingPage as GoalPage } from '@/pages/OnboardingPage'
 import { PlanPage as CoachPlanPage } from '@/pages/PlanPage'
 import { SessionPage } from '@/pages/SessionPage'
 import { SettingsPage as CoachSettingsPage } from '@/pages/SettingsPage'
-import { AnalyticsDashboards, HomeTab, PlanTab } from './CoachTabs'
+import { HomeTab, PlanTab } from './CoachTabs'
+import { RunsFeed } from './RunsFeed'
 import { BrandLogo } from './brands'
 import { CoachChat } from './CoachChat'
 import { FitnessDashboard } from './Fitness'
@@ -221,7 +223,7 @@ function CoachRoutes() {
   )
 }
 
-/** Analytics en deux sous-menus (barre latérale) : Runs (volume, sorties, journal) et Fitness (VO2max, prédicteurs de course). */
+/** Analytics en deux sous-menus (barre latérale) : Runs (fil semaine par semaine) et Fitness (VO2max, prédicteurs de course). */
 function AnalyticsTab() {
   const { data } = useOverview()
   const { pathname } = useLocation()
@@ -233,7 +235,7 @@ function AnalyticsTab() {
         <FitnessDashboard />
       ) : (
         <>
-          <AnalyticsDashboards />
+          <RunsFeed />
           {data?.answers && <OnboardingAnalytics />}
         </>
       )}
@@ -529,7 +531,7 @@ function EquipmentPage() {
   const watches = (a.wearables ?? []).filter((w) => w !== 'none')
   return (
     <>
-      <PageTitle title="Equipment">Your shoes and the devices that track your runs. Tap a pair to edit it.</PageTitle>
+      <PageTitle title="Equipment" />
       <h2 className="mb-3 font-medium text-sm">Shoes</h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {shoes.map((s, i) => (
@@ -612,7 +614,6 @@ function ShoeSheet({ shoes, index, onClose }: { shoes: Shoe[]; index: number | '
       <SheetContent side="right" className="w-full gap-0 sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader className="border-b p-6">
           <SheetTitle>{current ? 'Edit pair' : 'Add a pair'}</SheetTitle>
-          <SheetDescription>Brand, model and the distance on the shoes today. Runs synced after today are added to the default pair.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
           <div className="flex h-24 items-center justify-center rounded-2xl border bg-card">
@@ -643,14 +644,12 @@ function ShoeSheet({ shoes, index, onClose }: { shoes: Shoe[]; index: number | '
           <label className="flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm">
             <span>
               <span className="block font-medium">In rotation</span>
-              <span className="block text-muted-foreground text-xs">You currently run in this pair.</span>
             </span>
             <input type="checkbox" className="size-5 accent-[var(--accent)]" checked={draft.rotation} onChange={(e) => setDraft((d) => ({ ...d, rotation: e.target.checked }))} />
           </label>
           <label className="flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm">
             <span>
               <span className="block font-medium">Default pair</span>
-              <span className="block text-muted-foreground text-xs">New runs are added to it.</span>
             </span>
             <input type="checkbox" className="size-5 accent-[var(--accent)]" checked={!!draft.default} onChange={(e) => setDraft((d) => ({ ...d, default: e.target.checked }))} />
           </label>
@@ -722,11 +721,12 @@ function ShoeCard({ shoe: s, onEdit }: { shoe: Shoe; onEdit: () => void }) {
 function ProfilePage() {
   const me = useMe().data
   const { data } = useOverview()
+  const [editing, setEditing] = useState(false)
   const a = data?.answers
   if (!me) return null
   const rows: [string, string | null | undefined][] = [
     ['E-mail', me.email],
-    ['Sex', a?.about?.sex === 'f' ? 'Female' : a?.about?.sex === 'm' ? 'Male' : null],
+    ['Sex', a?.about?.sex === 'f' ? 'Female' : a?.about?.sex === 'm' ? 'Male' : a?.about?.sex === 'x' ? 'Other' : null],
     ['Year of birth', a?.about?.birthYear ? String(a.about.birthYear) : null],
     ['City', a?.city],
     ['Level', a?.level ? LEVELS[a.level] : null],
@@ -734,13 +734,7 @@ function ProfilePage() {
   ]
   return (
     <>
-      <div className="mb-6 flex items-center gap-4">
-        <RunnerAvatar name={me.name} size="lg" />
-        <div>
-          <h1 className="font-heading text-2xl">{me.name}</h1>
-          <p className="text-muted-foreground text-sm">Runner on {BRAND.name}</p>
-        </div>
-      </div>
+      <ProfileHeader name={me.name} />
       <div className="grid gap-4 lg:grid-cols-2">
       <Panel>
         <dl className="divide-y">
@@ -751,12 +745,13 @@ function ProfilePage() {
             </div>
           ))}
         </dl>
-        <LinkButton asChild variant="secondary" className="mt-auto self-start">
-          <Link to="/onboarding">Redo onboarding</Link>
-        </LinkButton>
+        <Button variant="secondary" className="mt-auto self-start" onClick={() => setEditing(true)}>
+          <PencilIcon className="size-4" /> Edit profile
+        </Button>
       </Panel>
       <InvitePanel />
       </div>
+      <ProfileSheet open={editing} me={me} answers={a} onClose={() => setEditing(false)} />
     </>
   )
 }

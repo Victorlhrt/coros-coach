@@ -4,7 +4,7 @@ import { Activity, ChevronLeft, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardDescription, CardTitle } from '@/components/ui/card'
+import { Card, CardTitle } from '@/components/ui/card'
 import { Chip } from '@/components/ui/chip'
 import { CourseCard } from '@/components/CourseCard'
 import { Input } from '@/components/ui/input'
@@ -121,7 +121,6 @@ export function OnboardingPage() {
             style={{ width: `${Math.max(8, (progress.done / progress.total) * 100)}%` }}
           />
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">Takes less than a minute. If the app reloads, generation picks up where it left off.</p>
       </div>
     )
   }
@@ -141,7 +140,6 @@ export function OnboardingPage() {
           <Activity className="size-6 text-accent" />
           <div className="flex-1">
             <CardTitle>My COROS data</CardTitle>
-            <CardDescription>Paces, predictions and recent volume to calibrate your plan.</CardDescription>
           </div>
         </div>
         {store.profile && (

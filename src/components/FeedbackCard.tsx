@@ -5,7 +5,7 @@ import { usePlan } from '@/lib/store/plan'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
-import { Card, CardDescription, CardTitle } from './ui/card'
+import { Card, CardTitle } from './ui/card'
 import { Chip } from './ui/chip'
 
 /** Note et ressenti d'une séance réalisée. */
@@ -42,7 +42,6 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
   return (
     <Card id="ressenti">
       <CardTitle>How was it?</CardTitle>
-      <CardDescription className="mt-1">How you felt feeds into your weekly review.</CardDescription>
 
       <p className="mt-4 text-sm font-medium text-muted-foreground">Rating</p>
       <Stars value={draft.rating} onChange={(rating) => setDraft((d) => ({ ...d, rating }))} size="lg" />

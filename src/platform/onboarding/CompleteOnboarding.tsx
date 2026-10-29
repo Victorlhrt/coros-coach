@@ -1091,7 +1091,7 @@ function ProfileStep({ answers, patch, sessionId }: StepProps & { sessionId: str
           </TextShimmer>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <span key={i} className="aspect-square animate-pulse rounded-[18px] bg-muted" style={{ animationDelay: `${i * 150}ms` }} />
+              <span key={i} className="aspect-square animate-skeleton rounded-[18px] bg-muted" style={{ animationDelay: `${i * 150}ms` }} />
             ))}
           </div>
         </div>

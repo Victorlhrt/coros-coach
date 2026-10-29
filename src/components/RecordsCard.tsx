@@ -9,7 +9,7 @@ import { fetchRecords } from '@/lib/coros/data'
 import { usePlan } from '@/lib/store/plan'
 import { toast } from '@/lib/toast'
 import { Button } from './ui/button'
-import { Card, CardDescription, CardTitle } from './ui/card'
+import { Card, CardTitle } from './ui/card'
 import { Input } from './ui/input'
 
 /** Records des 12 derniers mois (COROS ou saisis) → VDOT, allure seuil et prédictions. */
@@ -39,7 +39,6 @@ export function RecordsCard() {
       <CardTitle className="flex items-center gap-2">
         <Trophy className="size-5 text-accent" /> Runner profile
       </CardTitle>
-      <CardDescription className="mt-1">Best times from the last 12 months. You can edit them by hand (h:mm:ss).</CardDescription>
 
       <div className="mt-4 space-y-2">
         {RECORD_DISTANCES.map((d) => {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Hono } from 'hono'
 import type { SessionUser } from './auth.js'
 import { db } from './db.js'
@@ -9,10 +10,14 @@ import { db } from './db.js'
  * Les sorties synchronisées (`run_days`) des jours strictement après `since` s'ajoutent à la paire créditée :
  * la paire `default`, sinon la première en rotation, sinon la première. Une saisie faite le jour d'une sortie
  * est donc supposée l'inclure (pas de double compte) ; une sortie du même jour encore non synchronisée est perdue.
+ *
+ * Une activité peut être rattachée à une autre paire (`activity_shoes`, depuis la séance) : sa distance quitte
+ * la paire créditée (si elle est après son `since`) et s'ajoute à la paire choisie (si elle est après le `since`
+ * de celle-ci). Chaque paire a un `id` stable, attribué à la première lecture et gardé par la sauvegarde.
  */
 
 /** Forme rangée dans `answers.shoes` (`km` = `baseKm`, pour ce qui lit encore l'ancien champ). */
-type StoredShoe = { brand: string; model: string; km: number; baseKm: number; since: string; rotation: boolean; default: boolean }
+type StoredShoe = { id: string; brand: string; model: string; km: number; baseKm: number; since: string; rotation: boolean; default: boolean }
 /** Forme renvoyée au client : `km` est le total courant calculé. */
 export type ShoeOut = StoredShoe & { credited: boolean }
 
@@ -35,12 +40,38 @@ async function kmAfter(userId: string, since: string) {
   return (row?.m ?? 0) / 1000
 }
 
+type Assignment = { label_id: string; day: string; meters: number; shoe_id: string }
+
+/**
+ * Kilomètres à ajouter à `baseKm` pour chaque paire : sorties synchronisées pour la paire créditée, corrigées
+ * des activités rattachées à une autre paire, plus ces activités pour la paire choisie.
+ */
+async function extraKm(userId: string, shoes: { id: string; since: string; rotation: boolean; default?: boolean }[]) {
+  const extra = shoes.map(() => 0)
+  const ci = creditedIndex(shoes)
+  if (ci < 0) return extra
+  extra[ci] = await kmAfter(userId, shoes[ci].since)
+  const rows = await db<Assignment[]>`
+    select label_id, to_char(activity_date, 'YYYY-MM-DD') as day, meters, shoe_id from activity_shoes where user_id = ${userId}`
+  for (const r of rows) {
+    const j = shoes.findIndex((s) => s.id === r.shoe_id)
+    if (j < 0 || j === ci) continue
+    if (r.day > shoes[ci].since) extra[ci] -= r.meters / 1000
+    if (r.day > shoes[j].since) extra[j] += r.meters / 1000
+  }
+  // Une activité rattachée mais pas encore synchronisée ne doit pas rendre le total négatif.
+  extra[ci] = Math.max(0, extra[ci])
+  return extra
+}
+
 /** Ajoute le total courant et la paire créditée aux paires rangées. */
 async function withTotals(userId: string, shoes: StoredShoe[]): Promise<ShoeOut[]> {
   const ci = creditedIndex(shoes)
-  const extra = ci >= 0 ? await kmAfter(userId, shoes[ci].since) : 0
-  return shoes.map((s, i) => ({ ...s, km: round1(s.baseKm + (i === ci ? extra : 0)), credited: i === ci }))
+  const extra = await extraKm(userId, shoes)
+  return shoes.map((s, i) => ({ ...s, km: round1(s.baseKm + extra[i]), credited: i === ci }))
 }
+
+const SHOE_ID = /^[\w-]{1,64}$/
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v))
 
@@ -50,7 +81,8 @@ function normalize(raw: Record<string, unknown>, fallbackSince: string): StoredS
   if (!brand) return null
   const baseKm = Number.isFinite(num(raw.baseKm)) ? num(raw.baseKm) : Number.isFinite(num(raw.km ?? raw.shoeKm)) ? num(raw.km ?? raw.shoeKm) : 0
   const since = typeof raw.since === 'string' && ISO.test(raw.since) ? raw.since : fallbackSince
-  return { brand, model: typeof raw.model === 'string' ? raw.model : '', km: baseKm, baseKm, since, rotation: !!raw.rotation, default: !!raw.default }
+  const id = typeof raw.id === 'string' && SHOE_ID.test(raw.id) ? raw.id : randomUUID()
+  return { id, brand, model: typeof raw.model === 'string' ? raw.model : '', km: baseKm, baseKm, since, rotation: !!raw.rotation, default: !!raw.default }
 }
 
 type SessionRow = { id: string; answers: Record<string, unknown>; completed_at: Date | null; updated_at: Date }
@@ -74,7 +106,21 @@ export async function loadShoes(userId: string, session?: SessionRow | null): Pr
   const fallback = isoDay(s.updated_at ?? s.completed_at ?? Date.now())
   const rawList = Array.isArray(a.shoes) ? (a.shoes as Record<string, unknown>[]) : a.gear && typeof a.gear === 'object' ? [a.gear as Record<string, unknown>] : []
   const shoes = rawList.map((r) => (r && typeof r === 'object' ? normalize(r, fallback) : null)).filter((x): x is StoredShoe => !!x)
-  const needsMigration = !Array.isArray(a.shoes) ? shoes.length > 0 : rawList.some((r) => !r || typeof r.since !== 'string' || !Number.isFinite(num(r.baseKm)))
+  // Deux paires ne partagent jamais un id (copie manuelle, ancienne donnée) : la seconde en reçoit un neuf.
+  const seen = new Set<string>()
+  let dup = false
+  for (const sh of shoes) {
+    if (seen.has(sh.id)) {
+      sh.id = randomUUID()
+      dup = true
+    }
+    seen.add(sh.id)
+  }
+  const needsMigration =
+    dup ||
+    (!Array.isArray(a.shoes)
+      ? shoes.length > 0
+      : rawList.some((r) => !r || typeof r.since !== 'string' || !Number.isFinite(num(r.baseKm)) || typeof r.id !== 'string' || !SHOE_ID.test(r.id)))
   if (needsMigration) {
     // Fige la migration sans toucher `updated_at` (sinon `since` glisserait à chaque lecture).
     await db`update onboarding_sessions set answers = answers || ${db.json({ shoes } as never)} where id = ${s.id}`
@@ -102,6 +148,7 @@ shoeRoutes.put('/shoes', async (c) => {
     typeof body.today === 'string' && ISO.test(body.today) && Math.abs(Date.parse(body.today) - Date.parse(isoDay(now))) <= 86_400_000 ? body.today : isoDay(now)
   const input: (Omit<StoredShoe, 'km' | 'baseKm' | 'since'> & { km: number; prevBase: number | null; prevSince: string | null })[] = []
   let hasDefault = false
+  const ids = new Set<string>()
   for (const s of body.shoes as Record<string, unknown>[]) {
     const brand = typeof s?.brand === 'string' ? s.brand.trim().slice(0, 60) : ''
     const km = Number(s?.km)
@@ -111,15 +158,19 @@ shoeRoutes.put('/shoes', async (c) => {
     // Une seule paire par défaut : la première cochée.
     const isDefault: boolean = !!s.default && !hasDefault
     hasDefault ||= isDefault
-    input.push({ brand, model: typeof s.model === 'string' ? s.model.trim().slice(0, 80) : '', km: round1(km), rotation: !!s.rotation, default: isDefault, prevBase, prevSince })
+    // L'id reçu est gardé (rattachements des activités) ; nouvelle paire ou doublon : id neuf.
+    const id = typeof s.id === 'string' && SHOE_ID.test(s.id) && !ids.has(s.id) ? s.id : randomUUID()
+    ids.add(id)
+    input.push({ id, brand, model: typeof s.model === 'string' ? s.model.trim().slice(0, 80) : '', km: round1(km), rotation: !!s.rotation, default: isDefault, prevBase, prevSince })
   }
-  const ci = creditedIndex(input)
+  // Total projeté de chaque paire avec ses anciennes valeurs, selon la même règle que l'affichage.
+  const projectedExtra = await extraKm(userId, input.map((s) => ({ ...s, since: s.prevSince ?? today })))
   const shoes: StoredShoe[] = []
   for (const [i, s] of input.entries()) {
     const { prevBase, prevSince, km, ...rest } = s
     let keep = false
     if (prevBase !== null && prevSince !== null) {
-      const projected = round1(prevBase + (i === ci ? await kmAfter(userId, prevSince) : 0))
+      const projected = round1(prevBase + projectedExtra[i])
       keep = Math.abs(projected - km) < 0.05
     }
     const baseKm = keep ? prevBase! : km
@@ -135,5 +186,50 @@ shoeRoutes.put('/shoes', async (c) => {
     )
     returning id, answers, completed_at, updated_at`
   if (!row) return c.json({ error: 'Finish onboarding before adding shoes.' }, 404)
+  // Les activités rattachées à une paire supprimée reviennent à la paire par défaut.
+  await db`delete from activity_shoes where user_id = ${userId} and not (shoe_id = any(${shoes.map((x) => x.id)}::text[]))`
   return c.json({ shoes: await withTotals(userId, shoes) })
+})
+
+const LABEL = /^[\w-]{1,64}$/
+
+/** Paires et chaussure rattachée à chacune des activités demandées (`labels` séparés par des virgules). */
+shoeRoutes.get('/activity-shoes', async (c) => {
+  const userId = c.get('user').id
+  const labels = (c.req.query('labels') ?? '').split(',').map((l) => l.trim()).filter((l) => LABEL.test(l)).slice(0, 200)
+  const shoes = await loadShoes(userId)
+  const rows = labels.length
+    ? await db<{ label_id: string; shoe_id: string }[]>`
+        select label_id, shoe_id from activity_shoes where user_id = ${userId} and label_id = any(${labels}::text[])`
+    : []
+  const known = new Set(shoes.map((s) => s.id))
+  const assignments = Object.fromEntries(rows.filter((r) => known.has(r.shoe_id)).map((r) => [r.label_id, r.shoe_id]))
+  return c.json({ shoes, assignments })
+})
+
+/**
+ * Rattache une activité COROS à une paire (`shoeId`), ou la rend à la paire par défaut (`null`). La date et la
+ * distance de l'activité sont gardées pour le kilométrage sans relire COROS.
+ */
+shoeRoutes.put('/activity-shoes/:labelId', async (c) => {
+  const userId = c.get('user').id
+  const labelId = c.req.param('labelId')
+  if (!LABEL.test(labelId)) return c.json({ error: 'Invalid activity.' }, 400)
+  const body = await c.req.json<{ shoeId?: unknown; date?: unknown; meters?: unknown }>().catch(() => null)
+  if (!body || (body.shoeId !== null && typeof body.shoeId !== 'string')) return c.json({ error: 'Choose a pair.' }, 400)
+  if (body.shoeId === null) {
+    await db`delete from activity_shoes where user_id = ${userId} and label_id = ${labelId}`
+  } else {
+    const meters = Number(body.meters)
+    if (typeof body.date !== 'string' || !ISO.test(body.date) || !Number.isFinite(meters) || meters < 0 || meters > 500_000)
+      return c.json({ error: 'Invalid activity date or distance.' }, 400)
+    const shoes = await loadShoes(userId)
+    if (!shoes.some((s) => s.id === body.shoeId)) return c.json({ error: 'Unknown pair.' }, 404)
+    await db`
+      insert into activity_shoes (user_id, label_id, activity_date, meters, shoe_id)
+      values (${userId}, ${labelId}, ${body.date}::date, ${Math.round(meters)}, ${body.shoeId})
+      on conflict (user_id, label_id) do update
+        set activity_date = excluded.activity_date, meters = excluded.meters, shoe_id = excluded.shoe_id, updated_at = now()`
+  }
+  return c.json({ shoes: await loadShoes(userId), shoeId: body.shoeId })
 })

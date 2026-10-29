@@ -98,6 +98,11 @@ onboardingRoutes.post('/sessions', async (c) => {
   const preview = !!parsed.data.preview && user?.role === 'admin'
   const code = await validCode(parsed.data.inviteCode)
   if (!user && !code) return c.json({ error: 'Invite code is invalid or used up' }, 403)
+  // L'onboarding ne se fait qu'une fois : ensuite, le profil se modifie depuis l'espace coureur (aperçus admin exceptés).
+  if (user && !preview) {
+    const [done] = await db`select 1 from onboarding_sessions where user_id = ${user.id} and completed_at is not null and not is_preview limit 1`
+    if (done) return c.json({ error: 'You’ve already completed onboarding. Edit your profile instead.', onboarded: true }, 409)
+  }
   const [row] = await db<{ id: string }[]>`
     insert into onboarding_sessions (variant_id, user_id, is_preview, invite_code)
     values (${parsed.data.variantId}, ${user?.id ?? null}, ${preview}, ${code?.code ?? null})

@@ -54,10 +54,6 @@ export function SettingsPage({ children }: { children?: ReactNode }) {
           <label className="flex items-center justify-between gap-4">
             <div>
               <CardTitle>Automatic review</CardTitle>
-              <CardDescription className="mt-1">
-                The first time you open the app each week, Pacer analyses the past week (splits, how you felt, recovery) and
-                suggests adjustments.
-              </CardDescription>
             </div>
             <input
               type="checkbox"

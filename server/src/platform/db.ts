@@ -129,6 +129,9 @@ export async function migratePlatform() {
       created_at timestamptz not null default now()
     )`
   await db`alter table onboarding_sessions add column if not exists invite_code text`
+  // Photo de profil envoyée depuis l'espace coureur (data URL webp/jpeg/png, 100 Ko max), prioritaire sur celle de l'onboarding.
+  await db`alter table users add column if not exists photo_data text`
+  await db`alter table users add column if not exists photo_updated_at timestamptz`
   // État du coach (plan, séances, ressentis, réglages) de chaque coureur, un document JSON versionné.
   await db`
     create table if not exists coach_state (
@@ -193,6 +196,17 @@ export async function migratePlatform() {
       primary key (user_id, day)
     )`
   await db`create index if not exists run_days_day_idx on run_days (day)`
+  // Chaussure choisie pour une activité COROS précise (sinon la paire par défaut) : date et distance gardées pour le kilométrage.
+  await db`
+    create table if not exists activity_shoes (
+      user_id uuid not null references users(id) on delete cascade,
+      label_id text not null,
+      activity_date date not null,
+      meters int not null default 0,
+      shoe_id text not null,
+      updated_at timestamptz not null default now(),
+      primary key (user_id, label_id)
+    )`
   await db`
     create table if not exists friendships (
       requester_id uuid not null references users(id) on delete cascade,

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { TypeBadge } from '@/components/TypeBadge'
 import { Button } from '@/components/ui/button'
-import { Card, CardDescription } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { claudeErrorMessage } from '@/lib/coach/claude'
 import { formatDay, today } from '@/lib/coach/dates'
@@ -78,11 +78,7 @@ export function AdjustPage() {
 
       {!result && !analyse.isPending && (
         <Card>
-          <CardDescription>
-            Pacer compares your planned sessions with your linked COROS activities and their splits, reads your recovery, HRV, sleep and resting HR, then
-            suggests changes for the rest of the week. Nothing changes without your OK.
-          </CardDescription>
-          <Button className="mt-4 w-full" onClick={() => analyse.mutate()}>
+          <Button className="w-full" onClick={() => analyse.mutate()}>
             <Wand2 className="size-5" /> Analyse my week
           </Button>
         </Card>

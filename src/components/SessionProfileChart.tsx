@@ -7,7 +7,8 @@ import { STEP_LABEL } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
 
 const SERIES = [{ key: 'zone', label: 'Planned', area: true }]
-const SERIES_ACTUAL = [...SERIES, { key: 'actual', label: 'Actual', area: false, color: 'var(--foreground)' }]
+/** Courbe réelle : verte si la séance est tenue (ou mieux), orange sinon. */
+const ACTUAL_COLOR = { good: '#43b581', off: '#f2a33a' } as const
 const SAMPLES = 160
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
@@ -28,6 +29,13 @@ export function paceToZone(pace: number, zones: Zone[]) {
   const span = Math.max(1, best.paceSlow - best.paceFast)
   const v = best.zone - 0.5 + (best.paceSlow - pace) / span
   return Math.round(Math.min(6.5, Math.max(0.5, v)) * 100) / 100
+}
+
+/** Inverse de paceToZone : position sur l'échelle des zones → allure (s/km), pour l'infobulle. */
+function zoneToPace(v: number, zones: Zone[]) {
+  const z = zones.find((x) => x.zone === Math.min(6, Math.max(1, Math.round(v))))
+  if (!z) return null
+  return z.paceSlow - (v - z.zone + 0.5) * Math.max(1, z.paceSlow - z.paceFast)
 }
 
 /** Profil d'intensité de la séance (Arc LineChart) : zone visée minute par minute, survol pour l'étape et l'allure. Avec les tours de l'activité liée, la courbe réelle se superpose à la théorique. */
@@ -55,11 +63,9 @@ export function SessionProfileChart({ blocks, zones, units, laps, className }: {
     const lap = lapIdx >= 0 ? real[lapIdx] : null
     const mark = t >= next ? formatDuration(next) : undefined
     while (t >= next) next += tick
-    const z = zones.find((z) => z.zone === s.zone)
-    const [fast, slow] = s.paceFast && s.paceSlow ? [s.paceFast, s.paceSlow] : z ? [z.paceFast, z.paceSlow] : []
-    const pace = fast && slow ? `${formatPace(fast, units)}–${formatPace(slow, units)} ${paceUnit(units)}` : null
-    const planLabel = inPlan ? `${STEP_LABEL[s.kind]}${s.rep ? ` ${s.rep}` : ''}${pace ? ` · ${pace}` : ''}` : 'after the plan'
-    const lapLabel = lap && t <= realTotal ? ` · lap ${lap.index}: ${formatPace(lap.paceSecPerKm!, units)} ${paceUnit(units)}${lap.avgHr ? `, ${Math.round(lap.avgHr)} bpm` : ''}` : ''
+    // Libellé court pour que l'infobulle reste dans la carte : l'allure réelle est dans les valeurs.
+    const planLabel = inPlan ? `${STEP_LABEL[s.kind]}${s.rep ? ` ${s.rep}` : ''}` : 'After the plan'
+    const lapLabel = lap && t <= realTotal ? ` · lap ${lap.index}${lap.avgHr ? ` · ${Math.round(lap.avgHr)} bpm` : ''}` : ''
     return {
       key: String(n),
       label: `${clock(t)} · ${planLabel}${lapLabel}`,
@@ -68,18 +74,29 @@ export function SessionProfileChart({ blocks, zones, units, laps, className }: {
     }
   })
   const withActual = real.length > 0
+  // Séance tenue : au moins 80 % du temps prévu couru dans la zone visée ou plus vite, et 90 % de la durée faite.
+  const compared = data.filter((d, n) => (n / SAMPLES) * total <= Math.min(planned, realTotal) && d.values.actual !== undefined)
+  const hit = compared.filter((d) => (d.values.actual ?? 0) >= d.values.zone - 0.5).length
+  const met = withActual && realTotal >= planned * 0.9 && compared.length > 0 && hit / compared.length >= 0.8
+  const series = withActual ? [...SERIES, { key: 'actual', label: met ? 'Actual · on target' : 'Actual · off target', area: false, color: met ? ACTUAL_COLOR.good : ACTUAL_COLOR.off }] : SERIES
   return (
     <LineChart
       className={className}
       data={data}
-      series={withActual ? SERIES_ACTUAL : SERIES}
+      series={series}
       label={withActual ? 'Planned and actual intensity' : 'Session intensity profile'}
       height={withActual ? 200 : 180}
       max={withActual ? 6.5 : 6}
       legend={withActual}
       curve="linear"
       categoryLabel="Time"
-      formatValue={(v) => `Z${v} ${ZONE_NAMES[v] ?? ''}`}
+      formatValue={(v, line) => {
+        if (line.key === 'actual') {
+          const p = zoneToPace(v, zones)
+          return p ? `${formatPace(p, units)} ${paceUnit(units)}` : `Z${v}`
+        }
+        return `Z${v} ${ZONE_NAMES[v] ?? ''}`
+      }}
       formatTick={(v) => (v > 0 && v <= 6 && Number.isInteger(v) ? `Z${v}` : '')}
     />
   )
