@@ -33,6 +33,13 @@ export const config = {
   coachOwnerEmail: (process.env.COACH_OWNER_EMAIL ?? 'lhermetvictor@gmail.com').trim().toLowerCase(),
   /** Code demandé pour enregistrer un passkey sans être connecté (premier appareil, appareil sans passkey synchronisé). */
   setupCode: process.env.SETUP_CODE ?? '',
+  /** Paiements Stripe : sans clé, la facturation est désactivée (les routes répondent 503) et tout le monde garde l'accès complet. */
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+  /** Tests locaux seulement (stripe-mock, relais) : URL de l'API Stripe à la place de https://api.stripe.com. */
+  stripeApiUrl: process.env.STRIPE_API_URL ?? '',
+  /** Jours d'essai offerts au premier abonnement (0 = pas d'essai). */
+  stripeTrialDays: Math.max(0, Math.floor(Number(process.env.STRIPE_TRIAL_DAYS ?? 0) || 0)),
   origin,
   rpID: new URL(origin).hostname,
   rpName: 'Coach COROS',

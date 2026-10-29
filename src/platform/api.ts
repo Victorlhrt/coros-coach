@@ -25,7 +25,29 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 
 export type UserRole = 'runner' | 'admin'
 export type UserStatus = 'waitlist' | 'active' | 'suspended'
-export type Me = { id: string; email: string; name: string; role: UserRole; status: UserStatus }
+export type PlanId = 'free' | 'pro' | 'expert'
+export type BillingInterval = 'month' | 'year'
+/** Droits de l'offre (même forme que server/src/platform/entitlements.ts) ; null = illimité. */
+export type Entitlements = {
+  maxPlans: number | null
+  maxSources: number | null
+  weeklyReview: boolean
+  coachChat: 'none' | 'limited' | 'unlimited'
+  expertMode: boolean
+}
+export type Me = { id: string; email: string; name: string; role: UserRole; status: UserStatus; plan?: PlanId; entitlements?: Entitlements }
+export type Billing = {
+  configured: boolean
+  plan: PlanId
+  status: string | null
+  interval: BillingInterval | null
+  periodEnd: string | null
+  cancelAtPeriodEnd: boolean
+  hasCustomer: boolean
+  enforced: boolean
+  earlyAccess: boolean
+  entitlements: Entitlements
+}
 
 export type CompleteKind = 'reason' | 'wearables' | 'identity' | 'goal' | 'estimate' | 'health' | 'gear' | 'generate'
 

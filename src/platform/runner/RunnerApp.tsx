@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, TrophyIcon, UserIcon } from 'lucide-react'
+import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, CreditCardIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, TrophyIcon, UserIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { RunnerAvatar } from './RunnerAvatar'
+import { BillingPage, planLabel, useBilling } from './BillingPage'
 import { ProfileHeader, ProfileSheet } from './ProfileEdit'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -93,6 +94,7 @@ const NAV: NavItem[] = [
 ]
 const FOOTER_NAV: NavItem[] = [
   { title: 'Profile', path: '/account/profile', icon: <UserIcon /> },
+  { title: 'Billing', path: '/account/billing', icon: <CreditCardIcon /> },
   { title: 'Settings', path: '/account/settings', icon: <SettingsIcon /> },
 ]
 
@@ -163,7 +165,7 @@ export default function RunnerApp() {
   }, [me.data, active])
 
   if (me.isPending) return <div className="min-h-dvh" />
-  if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
+  if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (locked) return <LockScreen />
 
   return (
@@ -199,9 +201,12 @@ function CoachRoutes() {
   useAutoLink()
   usePlanRepair()
   usePlanEnglish()
-  useWeeklyReview()
+  const entitlements = useMe().data?.entitlements
+  useWeeklyReview(entitlements?.weeklyReview !== false)
   useRunSync()
   const hasPlan = usePlan((s) => !!s.plan)
+  // Offre limitée à un plan : pas de nouveau plan tant qu'il y en a un (le plan du coach est unique sur l'appareil).
+  const planCapped = hasPlan && entitlements?.maxPlans != null && entitlements.maxPlans <= 1
   return (
     <Routes>
       <Route index element={<Navigate to="home" replace />} />
@@ -213,9 +218,10 @@ function CoachRoutes() {
       <Route path="coach" element={<CoachTab />} />
       <Route path="equipment" element={<EquipmentPage />} />
       <Route path="profile" element={<ProfilePage />} />
+      <Route path="billing" element={<BillingPage />} />
       <Route path="settings" element={<SettingsTab />} />
       <Route path="session/:id" element={<SessionPage />} />
-      <Route path="goal" element={<GoalPage />} />
+      <Route path="goal" element={planCapped ? <UpgradePrompt title="New plans are on Pro" /> : <GoalPage />} />
       <Route path="debug" element={<DebugPage />} />
       <Route path="*" element={<Navigate to="home" replace />} />
     </Routes>
@@ -369,6 +375,21 @@ function Panel({ title, children, className }: { title?: string; children: React
   )
 }
 
+/** Fonction réservée aux offres payantes (seulement quand l'admin a activé les limites). */
+function UpgradePrompt({ title }: { title: string }) {
+  return (
+    <EmptyState
+      title={title}
+      description="Pro · Expert"
+      action={
+        <LinkButton asChild>
+          <Link to="/account/billing?plan=pro&interval=year">See plans</Link>
+        </LinkButton>
+      }
+    />
+  )
+}
+
 function NoOnboarding() {
   return (
     <EmptyState
@@ -505,6 +526,7 @@ function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
+  if (me?.entitlements?.coachChat === 'none') return <UpgradePrompt title="Pacer coach chat is on Pro" />
   return <CoachChat firstName={first} className="mx-auto h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] w-full max-w-4xl md:h-[calc(100dvh-8.5rem)]" />
 }
 
@@ -759,10 +781,22 @@ function AccountSettings() {
   const logout = useLogout()
   const navigate = useNavigate()
   const me = useMe().data
+  const billing = useBilling().data
   return (
     <RPanel>
       <RPanelHeader title="Account" subtitle={me?.email} />
       <div className="divide-y border-t">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+          <div className="min-w-0">
+            <p className="font-medium text-sm">Plan</p>
+            <p className="text-muted-foreground text-xs">{billing ? planLabel(billing) : '—'}</p>
+          </div>
+          <LinkButton asChild variant="secondary" size="sm">
+            <Link to="/account/billing">
+              <CreditCardIcon className="size-4" /> Billing
+            </Link>
+          </LinkButton>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
           <div className="min-w-0">
             <p className="font-medium text-sm">Password</p>

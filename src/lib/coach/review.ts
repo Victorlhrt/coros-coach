@@ -100,8 +100,9 @@ let attempted: string | null = null
 /**
  * Bilan automatique : à la première ouverture de chaque nouvelle semaine du plan (à partir de la 2e),
  * le bilan de la semaine écoulée est préparé en arrière-plan. Rien n'est appliqué sans accord.
+ * `allowed` : coupé quand l'offre du compte n'inclut pas le bilan hebdomadaire.
  */
-export function useWeeklyReview() {
+export function useWeeklyReview(allowed = true) {
   const plan = usePlan((s) => s.plan)
   const reviews = usePlan((s) => s.reviews)
   const connected = useCorosAuth((s) => s.connected)
@@ -110,7 +111,7 @@ export function useWeeklyReview() {
   const week = plan?.weeks.find((w) => w.start <= now && w.end >= now)
 
   useEffect(() => {
-    if (!plan || !week || week.number < 2 || !connected || !autoReview) return
+    if (!allowed || !plan || !week || week.number < 2 || !connected || !autoReview) return
     const key = `${plan.id}:${week.number}`
     if (reviews[week.number] || attempted === key) return
     attempted = key
@@ -123,5 +124,5 @@ export function useWeeklyReview() {
         ),
       )
       .catch((err) => toast.error(`Weekly review: ${claudeErrorMessage(err)}`))
-  }, [plan, week, reviews, connected, autoReview])
+  }, [allowed, plan, week, reviews, connected, autoReview])
 }

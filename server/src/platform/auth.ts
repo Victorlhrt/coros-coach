@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { config } from '../config.js'
 import { audit, db, getSetting, type UserRole, type UserStatus } from './db.js'
 import { sendEmailLater } from './email.js'
+import { userEntitlements } from './entitlements.js'
 import * as emails from './emails/templates.js'
 import { createPlanFromSession } from './onboarding.js'
 
@@ -104,7 +105,9 @@ export const platformAuthRoutes = new Hono()
 
 platformAuthRoutes.get('/me', async (c) => {
   const user = await currentUser(c)
-  return c.json({ user })
+  if (!user) return c.json({ user })
+  const { plan, entitlements } = await userEntitlements(user.id, user.role)
+  return c.json({ user: { ...user, plan, entitlements } })
 })
 
 platformAuthRoutes.post('/signup', async (c) => {

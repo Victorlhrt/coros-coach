@@ -219,6 +219,25 @@ export async function migratePlatform() {
     )`
   await db`create unique index if not exists friendships_pair_idx on friendships (least(requester_id, addressee_id), greatest(requester_id, addressee_id))`
   await db`create index if not exists friendships_addressee_idx on friendships (addressee_id, status)`
+  // Abonnements Stripe : offre courante recopiée par le webhook (Stripe reste la source de vérité).
+  await db`alter table users add column if not exists plan text not null default 'free'`
+  await db`
+    do $$ begin
+      if not exists (select 1 from pg_constraint where conname = 'users_plan_check') then
+        alter table users add constraint users_plan_check check (plan in ('free', 'pro', 'expert'));
+      end if;
+    end $$`
+  await db`alter table users add column if not exists plan_status text`
+  await db`alter table users add column if not exists plan_period_end timestamptz`
+  await db`alter table users add column if not exists plan_interval text`
+  await db`alter table users add column if not exists plan_cancel_at_period_end boolean not null default false`
+  await db`alter table users add column if not exists stripe_customer_id text unique`
+  await db`alter table users add column if not exists stripe_subscription_id text`
+  // Accès anticipé : les comptes existant avant la facturation gardent l'accès complet ; les suivants non.
+  await db`alter table users add column if not exists early_access boolean`
+  await db`update users set early_access = true where early_access is null`
+  await db`alter table users alter column early_access set default false`
+  await db`alter table users alter column early_access set not null`
   await db`insert into invite_codes (code, label, max_uses) values ('victor43', 'Code de Victor (illimité)', null) on conflict (code) do nothing`
   await db`create index if not exists users_created_idx on users (created_at)`
   await db`create index if not exists onboarding_sessions_variant_idx on onboarding_sessions (variant_id, created_at)`
@@ -233,6 +252,7 @@ export async function migratePlatform() {
       on conflict (id) do nothing`
   }
   await db`insert into app_settings (key, value) values ('signup_mode', ${db.json('open')}) on conflict (key) do nothing`
+  await db`insert into app_settings (key, value) values ('billing_enforced', ${db.json(false)}) on conflict (key) do nothing`
   await db`delete from user_sessions where expires_at < now()`
   await db`delete from password_resets where expires_at < now() - interval '1 day'`
 }

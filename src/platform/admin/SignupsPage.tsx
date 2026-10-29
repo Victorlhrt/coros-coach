@@ -21,6 +21,10 @@ type UserRow = {
   source: string
   onboarding_variant: string | null
   plans: number
+  plan: 'free' | 'pro' | 'expert'
+  plan_status: string | null
+  plan_interval: string | null
+  early_access: boolean
   created_at: string
   last_login_at: string | null
 }
@@ -70,6 +74,23 @@ export function SignupsPage() {
       ),
     },
     { key: 'status', label: 'Status', sortable: true, render: (_, u) => <Badge tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].label}</Badge> },
+    {
+      key: 'plan',
+      label: 'Plan',
+      sortable: true,
+      render: (_, u) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <Badge size="sm" tone={u.plan === 'free' ? 'neutral' : u.plan_status === 'past_due' ? 'warning' : 'success'}>
+            {`${u.plan === 'free' ? 'Free' : u.plan === 'pro' ? 'Pro' : 'Expert'}${u.plan !== 'free' && u.plan_interval ? ` · ${u.plan_interval === 'year' ? 'yearly' : 'monthly'}` : ''}`}
+          </Badge>
+          {u.early_access && (
+            <Badge size="sm" tone="info">
+              early
+            </Badge>
+          )}
+        </span>
+      ),
+    },
     { key: 'source', label: 'Source', sortable: true },
     { key: 'onboarding_variant', label: 'Flow', sortable: true, render: (v) => (v as string | null) ?? '—' },
     { key: 'plans', label: 'Plans', sortable: true, numeric: true },

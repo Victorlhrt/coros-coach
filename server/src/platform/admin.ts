@@ -67,7 +67,7 @@ adminRoutes.get('/users', async (c) => {
   const q = c.req.query('q')?.trim().toLowerCase()
   const rows = await db`
     select u.id, u.email, u.name, u.role, u.status, u.source, u.onboarding_variant, u.product_updates, u.notes,
-           u.created_at, u.last_login_at, (select count(*)::int from plans p where p.user_id = u.id) plans
+           u.plan, u.plan_status, u.plan_interval, u.early_access, u.created_at, u.last_login_at, (select count(*)::int from plans p where p.user_id = u.id) plans
     from users u
     where (${status ?? null}::text is null or u.status = ${status ?? null})
       and (${q ?? null}::text is null or u.email like ${`%${q ?? ''}%`} or lower(u.name) like ${`%${q ?? ''}%`})
@@ -295,16 +295,31 @@ adminRoutes.patch('/plans/:id', async (c) => {
 
 adminRoutes.get('/settings', async (c) => {
   const admins = await db`select id, email, name, last_login_at from users where role = 'admin' order by created_at`
-  return c.json({ signupMode: await getSetting('signup_mode', 'open'), admins })
+  return c.json({
+    signupMode: await getSetting('signup_mode', 'open'),
+    billingEnforced: (await getSetting<boolean>('billing_enforced', false)) === true,
+    billingConfigured: !!config.stripeSecretKey,
+    admins,
+  })
 })
 
+const SettingsPatch = z.object({ signupMode: z.enum(['open', 'waitlist', 'closed']).optional(), billingEnforced: z.boolean().optional() })
+
 adminRoutes.put('/settings', async (c) => {
-  const parsed = z.object({ signupMode: z.enum(['open', 'waitlist', 'closed']) }).safeParse(await c.req.json().catch(() => null))
+  const parsed = SettingsPatch.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: 'Invalid setting' }, 400)
-  await db`
-    insert into app_settings (key, value, updated_at) values ('signup_mode', ${db.json(parsed.data.signupMode)}, now())
+  const { signupMode, billingEnforced } = parsed.data
+  const save = (key: string, value: unknown) => db`
+    insert into app_settings (key, value, updated_at) values (${key}, ${db.json(value as never)}, now())
     on conflict (key) do update set value = excluded.value, updated_at = now()`
-  await audit(c.get('user').id, 'settings.signup_mode', null, parsed.data)
+  if (signupMode !== undefined) {
+    await save('signup_mode', signupMode)
+    await audit(c.get('user').id, 'settings.signup_mode', null, { signupMode })
+  }
+  if (billingEnforced !== undefined) {
+    await save('billing_enforced', billingEnforced)
+    await audit(c.get('user').id, 'settings.billing_enforced', null, { billingEnforced })
+  }
   return c.json({ ok: true })
 })
 

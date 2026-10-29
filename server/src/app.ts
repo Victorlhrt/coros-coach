@@ -10,6 +10,7 @@ import { config } from './config.js'
 import { migrate } from './db.js'
 import { accountRoutes } from './platform/account.js'
 import { adminRoutes } from './platform/admin.js'
+import { billingRoutes, stripeWebhookRoutes } from './platform/billing.js'
 import { platformAuthRoutes } from './platform/auth.js'
 import { migratePlatform } from './platform/db.js'
 import { lookupRoutes } from './platform/lookup.js'
@@ -32,6 +33,10 @@ app.use('/api/*', async (c, next) => {
 })
 
 app.get('/api/health', (c) => c.json({ ok: true }))
+
+// Webhook Stripe : sans Origin (passe le filtre CSRF), corps brut lu tel quel pour vérifier la signature.
+app.use('/api/stripe/*', bodyLimit({ maxSize: 1024 * 1024 }))
+app.route('/api/stripe', stripeWebhookRoutes)
 app.route('/api/auth', authRoutes)
 
 app.use('/api/state', requireCoachAccess, bodyLimit({ maxSize: 5 * 1024 * 1024 }))
@@ -50,6 +55,7 @@ app.route('/api/platform/connect', connectRoutes)
 app.route('/api/platform/admin/ai-usage', aiUsageRoutes)
 app.route('/api/platform/admin', adminRoutes)
 app.route('/api/platform/account', accountRoutes)
+app.route('/api/platform/billing', billingRoutes)
 
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 
