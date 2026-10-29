@@ -2,6 +2,7 @@ import { callStructured } from './claude'
 import { WEEKDAYS_FR as WEEKDAYS, addDays, today, weekday } from './dates'
 import { COACH_SYSTEM, describeGoal, describeProfile, describeZones } from './prompts'
 import { AdjustmentSchema, type Adjustment, type Goal, type Plan, type Profile, type Session, type Zone } from './schema'
+import { checkAdjustment, describeTrend, type Trend } from './guardrails'
 import { goalPace } from './repace'
 import { validateSessions } from './validate'
 import type { RaceRecord } from './vdot'
@@ -20,8 +21,10 @@ export async function proposeAdjustment(params: {
   /** Prévu vs réalisé des 7 derniers jours, avec les splits */
   performance: string
   records?: RaceRecord[]
+  /** Tendance des 3 dernières semaines : décide de ce que le bilan a le droit de baisser. */
+  trend: Trend
 }): Promise<Adjustment> {
-  const { plan, goal, profile, zones, recent, performance, records = [] } = params
+  const { plan, goal, profile, zones, recent, performance, records = [], trend } = params
   const from = today()
   const week = plan.weeks.find((w) => w.start <= from && w.end >= from)
   if (!week) throw new Error('No plan week covers today.')
@@ -54,6 +57,8 @@ ${remaining.map(describeSession).join('\n') || 'aucune'}
 Données COROS des 7 derniers jours (récupération, HRV, sommeil, FC repos, charge) :
 ${dump}
 
+${describeTrend(trend)}
+
 Analyse comme un coach :
 - séances réalisées ou manquées, volume réel vs prévu ;
 - splits des séances de qualité : allures tenues sur les répétitions, régularité, dérive en fin de séance ;
@@ -82,6 +87,7 @@ Si tout va bien, renvoie une liste de changements vide et dis-le dans summary.`,
       }
       const sessions = a.changes.flatMap((c) => (c.session ? [c.session] : []))
       errors.push(...validateSessions(sessions, allowedSet, 'Ajustement', { zones, goalPace: goalPace(goal) }))
+      errors.push(...checkAdjustment(a, trend, remaining, zones))
       return errors
     },
   })

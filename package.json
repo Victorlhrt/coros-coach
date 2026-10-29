@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build && tsc -p server/tsconfig.json",
     "lint": "oxlint",
     "preview": "vite preview",
-    "check": "tsx scripts/check-mapping.ts && tsx scripts/check-activities.ts && tsx scripts/check-repace.ts && tsx scripts/check-gpx.ts && tsx scripts/check-vdot.ts && tsx scripts/check-coach.ts && tsx scripts/check-vault.ts",
+    "check": "tsx scripts/check-mapping.ts && tsx scripts/check-activities.ts && tsx scripts/check-repace.ts && tsx scripts/check-gpx.ts && tsx scripts/check-vdot.ts && tsx scripts/check-coach.ts && tsx scripts/check-guardrails.ts && tsx scripts/check-vault.ts",
     "dev:server": "tsx watch server/src/index.ts",
     "dev:landing": "SITE_ROLE=landing tsx watch server/src/index.ts",
     "start": "node server-dist/index.js",

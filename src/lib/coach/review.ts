@@ -11,6 +11,7 @@ import { claudeErrorMessage } from './claude'
 import { describeFeedback } from './feedback'
 import { addDays, today } from './dates'
 import { formatClock, formatPace } from './format'
+import { trainingTrend } from './guardrails'
 import { autoLinks } from './links'
 import { isRun, sessionTotals } from './metrics'
 import type { Session } from './schema'
@@ -86,6 +87,7 @@ export async function runReview() {
     profile: store.profile,
     zones: store.zones,
     records: store.records,
+    trend: trainingTrend(plan, links, usePlan.getState().feedback, store.reviews, store.zones, now),
     recent,
     performance: [...lines, ...extra].join('\n') || 'Aucune séance prévue ni réalisée.',
   })
