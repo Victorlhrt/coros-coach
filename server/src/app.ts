@@ -16,6 +16,7 @@ import { migratePlatform } from './platform/db.js'
 import { lookupRoutes } from './platform/lookup.js'
 import { inviteRoutes } from './platform/invites.js'
 import { connectRoutes } from './platform/connect.js'
+import { garminAccountRoutes, garminOnboardingRoutes } from './platform/garmin.js'
 import { onboardingRoutes } from './platform/onboarding.js'
 import { requireCoachAccess, stateRoutes } from './state.js'
 
@@ -51,9 +52,12 @@ app.route('/api/platform/auth', platformAuthRoutes)
 app.route('/api/platform/onboarding', onboardingRoutes)
 app.route('/api/platform/lookup', lookupRoutes)
 app.route('/api/platform/invites', inviteRoutes)
+// Garmin (clé Personal API) : avant les routes génériques de connexion et du compte.
+app.route('/api/platform/connect/garmin', garminOnboardingRoutes)
 app.route('/api/platform/connect', connectRoutes)
 app.route('/api/platform/admin/ai-usage', aiUsageRoutes)
 app.route('/api/platform/admin', adminRoutes)
+app.route('/api/platform/account/garmin', garminAccountRoutes)
 app.route('/api/platform/account', accountRoutes)
 app.route('/api/platform/billing', billingRoutes)
 

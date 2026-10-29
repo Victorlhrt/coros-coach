@@ -1,9 +1,13 @@
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
 import { auth } from '@modelcontextprotocol/sdk/client/auth.js'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js'
 import { Hono } from 'hono'
 import { config } from '../config.js'
 import { db, getSetting } from './db.js'
+import type { GarminConnection } from './garmin.js'
+import { corosInsights, emptyInsights, garminInsights, hasData, parseToolResult, type ToolCaller, type WatchInsights } from './watch-insights.js'
 
 /**
  * Connexion COROS pendant l'onboarding, par le serveur MCP officiel de COROS (OAuth 2.1, PKCE,
@@ -145,4 +149,61 @@ connectRoutes.get('/status', async (c) => {
   if (!sessionId) return c.json({ providers: [] })
   const rows = await db<{ provider: string }[]>`select provider from wearable_connections where onboarding_session_id = ${sessionId}`
   return c.json({ providers: rows.map((r) => r.provider) })
+})
+
+/**
+ * Client MCP COROS du serveur pour une connexion enregistrée (lecture seule). Le SDK rafraîchit le token
+ * expiré avec le refresh token ; le nouveau jeu est réenregistré sur la connexion.
+ */
+export async function withCorosTools<T>(conn: { id: string; tokens: OAuthTokens }, fn: (call: ToolCaller) => Promise<T>): Promise<T> {
+  const provider = await new ServerCorosProvider().load()
+  provider.tokensValue = conn.tokens
+  const client = new Client({ name: 'raice-run', version: '1.0.0' })
+  try {
+    await client.connect(new StreamableHTTPClientTransport(new URL(COROS_MCP), { authProvider: provider }))
+    return await fn(async (name, args = {}) => parseToolResult(await client.callTool({ name, arguments: args })))
+  } finally {
+    await client.close().catch(() => undefined)
+    if (provider.tokensValue && provider.tokensValue !== conn.tokens) {
+      await db`update wearable_connections set tokens = ${db.json(provider.tokensValue as never)}, updated_at = now() where id = ${conn.id}`.catch(() => undefined)
+    }
+  }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const INSIGHTS_TTL = 10 * 60_000
+/** Lectures en cours par parcours : deux appels rapprochés partagent la même. */
+const pendingInsights = new Map<string, Promise<WatchInsights>>()
+
+/**
+ * Aperçu de la montre connectée pendant l'onboarding (volume, records, VO2max…), sans connexion au compte.
+ * Gardé 10 min sur le parcours ; une lecture en échec renvoie des null.
+ */
+connectRoutes.get('/insights', async (c) => {
+  const sessionId = c.req.query('sessionId') ?? c.req.query('session') ?? ''
+  if (!UUID.test(sessionId)) return c.json({ error: 'Missing onboarding session' }, 400)
+  const [session] = await db<{ watch_insights: WatchInsights | null }[]>`select watch_insights from onboarding_sessions where id = ${sessionId}`
+  if (!session) return c.json({ error: 'Onboarding session not found' }, 404)
+  const rows = await db<{ id: string; provider: string; user_id: string | null; onboarding_session_id: string | null; tokens: OAuthTokens }[]>`
+    select id, provider, user_id, onboarding_session_id, tokens from wearable_connections where onboarding_session_id = ${sessionId} order by updated_at desc`
+  const conn = rows.find((r) => r.provider === 'coros') ?? rows.find((r) => r.provider === 'garmin')
+  if (!conn) return c.json({ error: 'No watch connected yet' }, 404)
+  const provider = conn.provider as WatchInsights['source']
+
+  const cached = session.watch_insights
+  if (cached?.source === provider && Date.now() - Date.parse(cached.fetchedAt) < INSIGHTS_TTL) return c.json(cached)
+
+  let pending = pendingInsights.get(sessionId)
+  if (!pending) {
+    pending = (provider === 'coros' ? withCorosTools(conn, (call) => corosInsights(call)) : garminInsights(conn as unknown as GarminConnection))
+      .catch((e: unknown) => {
+        console.error(`[insights] ${provider}`, e instanceof Error ? e.message : e)
+        return emptyInsights(provider)
+      })
+      .finally(() => pendingInsights.delete(sessionId))
+    pendingInsights.set(sessionId, pending)
+  }
+  const insights = await pending
+  if (hasData(insights)) await db`update onboarding_sessions set watch_insights = ${db.json(insights as never)} where id = ${sessionId}`.catch(() => undefined)
+  return c.json(insights)
 })

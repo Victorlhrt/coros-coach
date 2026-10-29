@@ -15,7 +15,7 @@ import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raic
 import { Button as LinkButton } from '@/components/shadcn/button'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
 import { formatDay, toIso } from '@/lib/coach/dates'
-import { useCorosAuth } from '@/lib/coros/auth-store'
+import { useHasWatch } from '@/lib/watch'
 import { useActivities } from '@/lib/coros/activity-hooks'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -90,7 +90,7 @@ export function LeaderboardPage() {
   const [tab, setTab] = useState('friends')
   const [period, setPeriod] = useState<Period>('week')
   const [adding, setAdding] = useState(false)
-  const connected = useCorosAuth((s) => s.connected)
+  const connected = useHasWatch()
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -108,9 +108,9 @@ export function LeaderboardPage() {
 
       {!connected && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-dashed px-5 py-4 text-sm">
-          <p className="text-muted-foreground">Connect your COROS watch so your runs count in the rankings.</p>
+          <p className="text-muted-foreground">Connect your COROS or Garmin watch so your runs count in the rankings.</p>
           <LinkButton asChild variant="secondary" size="sm">
-            <Link to="/account/settings">Connect COROS</Link>
+            <Link to="/account/settings">Connect a watch</Link>
           </LinkButton>
         </div>
       )}

@@ -11,7 +11,7 @@ import { DISTANCES } from '@/lib/coach/schema'
 import { RECORD_DISTANCES, predictTime, thresholdPace, vdot } from '@/lib/coach/vdot'
 import type { Activity } from '@/lib/coros/activities'
 import { useActivityHistory } from '@/lib/coros/activity-hooks'
-import { useCorosAuth } from '@/lib/coros/auth-store'
+import { useHasRunData } from '@/lib/watch'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
@@ -70,7 +70,7 @@ function weeklyFitness(starts: string[], acts: Activity[]) {
 type Row = Kpi & { hint: string; extra?: React.ReactNode }
 
 export function FitnessDashboard() {
-  const connected = useCorosAuth((s) => s.connected)
+  const connected = useHasRunData()
   const units = useSettings((s) => s.units)
   const goal = usePlan((s) => s.goal)
   const records = usePlan((s) => s.records)
@@ -223,14 +223,14 @@ export function FitnessDashboard() {
             <Segmented value={range} options={RANGES} onChange={setRange} label="Period" />
             {!connected && (
               <Button asChild variant="outline" size="sm">
-                <Link to={ROUTES.settings}>Connect COROS</Link>
+                <Link to={ROUTES.settings}>Connect a watch</Link>
               </Button>
             )}
           </>
         }
       />
       {(() => {
-        const empty = connected ? 'Not enough runs in this period' : 'COROS isn’t connected'
+        const empty = connected ? 'Not enough runs in this period' : 'No watch connected'
         const active = rows.find((r) => r.id === open) ?? rows[0]
         const span: Record<string, string> = { vo2: 'col-span-2', predict: 'col-span-2', load: 'col-span-2 lg:col-span-1' }
         return (

@@ -40,8 +40,11 @@ import { Switch } from '@/components/arc/switch/switch'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { api, type Variant } from '../api'
+import { connectGarminOnboarding, type GarminExpiry } from '@/lib/garmin/client'
+import { GarminKeyForm } from '../runner/GarminConnect'
 import { CoachAvatar } from './CoachAvatar'
 import { readStravaExport, type StravaSummary } from './strava'
+import { InsightTiles, hasInsights, watchName, watchPerformances, type WatchInsights } from './WatchInsights'
 import { distanceCategory, formatDuration, formatPace, parseDuration, predict, type Performance } from './estimate'
 
 /**
@@ -140,6 +143,10 @@ export type CompleteAnswers = {
   days?: string[]
   level?: string
   strava_need?: string
+  /** Aperçu de la montre connectée (volume, records, VO2max…), lu en arrière-plan ; repris par la génération du plan. */
+  watch_insights?: WatchInsights | null
+  /** Réponses pré-remplies depuis la montre (« weekly_km », « days ») : Pacer le dit dans sa question. */
+  watch_prefilled?: string[]
 }
 
 const STEPS = [
@@ -409,6 +416,38 @@ export function CompleteOnboarding({
   })
   const ctx = { weeklyPct: weeklyStat.data?.percentile ?? null }
 
+  /**
+   * Dès qu'une montre est connectée, son aperçu est lu en arrière-plan pendant que la conversation continue.
+   * À l'arrivée : réponses pré-remplies (si pas encore données) et carte de Pacer à l'étape en cours.
+   */
+  const watch = (a.connected ?? []).find((c) => c === 'coros' || c === 'garmin')
+  const watchInsights = useQuery({
+    queryKey: ['watch-insights', sessionId, watch],
+    queryFn: () => api<WatchInsights>(`/connect/insights?sessionId=${sessionId}`),
+    enabled: !!sessionId && !!watch,
+    staleTime: 600_000,
+    retry: 2,
+  })
+  const [insightsAt, setInsightsAt] = useState<string | null>(null)
+  useEffect(() => {
+    const data = watchInsights.data
+    if (!data || !hasInsights(data) || a.watch_insights?.fetchedAt === data.fetchedAt) return
+    setA((cur) => ({ ...cur, ...watchPrefill(cur, data) }))
+    setInsightsAt((at) => at ?? step.id)
+  }, [watchInsights.data, a.watch_insights?.fetchedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  const insightCard = (at: string) =>
+    insightsAt === at && a.watch_insights ? (
+      <div className="flex flex-col gap-2">
+        <CoachBubble first>Here’s what I see on your {watchName(a.watch_insights)}.</CoachBubble>
+        <div className="flex animate-[fade-in_300ms_ease-out] gap-2">
+          <span className="w-9 shrink-0" />
+          <div className="w-full max-w-[85%] sm:max-w-sm">
+            <InsightTiles insights={a.watch_insights} />
+          </div>
+        </div>
+      </div>
+    ) : null
+
   // Pacer écrit ses bulles une à une, avec un temps de frappe ; la zone de réponse vient ensuite.
   const lines = coachLines(step.id, a, ctx)
   const [shown, setShown] = useState(0)
@@ -455,6 +494,7 @@ export function CompleteOnboarding({
               {line}
             </CoachBubble>
           ))}
+          {insightCard(s.id)}
           <UserBubble>{summarize(s.id, a)}</UserBubble>
         </div>
       ))}
@@ -467,6 +507,7 @@ export function CompleteOnboarding({
           </CoachBubble>
         ))}
         {!ready2 && typing && <TypingBubble avatar={shown === 0} />}
+        {ready2 && insightCard(step.id)}
       </div>
 
       {ready2 &&
@@ -647,7 +688,9 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
         a.about?.birthYear ? 'Thanks, noted.' : 'No problem, we’ll do without.',
         a.strava?.since
           ? `Your first Strava run goes back to ${new Date(a.strava.since).getFullYear()}. How long have you been running in total?`
-          : 'How long have you been running?',
+          : a.watch_insights?.since
+            ? `Your ${watchName(a.watch_insights)} history goes back to ${new Date(a.watch_insights.since).getFullYear()}. How long have you been running in total?`
+            : 'How long have you been running?',
       ]
     case 'goal':
       return [
@@ -665,7 +708,9 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
     case 'estimate':
       return race
         ? [`${race.name}, great choice.`, 'I ran the numbers: here’s what I think you can do. Adjust it if you want to aim faster or play it safer.']
-        : ['Consistency is key.', 'Give me a recent time: I’ll calibrate your paces with it.']
+        : a.watch_insights?.bests.length
+          ? ['Consistency is key.', `I’ve got your best times from your ${watchName(a.watch_insights)}. Add a more recent one if you have it.`]
+          : ['Consistency is key.', 'Give me a recent time: I’ll calibrate your paces with it.']
     case 'volume': {
       const e = a.estimate
       const praise =
@@ -678,7 +723,9 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
         praise,
         a.strava?.recent.runs
           ? `According to Strava, you’re running around ${a.strava.recent.weeklyKm} km a week: I’ve filled it in. Change it if things have changed.`
-          : 'How many kilometres are you running per week right now?',
+          : a.watch_prefilled?.includes('weekly_km') && a.watch_insights?.weeklyKm != null
+            ? `From your ${watchName(a.watch_insights)}: about ${a.watch_insights.weeklyKm} km a week. I’ve filled it in, change it if needed.`
+            : 'How many kilometres are you running per week right now?',
       ]
     }
     case 'pains':
@@ -691,7 +738,9 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
     case 'days':
       return [
         h?.events.length ? 'Thanks for being upfront, we’ll ease you back in.' : 'Nothing to report, ideal for getting started.',
-        'Which days can you run? And which one for your long run?',
+        a.watch_prefilled?.includes('days') && a.watch_insights?.usualDays
+          ? `From your ${watchName(a.watch_insights)}, you usually run on ${listDays(a.watch_insights.usualDays)}: I’ve pre-selected them. Change them if needed, and pick your long run day.`
+          : 'Which days can you run? And which one for your long run?',
       ]
     case 'duration': {
       const n = a.schedule?.days.length ?? 0
@@ -907,13 +956,31 @@ function StravaImport({ answers, patch }: { answers: CompleteAnswers; patch: (p:
   )
 }
 
-/** Connexion des montres : COROS par OAuth dans une nouvelle fenêtre, Garmin en attente du programme partenaire. */
+/** Connexion des montres : COROS par OAuth dans une nouvelle fenêtre, Garmin par la clé Personal API collée ici. */
 function ConnectStep({ answers, patch, sessionId }: StepProps & { sessionId: string | null }) {
   const w = answers.wearables ?? []
   const connected = answers.connected ?? []
   const [opening, setOpening] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState('')
+  const [garminOpen, setGarminOpen] = useState(false)
+  const [garminPending, setGarminPending] = useState(false)
+  const [garminError, setGarminError] = useState('')
+
+  async function connectGarmin(apiKey: string, expiryDays: GarminExpiry) {
+    if (!sessionId) return
+    setGarminError('')
+    setGarminPending(true)
+    try {
+      await connectGarminOnboarding(sessionId, apiKey, expiryDays)
+      patch({ connected: [...new Set([...(answers.connected ?? []), 'garmin'])] })
+      setGarminOpen(false)
+    } catch (e) {
+      setGarminError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setGarminPending(false)
+    }
+  }
 
   // Pendant que la fenêtre COROS est ouverte, on demande au serveur si la connexion a abouti.
   useEffect(() => {
@@ -959,7 +1026,8 @@ function ConnectStep({ answers, patch, sessionId }: StepProps & { sessionId: str
           const meta = WEARABLES.find((x) => x.id === id)!
           const done = connected.includes(id)
           return (
-            <div key={id} className="flex items-center gap-3 rounded-[20px] border bg-background p-4">
+            <div key={id} className="flex flex-col gap-4 rounded-[20px] border bg-background p-4">
+            <div className="flex items-center gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-card">
                 <img src={meta.logo} alt="" className={`size-full object-contain ${meta.invert ? 'p-2 invert' : ''}`} />
               </span>
@@ -969,7 +1037,7 @@ function ConnectStep({ answers, patch, sessionId }: StepProps & { sessionId: str
                   {done
                     ? 'Connected: reading your history'
                     : id === 'garmin'
-                      ? 'Connection coming soon'
+                      ? 'Paste a Personal API key from Garmin Connect'
                       : waiting
                         ? 'Finish connecting in the COROS window…'
                         : 'Allow Raice.run to read your workouts'}
@@ -984,8 +1052,16 @@ function ConnectStep({ answers, patch, sessionId }: StepProps & { sessionId: str
                   {waiting ? 'Waiting' : 'Connect'}
                 </Button>
               ) : (
-                <Badge>Coming soon</Badge>
+                <Button type="button" variant={garminOpen ? 'secondary' : undefined} disabled={!sessionId} onClick={() => setGarminOpen((o) => !o)}>
+                  {garminOpen ? 'Close' : 'Connect'}
+                </Button>
               )}
+            </div>
+            {id === 'garmin' && !done && garminOpen && (
+              <div className="border-t pt-4">
+                <GarminKeyForm pending={garminPending} error={garminError} onSubmit={(apiKey, expiryDays) => void connectGarmin(apiKey, expiryDays)} />
+              </div>
+            )}
             </div>
           )
         })}
@@ -1620,7 +1696,8 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
         .filter((p) => p.seconds > 0),
     [profile.data],
   )
-  const perfs = [...manual, ...(answers.strava?.performances ?? []), ...utmbPerfs]
+  const watchPerfs = useMemo(() => watchPerformances(answers.watch_insights), [answers.watch_insights])
+  const perfs = [...manual, ...(answers.strava?.performances ?? []), ...watchPerfs, ...utmbPerfs]
   const race = answers.goal?.race
   const prediction = race ? predict(perfs, race.km, race.elevation) : null
   const target = answers.estimate?.target ?? prediction?.seconds ?? null
@@ -1702,6 +1779,21 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
         <EmptyState title="Not enough data yet" description="Add a recent time below to get an estimate." />
       )}
 
+      {answers.watch_insights && watchPerfs.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-[26px] border p-5">
+          <span className="font-medium text-sm">Best times on your {watchName(answers.watch_insights)}</span>
+          {answers.watch_insights.bests.map((b) => (
+            <div key={b.label} className="flex items-center justify-between text-sm">
+              <span>{b.label === 'Half' ? 'Half marathon' : b.label}</span>
+              <span className="text-muted-foreground tabular-nums">
+                <span className="text-foreground">{formatDuration(b.seconds)}</span>
+                {b.date ? ` · ${new Date(`${b.date}T12:00:00`).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 rounded-[26px] border p-5">
         <span className="font-medium text-sm">Add a recent time</span>
         <ChipGroup label="Distance" multiple={false} options={MANUAL_DISTANCES} value={[draft.km]} onValueChange={([v]) => v && setDraft({ ...draft, km: v })} />
@@ -1741,7 +1833,37 @@ function EstimateStep({ answers, patch }: { answers: CompleteAnswers; patch: (p:
 // ---------- 6. Santé ----------
 
 function defaultHealth(a: CompleteAnswers): NonNullable<CompleteAnswers['health']> {
-  return a.health ?? { pains: [], painLevel: 0, events: [], weeklyKm: a.strava?.recent.runs ? a.strava.recent.weeklyKm : 20, notes: '' }
+  return (
+    a.health ?? {
+      pains: [],
+      painLevel: 0,
+      events: [],
+      weeklyKm: a.strava?.recent.runs ? a.strava.recent.weeklyKm : (a.watch_insights?.weeklyKm ?? 20),
+      notes: '',
+    }
+  )
+}
+
+/** Réponses tirées de la montre, seulement quand la personne n'a pas encore répondu (elle peut toujours les changer). */
+function watchPrefill(a: CompleteAnswers, w: WatchInsights): Partial<CompleteAnswers> {
+  const prefilled = new Set(a.watch_prefilled ?? [])
+  const out: Partial<CompleteAnswers> = { watch_insights: w }
+  if (!a.health && w.weeklyKm !== null) {
+    out.health = { ...defaultHealth({ ...a, watch_insights: w }), weeklyKm: w.weeklyKm }
+    prefilled.add('weekly_km')
+  }
+  if (!a.schedule && w.usualDays?.length) {
+    out.schedule = { days: w.usualDays, longDay: w.longRunDay && w.usualDays.includes(w.longRunDay) ? w.longRunDay : null }
+    prefilled.add('days')
+  }
+  out.watch_prefilled = [...prefilled]
+  return out
+}
+
+/** « Tue, Thu and Sun » */
+function listDays(days: string[]) {
+  const names = WEEKDAYS.filter((d) => days.includes(d.value)).map((d) => d.label)
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : (names[0] ?? '')
 }
 
 function useHealth({ answers, patch }: StepProps) {

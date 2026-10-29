@@ -20,7 +20,7 @@ import { ROUTES } from '@/lib/coach/routes'
 import type { Session, Week } from '@/lib/coach/schema'
 import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
 import { useActivities } from '@/lib/coros/activity-hooks'
-import { useCorosAuth } from '@/lib/coros/auth-store'
+import { useHasRunData } from '@/lib/watch'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weekRings, weeklyMetrics } from './coach-data'
@@ -569,7 +569,7 @@ const RANGES = [
 
 export function AnalyticsDashboards() {
   const { plan, zones } = usePlan()
-  const connected = useCorosAuth((s) => s.connected)
+  const connected = useHasRunData()
   const units = useSettings((s) => s.units)
   const activities = useActivities()
   const [range, setRange] = useState('6')
@@ -644,7 +644,7 @@ export function AnalyticsDashboards() {
         range={range}
         onRangeChange={setRange}
         compareLabel="Compare to plan"
-        emptyLabel={connected ? 'No runs in this period' : 'COROS isn’t connected'}
+        emptyLabel={connected ? 'No runs in this period' : 'No watch connected'}
         lists={[
           {
             title: 'Longest runs',
@@ -656,7 +656,7 @@ export function AnalyticsDashboards() {
         actions={
           !connected ? (
             <Button asChild variant="outline" size="sm">
-              <Link to={ROUTES.settings}>Connect COROS</Link>
+              <Link to={ROUTES.settings}>Connect a watch</Link>
             </Button>
           ) : undefined
         }

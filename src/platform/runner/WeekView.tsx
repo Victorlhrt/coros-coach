@@ -12,7 +12,7 @@ import type { Session } from '@/lib/coach/schema'
 import { TYPE_META } from '@/lib/coach/ui'
 import type { Activity } from '@/lib/coros/activities'
 import { useActivityHistory } from '@/lib/coros/activity-hooks'
-import { useCorosAuth } from '@/lib/coros/auth-store'
+import { useHasRunData } from '@/lib/watch'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,7 @@ type Row = { date: string; activity?: Activity; session?: Session }
 
 export function WeekView() {
   const { plan, zones, links, feedback } = usePlan()
-  const connected = useCorosAuth((s) => s.connected)
+  const connected = useHasRunData()
   const units = useSettings((s) => s.units)
   const history = useActivityHistory()
   const [now] = useState(today)

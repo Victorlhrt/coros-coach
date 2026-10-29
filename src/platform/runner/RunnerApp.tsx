@@ -61,6 +61,8 @@ import { CoachChat } from './CoachChat'
 import { FitnessDashboard } from './Fitness'
 import { MobileSubNav, MobileTabBar } from './MobileTabBar'
 import { Integrations } from './Integrations'
+import { StravaImport } from './StravaImport'
+import { useGarminConnected } from '@/lib/garmin/client'
 import { LeaderboardPage, useRunSync } from './Leaderboard'
 import { Panel as RPanel, PanelHeader as RPanelHeader } from '@/components/raice/panel'
 import { TrackLoader } from '@/components/raice/track-loader'
@@ -254,6 +256,7 @@ function SettingsTab() {
     <div className="flex w-full flex-col gap-4">
       <CoachSettingsPage>
         <Integrations stravaRuns={data?.answers?.strava?.runs} />
+        <StravaImport />
       </CoachSettingsPage>
       <AccountSettings />
     </div>
@@ -543,13 +546,15 @@ type Shoe = { brand: string; model: string; km: number; rotation: boolean; defau
 
 function EquipmentPage() {
   const { data, isPending } = useOverview()
+  const garminConnected = useGarminConnected()
   const [editing, setEditing] = useState<number | 'new' | null>(null)
   if (isPending) return null
   const a = data?.answers as (CompleteAnswers & { shoes?: Shoe[] }) | null | undefined
   if (!a) return <NoOnboarding />
   const g = a.gear
   const shoes: Shoe[] = data?.shoes ?? a.shoes ?? (g?.brand ? [{ brand: g.brand, model: g.model, km: g.shoeKm, rotation: g.rotation }] : [])
-  const watches = (a.wearables ?? []).filter((w) => w !== 'none')
+  // Garmin connecté par clé Personal API depuis les réglages : affiché même s'il n'avait pas été coché à l'onboarding.
+  const watches = [...new Set([...(a.wearables ?? []).filter((w) => w !== 'none'), ...(garminConnected ? ['garmin'] : [])])]
   return (
     <>
       <PageTitle title="Equipment" />

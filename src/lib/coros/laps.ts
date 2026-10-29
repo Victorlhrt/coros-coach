@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { clock, num, parseMeters, parseSeconds, pick, type Obj } from './activities'
 import { corosRead } from './client'
+import { fetchGarminLaps } from '@/lib/garmin/client'
+import { isGarminId } from '@/lib/garmin/merge'
 
 export interface Lap {
   index: number
@@ -57,11 +59,17 @@ export function fetchLaps(labelId: string, sportType: number) {
   return corosRead('queryActivityLapData', { labelId, sportType })
 }
 
-/** Splits d'une activité : ils ne changent plus, on les garde en cache. */
+/** Splits d'une activité : ils ne changent plus, on les garde en cache. Les activités Garmin passent par le serveur. */
 export function useLaps(labelId: string | null | undefined, sportType = 100, totalMeters?: number | null) {
   return useQuery({
     queryKey: ['coros', 'laps', labelId, totalMeters],
     queryFn: async () => {
+      // Sorties importées de l'archive Strava : pas de splits (seul activities.csv est lu).
+      if (labelId?.startsWith('strava:')) return { raw: null as unknown, laps: [] as Lap[] }
+      if (isGarminId(labelId)) {
+        const laps = await fetchGarminLaps(labelId!)
+        return { raw: laps as unknown, laps }
+      }
       const raw = await fetchLaps(labelId!, sportType)
       return { raw, laps: normalizeLaps(raw, totalMeters) }
     },

@@ -1,18 +1,20 @@
 import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Badge } from '@/components/arc/badge/badge'
 import { Panel, PanelHeader } from '@/components/raice/panel'
 import { Button } from '@/components/shadcn/button'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { disconnectCoros, startCorosLogin } from '@/lib/coros/client'
+import { RENEW_WITHIN_DAYS, daysLeft, formatExpiry, useGarminStatus } from '@/lib/garmin/client'
 import { BrandLogo } from './brands'
+import { GarminSheet } from './GarminConnect'
 
 /**
- * Montres et applications : COROS se connecte déjà, les autres sont affichées avec leur logo
- * et arrivent ensuite. Strava indique l'import fait pendant l'onboarding.
+ * Montres et applications : COROS (OAuth) et Garmin (clé Personal API) se connectent, les autres sont
+ * affichées avec leur logo et arrivent ensuite. Strava indique l'import fait pendant l'onboarding.
  */
 
 const SOON = [
-  { brand: 'Garmin', detail: 'Activities, sleep, HRV' },
   { brand: 'Apple', name: 'Apple Health', detail: 'Workouts and recovery' },
   { brand: 'Suunto', detail: 'Activities and workouts' },
   { brand: 'Polar', detail: 'Activities and recovery' },
@@ -27,6 +29,18 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
   const connected = useCorosAuth((s) => s.connected)
   const login = useMutation({ mutationFn: startCorosLogin })
   const logout = useMutation({ mutationFn: disconnectCoros })
+  const garmin = useGarminStatus()
+  const [garminOpen, setGarminOpen] = useState(false)
+  const g = garmin.data
+  const left = daysLeft(g?.expiresAt)
+  const renewSoon = !!g?.connected && left !== null && left <= RENEW_WITHIN_DAYS
+  const garminDetail = g?.connected
+    ? g.expiresAt
+      ? `Connected · Expires ${formatExpiry(g.expiresAt)}`
+      : 'Connected · activities and laps'
+    : g?.error
+      ? g.error
+      : 'Activities and laps'
   return (
     <Panel>
       <PanelHeader title="Watches & apps" />
@@ -39,6 +53,17 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
           ) : (
             <Button size="sm" onClick={() => login.mutate()} disabled={login.isPending}>
               {login.isPending ? 'Redirecting…' : 'Connect'}
+            </Button>
+          )}
+        </Tile>
+        <Tile brand="Garmin" detail={garminDetail} live>
+          {g?.connected ? (
+            <Button variant={renewSoon ? 'default' : 'outline'} size="sm" onClick={() => setGarminOpen(true)}>
+              {renewSoon ? 'Renew' : 'Manage'}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => setGarminOpen(true)} disabled={garmin.isPending}>
+              {g?.error ? 'Reconnect' : 'Connect'}
             </Button>
           )}
         </Tile>
@@ -58,6 +83,7 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
         <li aria-hidden className="hidden bg-card sm:block" />
       </ul>
       {login.error && <p className="border-t px-6 py-3 text-destructive text-sm">{login.error.message}</p>}
+      <GarminSheet open={garminOpen} status={g} onClose={() => setGarminOpen(false)} />
     </Panel>
   )
 }

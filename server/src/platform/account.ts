@@ -5,12 +5,15 @@ import { db } from './db.js'
 import { makeCode } from './invites.js'
 import { leaderboardRoutes } from './leaderboard.js'
 import { loadShoes, shoeRoutes } from './shoes.js'
+import { stravaImportRoutes } from './strava-import.js'
 
 /** Espace du coureur connecté. */
 export const accountRoutes = new Hono<{ Variables: { user: SessionUser } }>()
 accountRoutes.use('*', requireUser)
 // Amis, synchro des totaux quotidiens et classements (semaine, mois, ville).
 accountRoutes.route('/', leaderboardRoutes)
+// Import de l'archive Strava du coureur (sorties des deux dernières années + résumé).
+accountRoutes.route('/', stravaImportRoutes)
 
 accountRoutes.get('/plans', async (c) => {
   const rows = await db`

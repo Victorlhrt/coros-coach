@@ -129,6 +129,8 @@ export async function migratePlatform() {
       created_at timestamptz not null default now()
     )`
   await db`alter table onboarding_sessions add column if not exists invite_code text`
+  // Aperçu de la montre connectée pendant l'onboarding (GET /connect/insights), gardé 10 min.
+  await db`alter table onboarding_sessions add column if not exists watch_insights jsonb`
   // Photo de profil envoyée depuis l'espace coureur (data URL webp/jpeg/png, 100 Ko max), prioritaire sur celle de l'onboarding.
   await db`alter table users add column if not exists photo_data text`
   await db`alter table users add column if not exists photo_updated_at timestamptz`
@@ -207,6 +209,26 @@ export async function migratePlatform() {
       updated_at timestamptz not null default now(),
       primary key (user_id, label_id)
     )`
+  // Sorties importées par le coureur depuis sa propre archive Strava (lue dans le navigateur), comptées comme celles de la montre.
+  await db`
+    create table if not exists imported_activities (
+      user_id uuid not null references users(id) on delete cascade,
+      source text not null check (source in ('strava')),
+      label_id text not null,
+      activity_date date not null,
+      started_at timestamptz,
+      name text not null default '',
+      sport_type int not null default 100,
+      trail boolean not null default false,
+      meters int not null default 0,
+      seconds int not null default 0,
+      elapsed_seconds int not null default 0,
+      avg_hr int,
+      elevation_gain int not null default 0,
+      imported_at timestamptz not null default now(),
+      primary key (user_id, label_id)
+    )`
+  await db`create index if not exists imported_activities_date_idx on imported_activities (user_id, activity_date desc)`
   await db`
     create table if not exists friendships (
       requester_id uuid not null references users(id) on delete cascade,
