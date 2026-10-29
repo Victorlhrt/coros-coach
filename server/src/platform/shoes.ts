@@ -98,7 +98,7 @@ export async function loadShoes(userId: string, session?: SessionRow | null): Pr
       ? (
           await db<SessionRow[]>`
             select id, answers, completed_at, updated_at from onboarding_sessions
-            where user_id = ${userId} order by completed_at desc nulls last, updated_at desc limit 1`
+            where user_id = ${userId} and not is_preview order by completed_at desc nulls last, updated_at desc limit 1`
         )[0]
       : session
   if (!s) return []
@@ -181,7 +181,7 @@ shoeRoutes.put('/shoes', async (c) => {
   const [row] = await db<SessionRow[]>`
     update onboarding_sessions set answers = answers || ${db.json({ shoes, gear } as never)}, updated_at = now()
     where id = (
-      select id from onboarding_sessions where user_id = ${userId}
+      select id from onboarding_sessions where user_id = ${userId} and not is_preview
       order by completed_at desc nulls last, updated_at desc limit 1
     )
     returning id, answers, completed_at, updated_at`

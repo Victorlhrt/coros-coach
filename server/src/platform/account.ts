@@ -24,7 +24,7 @@ accountRoutes.get('/overview', async (c) => {
   const userId = c.get('user').id
   const [session] = await db<{ id: string; answers: Record<string, unknown>; completed_at: Date | null; updated_at: Date }[]>`
     select id, answers, completed_at, updated_at from onboarding_sessions
-    where user_id = ${userId} order by completed_at desc nulls last, updated_at desc limit 1`
+    where user_id = ${userId} and not is_preview order by completed_at desc nulls last, updated_at desc limit 1`
   const plans = await db`
     select id, title, goal_distance, to_char(goal_date, 'YYYY-MM-DD') goal_date, level, weeks, sessions_per_week, status, created_at
     from plans where user_id = ${userId} order by created_at desc`
@@ -71,7 +71,7 @@ accountRoutes.put('/city', async (c) => {
   const [row] = await db<{ id: string }[]>`
     update onboarding_sessions set answers = answers || ${db.json({ city } as never)}, updated_at = now()
     where id = (
-      select id from onboarding_sessions where user_id = ${userId}
+      select id from onboarding_sessions where user_id = ${userId} and not is_preview
       order by completed_at desc nulls last, updated_at desc limit 1
     )
     returning id`
@@ -102,7 +102,7 @@ accountRoutes.patch('/profile', async (c) => {
   if (p.city !== undefined && p.city !== '' && p.city.length < 2) return c.json({ error: 'Enter a city between 2 and 80 characters.' }, 400)
   const user = c.get('user')
   const [session] = await db<{ id: string; answers: Record<string, unknown> }[]>`
-    select id, answers from onboarding_sessions where user_id = ${user.id}
+    select id, answers from onboarding_sessions where user_id = ${user.id} and not is_preview
     order by completed_at desc nulls last, updated_at desc limit 1`
   const touchesAnswers = p.sex !== undefined || p.birthYear !== undefined || p.level !== undefined || p.city !== undefined
   if (touchesAnswers && !session) return c.json({ error: 'Finish onboarding before editing your profile.' }, 404)
@@ -159,7 +159,7 @@ accountRoutes.delete('/photo', async (c) => {
   await db`update users set photo_data = null, photo_updated_at = now() where id = ${userId}`
   await db`
     update onboarding_sessions set answers = answers || ${db.json({ photoUrl: null } as never)}, updated_at = now()
-    where user_id = ${userId} and answers ? 'photoUrl'`
+    where user_id = ${userId} and not is_preview and answers ? 'photoUrl'`
   return c.json({ ok: true })
 })
 

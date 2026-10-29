@@ -192,14 +192,14 @@ leaderboardRoutes.get('/leaderboard/city', async (c) => {
   const period = periodOf(c.req.query('period'))
   const [session] = await db<{ answers: Record<string, unknown> }[]>`
     select answers from onboarding_sessions
-    where user_id = ${me} order by completed_at desc nulls last, updated_at desc limit 1`
+    where user_id = ${me} and not is_preview order by completed_at desc nulls last, updated_at desc limit 1`
   const city = cityOf(session?.answers)
   const { start, end } = await bounds(period)
   if (!city) return c.json({ period, start, end, city: null, runners: 0, rows: [] })
   const rows = await db<(Totals & { runners: number; n: number })[]>`
     with latest as (
       select distinct on (s.user_id) s.user_id, s.answers
-      from onboarding_sessions s join users u on u.id = s.user_id and u.status = 'active'
+      from onboarding_sessions s join users u on u.id = s.user_id and u.status = 'active' and not s.is_preview
       order by s.user_id, s.completed_at desc nulls last, s.updated_at desc
     ), members as (
       select user_id id from latest
