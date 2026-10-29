@@ -22,15 +22,8 @@ export function SettingsPage({ children }: { children?: ReactNode }) {
       {children && <div className="mb-4">{children}</div>}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle>Display</CardTitle>
+          <CardTitle>Units</CardTitle>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            {(['dark', 'light'] as const).map((t) => (
-              <Button key={t} size="sm" variant={settings.theme === t ? 'default' : 'secondary'} onClick={() => settings.set({ theme: t })}>
-                {t === 'dark' ? 'Dark' : 'Light'}
-              </Button>
-            ))}
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
             {(['metric', 'imperial'] as const).map((u) => (
               <Button key={u} size="sm" variant={settings.units === u ? 'default' : 'secondary'} onClick={() => settings.set({ units: u })}>
                 {u === 'metric' ? 'km · min/km' : 'mi · min/mi'}
@@ -53,7 +46,7 @@ export function SettingsPage({ children }: { children?: ReactNode }) {
         <Card>
           <label className="flex items-center justify-between gap-4">
             <div>
-              <CardTitle>Automatic review</CardTitle>
+              <CardTitle>Weekly review</CardTitle>
             </div>
             <input
               type="checkbox"

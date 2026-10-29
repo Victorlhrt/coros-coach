@@ -6,10 +6,10 @@ import { db } from './db.js'
 /**
  * Chaussures du coureur et kilométrage automatique.
  *
- * Chaque paire garde `baseKm` (kilométrage saisi ou figé) et `since` (jour ISO déjà compris dans `baseKm`).
- * Les sorties synchronisées (`run_days`) des jours strictement après `since` s'ajoutent à la paire créditée :
- * la paire `default`, sinon la première en rotation, sinon la première. Une saisie faite le jour d'une sortie
- * est donc supposée l'inclure (pas de double compte) ; une sortie du même jour encore non synchronisée est perdue.
+ * Chaque paire garde `baseKm` (kilométrage saisi ou figé) et `since` (jour ISO de la saisie).
+ * Les sorties synchronisées (`run_days`) des jours à partir de `since` (compris) s'ajoutent à la paire créditée :
+ * la paire `default`, sinon la première en rotation, sinon la première. Une sortie du jour de la saisie compte :
+ * si le kilométrage saisi l'incluait déjà, elle est comptée deux fois (le coureur corrige à la main).
  *
  * Une activité peut être rattachée à une autre paire (`activity_shoes`, depuis la séance) : sa distance quitte
  * la paire créditée (si elle est après son `since`) et s'ajoute à la paire choisie (si elle est après le `since`
@@ -33,10 +33,10 @@ export function creditedIndex(shoes: { rotation: boolean; default?: boolean }[])
   return r >= 0 ? r : shoes.length ? 0 : -1
 }
 
-/** Kilomètres synchronisés après `since` (exclu). */
+/** Kilomètres synchronisés depuis `since` (compris : une sortie du jour où l'on a saisi le kilométrage compte). */
 async function kmAfter(userId: string, since: string) {
   const [row] = await db<{ m: number }[]>`
-    select coalesce(sum(meters), 0)::float8 m from run_days where user_id = ${userId} and day > ${since}::date`
+    select coalesce(sum(meters), 0)::float8 m from run_days where user_id = ${userId} and day >= ${since}::date`
   return (row?.m ?? 0) / 1000
 }
 
@@ -56,8 +56,8 @@ async function extraKm(userId: string, shoes: { id: string; since: string; rotat
   for (const r of rows) {
     const j = shoes.findIndex((s) => s.id === r.shoe_id)
     if (j < 0 || j === ci) continue
-    if (r.day > shoes[ci].since) extra[ci] -= r.meters / 1000
-    if (r.day > shoes[j].since) extra[j] += r.meters / 1000
+    if (r.day >= shoes[ci].since) extra[ci] -= r.meters / 1000
+    if (r.day >= shoes[j].since) extra[j] += r.meters / 1000
   }
   // Une activité rattachée mais pas encore synchronisée ne doit pas rendre le total négatif.
   extra[ci] = Math.max(0, extra[ci])

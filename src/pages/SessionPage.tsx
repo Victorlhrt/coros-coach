@@ -5,7 +5,6 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActivityLinkCard } from '@/components/ActivityLinkCard'
 import { EmptyState } from '@/components/EmptyState'
 import { FeedbackCard } from '@/components/FeedbackCard'
-import { SyncBadge } from '@/components/SyncBadge'
 import { TypeBadge } from '@/components/TypeBadge'
 import { SessionProfileChart } from '@/components/SessionProfileChart'
 import { Card } from '@/components/ui/card'
@@ -21,7 +20,6 @@ import { useActivities } from '@/lib/coros/activity-hooks'
 import { useLaps } from '@/lib/coros/laps'
 import { STEP_LABEL, zoneColor } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
-import { syncStatus } from '@/lib/coros/sync'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { ROUTES } from '@/lib/coach/routes'
@@ -29,7 +27,7 @@ import { ROUTES } from '@/lib/coach/routes'
 export function SessionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { plan, zones, coros, links } = usePlan()
+  const { plan, zones, links } = usePlan()
   const units = useSettings((s) => s.units)
   const session = allSessions(plan).find((s) => s.id === id)
   const location = useLocation()
@@ -47,7 +45,6 @@ export function SessionPage() {
   }
 
   const { seconds, meters } = sessionTotals(session, zones)
-  const status = syncStatus(plan, coros.synced, session)
 
   const pace = meters > 0 ? seconds / (meters / 1000) : 0
   const steps = session.blocks.reduce((n, b) => n + (b.kind === 'repeat' ? b.steps.length * b.repeats : 1), 0)
@@ -118,9 +115,6 @@ export function SessionPage() {
         </Panel>
 
         <div className="flex flex-col gap-4 xl:[&>*:last-child]:flex-1">
-          <Panel>
-            <PanelHeader title="Watch" actions={<SyncBadge status={status} />} />
-          </Panel>
           {session.blocks.length > 0 && <ZoneSplit blocks={session.blocks} zones={zones} />}
           {session.type !== 'strength' && <ActivityLinkCard session={session} />}
         </div>

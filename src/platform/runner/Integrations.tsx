@@ -10,8 +10,8 @@ import { BrandLogo } from './brands'
 import { GarminSheet } from './GarminConnect'
 
 /**
- * Montres et applications : COROS (OAuth) et Garmin (clé Personal API) se connectent, les autres sont
- * affichées avec leur logo et arrivent ensuite. Strava indique l'import fait pendant l'onboarding.
+ * Montres et applications : COROS (OAuth), Garmin (clé Personal API) et Strava (import d'archive) en tête ;
+ * les autres, à venir, sont repliées sous un dégradé.
  */
 
 const SOON = [
@@ -31,6 +31,7 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
   const logout = useMutation({ mutationFn: disconnectCoros })
   const garmin = useGarminStatus()
   const [garminOpen, setGarminOpen] = useState(false)
+  const [more, setMore] = useState(false)
   const g = garmin.data
   const left = daysLeft(g?.expiresAt)
   const renewSoon = !!g?.connected && left !== null && left <= RENEW_WITHIN_DAYS
@@ -45,7 +46,7 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
     <Panel>
       <PanelHeader title="Watches & apps" />
       <ul className="grid grid-cols-1 gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-3">
-        <Tile brand="COROS" detail={connected ? 'Connected · activities, sleep, HRV' : 'Activities, sleep, HRV, workouts to watch'} live>
+        <Tile brand="COROS" detail={connected ? 'Connected · activities, sleep, HRV' : 'Activities, sleep, HRV'} live>
           {connected ? (
             <Button variant="outline" size="sm" onClick={() => logout.mutate()} disabled={logout.isPending}>
               Disconnect
@@ -72,16 +73,33 @@ export function Integrations({ stravaRuns }: { stravaRuns?: number }) {
             {stravaRuns ? 'Imported' : 'Not imported'}
           </Badge>
         </Tile>
-        {SOON.map((s) => (
-          <Tile key={s.brand} brand={s.brand} name={s.name} detail={s.detail}>
-            <Badge size="sm" tone="neutral">
-              Coming soon
-            </Badge>
-          </Tile>
-        ))}
-        {/* 11 tuiles : une case vide teintée comme les autres complète la grille en 2 ou 3 colonnes. */}
-        <li aria-hidden className="hidden bg-card sm:block" />
       </ul>
+      {/* Les applications à venir : repliées sous un dégradé, « See more » les déplie. */}
+      <div className="relative border-t">
+        <ul className={`grid grid-cols-1 gap-px bg-border sm:grid-cols-2 xl:grid-cols-3 ${more ? '' : 'max-h-[76px] overflow-hidden sm:max-h-[80px]'}`}>
+          {SOON.map((s) => (
+            <Tile key={s.brand} brand={s.brand} name={s.name} detail={s.detail}>
+              <Badge size="sm" tone="neutral">
+                Coming soon
+              </Badge>
+            </Tile>
+          ))}
+          <li aria-hidden className="hidden bg-card xl:block" />
+        </ul>
+        {more ? (
+          <div className="flex justify-center border-t bg-card py-3">
+            <Button variant="ghost" size="sm" onClick={() => setMore(false)}>
+              See less
+            </Button>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-end justify-center bg-linear-to-b from-card/10 via-card/80 to-card pb-3">
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => setMore(true)}>
+              See more · {SOON.length}
+            </Button>
+          </div>
+        )}
+      </div>
       {login.error && <p className="border-t px-6 py-3 text-destructive text-sm">{login.error.message}</p>}
       <GarminSheet open={garminOpen} status={g} onClose={() => setGarminOpen(false)} />
     </Panel>
