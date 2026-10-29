@@ -20,6 +20,10 @@ export const navLinks = [
 		label: "AI coach",
 		href: "#coach",
 	},
+	{
+		label: "Pricing",
+		href: "#pricing",
+	},
 ];
 
 export function Header() {

@@ -21,6 +21,7 @@ import { HeroSection } from '@/components/hero'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { DotWordmark } from './DotWordmark'
 import { CoachFlow, WatchFlow } from './landing-flows'
+import { Pricing } from './Pricing'
 import { StepsTrack, type TrackStep } from './StepsTrack'
 import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/shadcn/button'
@@ -42,7 +43,7 @@ const FAQ = [
   { q: 'What is agentic running?', a: 'Instead of a fixed template, AI agents work for you: they read your watch data, build the plan, push sessions to your wrist and adjust every week. You stay in charge, they do the paperwork.' },
   { q: 'Which watches work?', a: 'COROS is connected today, with sessions sent directly to the watch. Garmin is next, then Apple Watch, Suunto and Polar.' },
   { q: 'Is it really personal?', a: 'Paces come from your own recent results, the volume from your current weeks, and the structure from your goal, your days and your body. No two plans look the same.' },
-  { q: 'How much does it cost?', a: 'Plans are free during the beta. We’ll announce pricing before the beta ends.' },
+  { q: 'How much does it cost?', a: 'Everything is free during early access. After that, Free keeps one plan with one data source; Pro (€12.99/month or €99/year) and Expert (€24.99/month or €199/year) unlock the rest.' },
 ]
 
 export function LandingPage() {
@@ -136,6 +137,10 @@ export function LandingPage() {
               </div>
             }
           />
+        </Section>
+
+        <Section id="pricing" eyebrow="Pricing" title={<>Free to start. <span className="text-foreground">Pro when you race.</span></>}>
+          <Pricing />
         </Section>
 
         <Section id="faq" eyebrow="FAQ" title={<>Questions, <span className="text-foreground">answered</span></>}>
