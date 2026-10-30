@@ -107,7 +107,7 @@ export function CodeStep({
         >
           <Input
             label="Invite code"
-            placeholder="E.g. victor43"
+            placeholder="Your invite code"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
