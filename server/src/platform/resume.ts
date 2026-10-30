@@ -106,6 +106,21 @@ export async function resumeHandler(c: Context) {
   const id = verify('resume', c.req.query('token'))
   if (id === 'expired') return c.json({ error: 'This link has expired. Start the onboarding again.', code: 'expired' }, 410)
   if (!id) return c.json({ error: 'Onboarding not found', code: 'not_found' }, 404)
+  return resumeSession(c, id)
+}
+
+/**
+ * GET /api/platform/onboarding/sessions/:id/resume : reprise après un rechargement de la page (onglet rechargé au retour
+ * de Garmin Connect sur mobile…). L'identifiant du parcours, gardé par le navigateur, suffit comme pour PATCH /sessions/:id.
+ */
+export async function resumeByIdHandler(c: Context) {
+  if (limited(`resume:${clientIp(c)}`)) return c.json({ error: 'Too many attempts, try again in a few minutes.' }, 429)
+  const id = c.req.param('id') ?? ''
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return c.json({ error: 'Onboarding not found', code: 'not_found' }, 404)
+  return resumeSession(c, id)
+}
+
+async function resumeSession(c: Context, id: string) {
   const [s] = await db<
     { id: string; variant_id: string; answers: Record<string, unknown>; step_reached: number; last_step_id: string | null; lead_step: string | null; invite_code: string | null }[]
   >`

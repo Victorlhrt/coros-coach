@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { currentUser } from './auth.js'
 import { db } from './db.js'
 import { validCode } from './invites.js'
-import { resumeHandler } from './resume.js'
+import { resumeByIdHandler, resumeHandler } from './resume.js'
 import type { OnboardingStep } from './onboarding-defaults.js'
 
 type Variant = { id: string; name: string; description: string; status: string; weight: number; steps: OnboardingStep[] }
@@ -33,6 +33,7 @@ export const onboardingRoutes = new Hono()
 
 // Reprise d'un parcours depuis le lien signé de l'e-mail de relance.
 onboardingRoutes.get('/resume', resumeHandler)
+onboardingRoutes.get('/sessions/:id/resume', resumeByIdHandler)
 
 /** Tire un parcours `live` au hasard selon les poids (test A/B). `?variant=` force un parcours, même brouillon (aperçu). */
 onboardingRoutes.get('/pick', async (c) => {

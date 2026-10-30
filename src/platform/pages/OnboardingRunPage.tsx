@@ -19,6 +19,26 @@ import { forgetInviteCode, rememberInviteCode, storedInviteCode } from '../invit
 export const ONBOARDING_KEY = 'platform.onboardingSession'
 /** Nom et e-mail saisis pendant le parcours, repris par l'inscription. */
 export const SIGNUP_PREFILL_KEY = 'platform.signupPrefill'
+/** Parcours en cours, repris si la page est rechargée (onglet rechargé au retour de Garmin Connect sur mobile…). */
+const RELOAD_KEY = 'platform.onboardingInProgress'
+const RELOAD_TTL_MS = 3 * 86_400_000
+
+function storedProgress(): string | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(RELOAD_KEY) ?? 'null') as { id?: string; at?: number } | null
+    return v?.id && v.at && Date.now() - v.at < RELOAD_TTL_MS ? v.id : null
+  } catch {
+    return null
+  }
+}
+function rememberProgress(id: string | null) {
+  try {
+    if (id) localStorage.setItem(RELOAD_KEY, JSON.stringify({ id, at: Date.now() }))
+    else localStorage.removeItem(RELOAD_KEY)
+  } catch {
+    /* sans stockage, un rechargement repart du début */
+  }
+}
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, i) => ({ value: String(i), label }))
 
@@ -45,14 +65,22 @@ export function OnboardingRunPage() {
   const me = useMe()
   const preview = params.get('preview') === '1'
   const resumeToken = preview ? null : params.get('resume')
+  // Page rechargée en plein parcours : il reprend à la question où la personne s'était arrêtée.
+  const [reloadId] = useState(() => (preview || params.get('variant') ? null : storedProgress()))
   const resume = useQuery({
-    queryKey: ['onboarding', 'resume', resumeToken],
-    queryFn: () => api<Resumed>(`/onboarding/resume?token=${encodeURIComponent(resumeToken ?? '')}`),
-    enabled: !!resumeToken,
+    queryKey: ['onboarding', 'resume', resumeToken, reloadId],
+    queryFn: () =>
+      resumeToken
+        ? api<Resumed>(`/onboarding/resume?token=${encodeURIComponent(resumeToken)}`)
+        : api<Resumed>(`/onboarding/sessions/${reloadId}/resume`).catch((e: unknown) => {
+            rememberProgress(null)
+            throw e
+          }),
+    enabled: !!resumeToken || !!reloadId,
     staleTime: Infinity,
     retry: false,
   })
-  const resuming = !!resumeToken && resume.isPending
+  const resuming = (!!resumeToken || !!reloadId) && resume.isPending
   // Lien expiré ou déjà utilisé : nouveau départ, Pacer le dit.
   const resumeFailed = !!resumeToken && resume.isError
   // L'onboarding est toujours le parcours Complet (en conversation avec le coach), sauf parcours forcé.
@@ -93,6 +121,7 @@ export function OnboardingRunPage() {
       setInviteCode(r.inviteCode)
     }
     setSessionId(r.sessionId)
+    rememberProgress(r.sessionId)
     try {
       sessionStorage.setItem(ONBOARDING_KEY, r.sessionId)
     } catch {
@@ -108,6 +137,7 @@ export function OnboardingRunPage() {
       .then(({ id }) => {
         setSessionId(id)
         if (!preview) {
+          rememberProgress(id)
           try {
             sessionStorage.setItem(ONBOARDING_KEY, id)
           } catch {
@@ -174,6 +204,7 @@ export function OnboardingRunPage() {
             await api(`/onboarding/sessions/${sessionId}`, { method: 'PATCH', body: { answers, stepReached: 8 } })
             const res = await api<{ needsAccount: boolean }>(`/onboarding/sessions/${sessionId}/complete`, { method: 'POST' })
             if (preview) return
+            rememberProgress(null)
             try {
               const id = answers.identity
               if (id) sessionStorage.setItem(SIGNUP_PREFILL_KEY, JSON.stringify({ name: `${id.firstName} ${id.lastName}`.trim(), email: id.email }))
