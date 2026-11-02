@@ -1,5 +1,5 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
-import { Check } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from './panel'
@@ -139,7 +139,7 @@ export function WeekPicker({
             transition={{ duration: reduce ? 0.1 : 0.18, ease: 'easeOut' }}
           >
             {day && day.sessions.length > 0 ? (
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className={cn('grid gap-2', day.sessions.length > 1 && 'md:grid-cols-2')}>
                 {day.sessions.map((s) => (
                   <SessionCard key={s.id} session={s} onOpen={onOpenSession} />
                 ))}
@@ -166,34 +166,35 @@ export function WeekPicker({
   )
 }
 
-/** Carte de séance : libellé principal, titre, intensité en barres verticales, coche si faite. */
+/** Carte de séance, mise en avant aux couleurs de son type : libellé principal, titre, intensité en barres verticales, coche si faite. */
 function SessionCard({ session: s, onOpen }: { session: PickerSession; onOpen?: (id: string) => void }) {
   const body = (
     <>
-      <span className="w-16 shrink-0 font-medium text-[15px] tabular-nums tracking-tight">{s.primary}</span>
-      <span aria-hidden className="h-8 w-1 shrink-0 rounded-full" style={{ background: s.color }} />
+      <span className="w-20 shrink-0 font-heading font-medium text-xl tabular-nums tracking-tight sm:w-24 sm:text-2xl">{s.primary}</span>
+      <span aria-hidden className="h-11 w-1 shrink-0 rounded-full" style={{ background: s.color }} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-sm">{s.title}</span>
-        {s.subtitle && <span className="block truncate text-muted-foreground text-xs">{s.subtitle}</span>}
+        <span className="block truncate font-medium text-base sm:text-lg">{s.title}</span>
+        {s.subtitle && <span className="block truncate text-muted-foreground text-sm">{s.subtitle}</span>}
       </span>
-      <span className="flex shrink-0 items-center gap-2.5">
+      <span className="flex shrink-0 items-center gap-3">
         <span className="flex items-end gap-[3px]" role="img" aria-label={`Intensity ${s.intensity} of 3`}>
           {[1, 2, 3].map((n) => (
             <span
               key={n}
-              className={cn('w-[3px] rounded-full', n > s.intensity && 'bg-foreground/15')}
-              style={{ height: 6 + n * 3, background: n <= s.intensity ? s.color : undefined }}
+              className={cn('w-1 rounded-full', n > s.intensity && 'bg-foreground/15')}
+              style={{ height: 8 + n * 4, background: n <= s.intensity ? s.color : undefined }}
             />
           ))}
         </span>
-        {s.done && <Check className="size-4 text-emerald-400" aria-label="Done" />}
+        {s.done ? <Check className="size-5 text-emerald-400" aria-label="Done" /> : onOpen && <ArrowRight className="hidden size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block" />}
       </span>
     </>
   )
-  const cls = 'flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors'
-  if (!onOpen) return <div className={cls}>{body}</div>
+  const cls = 'group flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition-colors sm:px-6 sm:py-5'
+  const tint = { background: `color-mix(in srgb, ${s.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${s.color} 35%, transparent)` }
+  if (!onOpen) return <div className={cls} style={tint}>{body}</div>
   return (
-    <button type="button" onClick={() => onOpen(s.id)} className={cn(cls, 'hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}>
+    <button type="button" onClick={() => onOpen(s.id)} style={tint} className={cn(cls, 'hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}>
       {body}
     </button>
   )

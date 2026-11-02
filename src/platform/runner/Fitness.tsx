@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LineChart, type Kpi, type MetricPoint } from '@/components/raice/metrics-dashboard'
@@ -11,6 +12,7 @@ import { DISTANCES } from '@/lib/coach/schema'
 import { RECORD_DISTANCES, predictTime, thresholdPace, vdot } from '@/lib/coach/vdot'
 import type { Activity } from '@/lib/coros/activities'
 import { useActivityHistory } from '@/lib/coros/activity-hooks'
+import { corosRead } from '@/lib/coros/client'
 import { useHasRunData } from '@/lib/watch'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
@@ -26,6 +28,22 @@ const RANGES = [
   { value: '8', label: '8W' },
   { value: '16', label: '16W' },
 ]
+/** VO2max donnée par la montre COROS (calculée avec la fréquence cardiaque), si elle est connectée. */
+function useWatchVo2max() {
+  return useQuery({
+    queryKey: ['coros', 'vo2max'],
+    queryFn: async () => {
+      const raw = await corosRead('queryFitnessAssessmentOverview').catch(() => null)
+      const text = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '')
+      const m = text.match(/vo2\s*_?max[^0-9\n]{0,24}(\d{2}(?:[.,]\d+)?)(?![\d.])/i)
+      const v = m ? parseFloat(m[1].replace(',', '.')) : null
+      return v !== null && v >= 20 && v <= 90 ? v : null
+    },
+    staleTime: 60 * 60_000,
+    retry: false,
+  })
+}
+
 const GOAL_METERS: Record<keyof typeof DISTANCES, number> = { '5k': 5000, '10k': 10000, half: 21097.5, marathon: 42195, trail: 0 }
 
 /** VDOT d'une sortie, seulement si elle est assez longue pour être parlante (≥ 3 km et ≥ 12 min). */
@@ -78,6 +96,7 @@ export function FitnessDashboard() {
   const [range, setRange] = useState('16')
   const [open, setOpen] = useState('vo2')
   const [now] = useState(today)
+  const watchVo2 = useWatchVo2max().data ?? null
   const acts = activities.data ?? []
   const weeks = weeklyFitness(lastWeeks(now, Number(range)), acts)
 
@@ -125,12 +144,15 @@ export function FitnessDashboard() {
   const rows: Row[] = [
     {
       id: 'vo2',
-      label: 'Estimated VO2max',
-      value: current ? formatNumber(round1(current)) : '—',
-      unit: current ? 'ml/kg/min' : undefined,
-      delta: pct(current, past),
-      trend: trend(current, past),
-      hint: 'VDOT from your best effort of the last 4 weeks (or your records)',
+      // La montre l'emporte (comme dans COROS) ; la VDOT, plus prudente, reste la base des prédictions ci-dessous.
+      label: watchVo2 ? 'VO2max' : 'Estimated VO2max',
+      value: watchVo2 ? formatNumber(round1(watchVo2)) : current ? formatNumber(round1(current)) : '—',
+      unit: watchVo2 || current ? 'ml/kg/min' : undefined,
+      delta: watchVo2 ? undefined : pct(current, past),
+      trend: watchVo2 ? 'flat' : trend(current, past),
+      hint: watchVo2
+        ? `From your COROS watch (heart-rate based). Race predictions use your VDOT, ${current ? formatNumber(round1(current)) : '—'}, from your actual run times: the curve shows it`
+        : 'VDOT from your best effort of the last 4 weeks (or your records)',
       points: rolling,
       format: (v) => formatNumber(v),
     },

@@ -576,8 +576,10 @@ export function AnalyticsDashboards() {
   const [now] = useState(today)
   const acts = activities.data?.activities ?? []
   const weeks = weeklyMetrics(lastWeeks(now, Number(range)), acts, plan, zones)
-  const last = weeks.at(-1)
-  const prev = weeks.at(-2)
+  // Lundi matin, la semaine en cours est encore vide : les chiffres affichés restent ceux de la semaine passée.
+  const showPast = weeks.length > 1 && !weeks.at(-1)?.runs
+  const last = weeks.at(showPast ? -2 : -1)
+  const prev = weeks.at(showPast ? -3 : -2)
   const delta = (a?: number, b?: number) => (a !== undefined && b ? `${Math.abs(Math.round(((a - b) / b) * 100))}%` : undefined)
   const trend = (a?: number, b?: number): Kpi['trend'] => (a === undefined || b === undefined || a === b ? 'flat' : a > b ? 'up' : 'down')
 
@@ -639,7 +641,8 @@ export function AnalyticsDashboards() {
     <div className="flex w-full flex-col gap-4">
       <MetricsDashboard
         title="Analytics"
-                kpis={kpis}
+        subtitle={showPast ? 'Last week · this week has no runs yet' : 'This week so far'}
+        kpis={kpis}
         ranges={RANGES}
         range={range}
         onRangeChange={setRange}
