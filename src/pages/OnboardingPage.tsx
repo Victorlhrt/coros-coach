@@ -17,6 +17,10 @@ import { bestVdot, thresholdPace } from '@/lib/coach/vdot'
 import { computeVolume } from '@/lib/coach/volume'
 import { zonesFromThreshold } from '@/lib/coach/zones'
 import { normalizeActivities } from '@/lib/coros/activities'
+import { useActivityHistory } from '@/lib/coros/activity-hooks'
+import { profileFromRuns } from '@/lib/coach/profile-from-runs'
+import { useGarminConnected } from '@/lib/garmin/client'
+import { useHasImportedRuns } from '@/lib/strava/imported'
 import { mergeRecords } from '@/lib/coach/records'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { fetchProfileData, fetchRecords } from '@/lib/coros/data'
@@ -48,7 +52,13 @@ const DEFAULT_GOAL: Goal = {
 export function OnboardingPage() {
   const navigate = useNavigate()
   const store = usePlan()
-  const connected = useCorosAuth((s) => s.connected)
+  const coros = useCorosAuth((s) => s.connected)
+  const garmin = useGarminConnected()
+  const imported = useHasImportedRuns()
+  const history = useActivityHistory()
+  const connected = coros || garmin || imported
+  // COROS : lecture complète (forme, récupération, prédictions de la montre) ; sinon, calcul à partir des sorties.
+  const source = coros ? 'COROS' : garmin ? 'Garmin' : imported ? 'Strava' : 'watch'
   const [goal, setGoal] = useState<Goal>({ ...DEFAULT_GOAL, ...store.goal })
   const [targetText, setTargetText] = useState(goal.targetTime ? formatClock(goal.targetTime) : '')
   const [progress, setProgress] = useState<Progress | null>(null)
@@ -59,6 +69,11 @@ export function OnboardingPage() {
 
   const readCoros = useMutation({
     mutationFn: async () => {
+      if (!coros) {
+        const { data } = await history.refetch()
+        if (!data?.length) throw new Error(`No runs found on ${source} yet.`)
+        return profileFromRuns(data)
+      }
       const [raw, records] = await Promise.all([fetchProfileData(), fetchRecords().catch(() => [])])
       const volume = computeVolume(normalizeActivities(raw.querySportRecords))
       const profile = await extractProfile(raw)
@@ -139,7 +154,7 @@ export function OnboardingPage() {
         <div className="flex items-center gap-3">
           <Activity className="size-6 text-accent" />
           <div className="flex-1">
-            <CardTitle>My COROS data</CardTitle>
+            <CardTitle>My {source} data</CardTitle>
           </div>
         </div>
         {store.profile && (
@@ -157,9 +172,9 @@ export function OnboardingPage() {
           disabled={!connected || readCoros.isPending}
           onClick={() => readCoros.mutate()}
         >
-          {readCoros.isPending ? <TextShimmer>Reading your data…</TextShimmer> : store.profile ? 'Re-read my data' : 'Read my COROS data'}
+          {readCoros.isPending ? <TextShimmer>Reading your data…</TextShimmer> : store.profile ? 'Re-read my data' : `Read my ${source} data`}
         </Button>
-        {!connected && <p className="mt-2 text-xs text-muted-foreground">Connect COROS in Settings.</p>}
+        {!connected && <p className="mt-2 text-xs text-muted-foreground">Connect COROS or Garmin in Settings.</p>}
         {readCoros.error && <p className="mt-2 text-sm text-destructive">{claudeErrorMessage(readCoros.error)}</p>}
       </Card>
         <CourseCard goal={goal} update={update} />
@@ -185,8 +200,8 @@ export function OnboardingPage() {
           />
           <p className="mt-1.5 text-sm text-muted-foreground">
             {store.volume
-              ? `COROS: ${store.volume.avg4w} km/wk over 4 weeks · last month ${store.volume.lastMonthKm} km (${store.volume.lastMonthWeekly} km/wk) · this month ${store.volume.thisMonthKm} km.`
-              : 'Your plan starts from this volume. “Read my COROS data” calculates it for you.'}
+              ? `${source}: ${store.volume.avg4w} km/wk over 4 weeks · last month ${store.volume.lastMonthKm} km (${store.volume.lastMonthWeekly} km/wk) · this month ${store.volume.thisMonthKm} km.`
+              : `Your plan starts from this volume. “Read my ${source} data” calculates it for you.`}
           </p>
         </Field>
 
@@ -201,7 +216,7 @@ export function OnboardingPage() {
           <Input inputMode="numeric" placeholder={prediction ? formatClock(prediction) : '0:50:00'} value={targetText} onChange={(e) => setTargetText(e.target.value)} />
           {prediction && (
             <button type="button" className="mt-1.5 text-sm font-medium text-accent" onClick={() => setTargetText(formatClock(prediction))}>
-              COROS prediction: {formatClock(prediction)} — use it
+              {coros ? 'COROS' : 'Predicted'}: {formatClock(prediction)} — use it
             </button>
           )}
         </Field>

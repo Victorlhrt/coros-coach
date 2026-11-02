@@ -48,7 +48,7 @@ export interface RaceRecord {
   key: RecordKey
   seconds: number
   date: string | null
-  source: 'coros' | 'manual'
+  source: 'coros' | 'garmin' | 'strava' | 'manual'
 }
 
 /** Meilleure VDOT parmi les records (la performance la plus solide sert de référence). */
