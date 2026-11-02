@@ -122,7 +122,14 @@ export function OnboardingPage() {
   }
 
   const targetOk = targetText.trim() === '' || parseClock(targetText) !== null
-  const canGenerate = goal.days.length >= 2 && !weeks.error && targetOk && !!goal.currentWeeklyKm
+  // Tout ce qui bloque la génération est dit sous le bouton (un bouton grisé sans raison ressemble à une panne).
+  const blockers = [
+    !goal.currentWeeklyKm && 'enter your current weekly volume',
+    goal.days.length < 2 && 'pick at least 2 running days',
+    weeks.error && 'choose a race date at least 4 weeks away',
+    !targetOk && 'write the target time like 1:45:00 or 1h45',
+  ].filter((b): b is string => !!b)
+  const canGenerate = blockers.length === 0
 
   if (generate.isPending && progress) {
     return (
@@ -213,7 +220,7 @@ export function OnboardingPage() {
         </Field>
 
         <Field label="Target time (h:mm:ss, optional)">
-          <Input inputMode="numeric" placeholder={prediction ? formatClock(prediction) : '0:50:00'} value={targetText} onChange={(e) => setTargetText(e.target.value)} />
+          <Input aria-invalid={!targetOk} placeholder={prediction ? formatClock(prediction) : '0:50:00 or 50min'} value={targetText} onChange={(e) => setTargetText(e.target.value)} />
           {prediction && (
             <button type="button" className="mt-1.5 text-sm font-medium text-accent" onClick={() => setTargetText(formatClock(prediction))}>
               {coros ? 'COROS' : 'Predicted'}: {formatClock(prediction)} — use it
@@ -258,7 +265,11 @@ export function OnboardingPage() {
       </Card>
 
       {generate.error && <Card className="text-sm text-destructive whitespace-pre-line lg:col-span-2">{claudeErrorMessage(generate.error)}</Card>}
-      {!goal.currentWeeklyKm && <p className="text-center text-sm text-muted-foreground lg:col-span-2">Enter your current volume to generate your plan.</p>}
+      {blockers.length > 0 && (
+        <p role="status" className="text-center text-sm text-muted-foreground lg:col-span-2">
+          To generate your plan: {blockers.join(' · ')}.
+        </p>
+      )}
 
       <Button className="w-full lg:col-span-2" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate(null)}>
         <Sparkles className="size-5" />

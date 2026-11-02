@@ -45,8 +45,24 @@ export function formatClock(seconds: number) {
 }
 
 /** "4:30" → 270 ; "1:45:00" → 6300 ; null si invalide */
+/**
+ * Durée saisie par le coureur : « 1:45:00 », « 45:30 », mais aussi « 1h45 », « 1h45m30 », « 45min », « 45' » ou « 45 »
+ * (un nombre seul = minutes).
+ */
 export function parseClock(text: string): number | null {
-  const parts = text.trim().split(':').map((p) => Number(p))
+  const t = text.trim().toLowerCase().replace(/\s+/g, '').replace(',', '.')
+  if (!t) return null
+  const hms = t.match(/^(?:(\d+(?:\.\d+)?)h)?(?:(\d+)(?:m|min|mn|'))?(?:(\d+)(?:s|"|''))?(\d+)?$/)
+  if (hms && /[hm'"s]/.test(t)) {
+    const [, h, m, sec, tail] = hms
+    // « 1h45 » : le nombre qui suit les heures est en minutes ; « 45m30 » : celui qui suit les minutes, en secondes.
+    const minutes = Number(m ?? (h && tail ? tail : 0))
+    const seconds = Number(sec ?? (m && tail ? tail : 0))
+    const total = Number(h ?? 0) * 3600 + minutes * 60 + seconds
+    return total > 0 && minutes < 60 && seconds < 60 ? Math.round(total) : null
+  }
+  if (/^\d+(\.\d+)?$/.test(t)) return Number(t) > 0 ? Math.round(Number(t) * 60) : null
+  const parts = t.split(':').map((p) => Number(p))
   if (parts.length < 2 || parts.length > 3 || parts.some((p) => !Number.isFinite(p) || p < 0)) return null
   return parts.reduce((acc, p) => acc * 60 + p, 0)
 }
