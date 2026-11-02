@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ExternalLinkIcon } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { FileDropzone } from '@/components/arc/file-dropzone/file-dropzone'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { Button } from '@/components/shadcn/button'
@@ -23,8 +23,12 @@ const STRAVA_ACCOUNT_URL = 'https://www.strava.com/account'
 export function StravaImport() {
   const qc = useQueryClient()
   const { data: status } = useStravaImportStatus()
-  const [open, setOpen] = useState(false)
+  // Arrivée depuis la proposition de l'accueil (/account/settings#strava) : la fenêtre d'import s'ouvre directement.
+  const [open, setOpen] = useState(() => typeof window !== 'undefined' && window.location.hash === '#strava')
   const [confirmRemove, setConfirmRemove] = useState(false)
+  useEffect(() => {
+    if (window.location.hash === '#strava') document.getElementById('strava')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: STRAVA_STATUS_KEY })
     void qc.invalidateQueries({ queryKey: IMPORTED_KEY })
@@ -43,7 +47,7 @@ export function StravaImport() {
   const summary = status?.summary
   const imported = !!status?.importedAt || !!summary
   return (
-    <Panel className="mt-4">
+    <Panel id="strava" className="mt-4 scroll-mt-20">
       <PanelHeader
         title={
           <span className="inline-flex items-center gap-2.5">

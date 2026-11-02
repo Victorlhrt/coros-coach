@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Moon, Star, Wand2 } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Moon, Star, Wand2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BarChart } from '@/components/arc/bar-chart/bar-chart'
@@ -20,7 +20,8 @@ import { ROUTES } from '@/lib/coach/routes'
 import type { Session, Week } from '@/lib/coach/schema'
 import { PHASE_LABEL, TYPE_META } from '@/lib/coach/ui'
 import { useActivities } from '@/lib/coros/activity-hooks'
-import { useHasRunData } from '@/lib/watch'
+import { useStravaImportStatus } from '@/lib/strava/imported'
+import { useHasRunData, useHasWatch } from '@/lib/watch'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weekRings, weeklyMetrics } from './coach-data'
@@ -80,6 +81,8 @@ export function HomeTab() {
           </div>
           <RefreshAction onRefresh={refresh} />
         </header>
+
+        <StravaOffer />
 
         {(review?.status === 'pending' || toRate) && (
           <div className="grid gap-4 md:grid-cols-2">
@@ -260,6 +263,43 @@ function ThisWeek({ week, now }: { week: Week; now: string }) {
         </div>
       </PanelSection>
     </Panel>
+  )
+}
+
+const STRAVA_OFFER_KEY = 'strava-offer.dismissed'
+
+/**
+ * Après l'onboarding, un coureur qui a connecté sa montre se voit proposer d'ajouter son historique Strava
+ * (sorties d'avant la montre, doublons écartés). Disparaît une fois l'import fait ou la proposition fermée.
+ */
+function StravaOffer() {
+  const watch = useHasWatch()
+  const status = useStravaImportStatus()
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(STRAVA_OFFER_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  if (!watch || dismissed || status.isPending || status.data?.importedAt || (status.data?.runs ?? 0) > 0) return null
+  const dismiss = () => {
+    setDismissed(true)
+    try {
+      localStorage.setItem(STRAVA_OFFER_KEY, '1')
+    } catch {
+      /* sans stockage, la proposition reviendra */
+    }
+  }
+  return (
+    <div className="relative">
+      <Notice to={`${ROUTES.settings}#strava`} icon={<img src="/partners/strava.png" alt="" className="size-5 rounded-[5px]" />} title="Add your Strava history" color="#fc4c02">
+        Import your Strava archive so your coach sees the runs from before your watch.
+      </Notice>
+      <button type="button" aria-label="Dismiss" onClick={dismiss} className="absolute top-2 right-2 rounded-full p-1.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
+        <X className="size-3.5" />
+      </button>
+    </div>
   )
 }
 
