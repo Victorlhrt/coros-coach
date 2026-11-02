@@ -123,17 +123,22 @@ platformAuthRoutes.post('/signup', async (c) => {
 
   const isAdmin = config.adminEmails.includes(body.email)
   const mode = await getSetting<'open' | 'waitlist' | 'closed'>('signup_mode', 'open')
-  if (mode === 'closed' && !isAdmin) return c.json({ error: 'Sign-ups are closed for now.' }, 403)
-  const status: UserStatus = isAdmin || mode === 'open' ? 'active' : 'waitlist'
+
+  let variant: string | null = null
+  // Un parcours ouvert avec un code d'invitation (vérifié à son démarrage) donne un compte actif d'emblée.
+  let invited = false
+  if (body.onboardingSessionId) {
+    const [s] = await db<{ variant_id: string; invite_code: string | null }[]>`
+      select variant_id, invite_code from onboarding_sessions where id = ${body.onboardingSessionId}`
+    variant = s?.variant_id ?? null
+    invited = !!s?.invite_code
+  }
+
+  if (mode === 'closed' && !isAdmin && !invited) return c.json({ error: 'Sign-ups are closed for now.' }, 403)
+  const status: UserStatus = isAdmin || invited || mode === 'open' ? 'active' : 'waitlist'
 
   const [existing] = await db`select 1 from users where email = ${body.email}`
   if (existing) return c.json({ error: 'An account already exists with this email. Log in instead.' }, 409)
-
-  let variant: string | null = null
-  if (body.onboardingSessionId) {
-    const [s] = await db<{ variant_id: string }[]>`select variant_id from onboarding_sessions where id = ${body.onboardingSessionId}`
-    variant = s?.variant_id ?? null
-  }
 
   const [user] = await db<{ id: string }[]>`
     insert into users (email, name, password_hash, role, status, product_updates, source, onboarding_variant)
