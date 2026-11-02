@@ -140,6 +140,8 @@ async function buildPlan(
 Le plan compte ${slots.length} semaines (lundi-dimanche), du ${start} à la semaine de course :
 ${slots.map((s) => `Semaine ${s.number} : ${s.start} → ${s.end}`).join('\n')}
 
+${periodizationRules(slots.length, goal)}
+
 Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine. La dernière semaine contient la course, et son volume inclut la distance de la course.
 Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parcours : où gérer, où relancer, allure cible par portion.`,
       schema: SkeletonSchema,
@@ -154,6 +156,7 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
         if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
         errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
         errors.push(...checkLongRuns(s.weeks))
+        if (slots.length <= 6 && s.weeks.some((w) => w.phase === 'base')) errors.push(`Plan de ${slots.length} semaines : pas de phase base, commence en build.`)
         return errors
       },
     }))
@@ -189,6 +192,8 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
 Structure du plan :
 ${outline}
 
+${periodizationRules(slots.length, goal)}
+
 Les autres semaines sont écrites en parallèle selon cette même structure : respecte-la pour que l’enchaînement reste cohérent.
 Écris maintenant toutes les séances des semaines ${part.map((w) => w.number).join(', ')}.
 Dates autorisées (et seulement celles-ci) :
@@ -204,6 +209,7 @@ Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séanc
             else {
               errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`, { zones, goalPace: goalPace(goal) }))
               errors.push(...checkWeekTotals(w, got.sessions, zones))
+              errors.push(...checkQuality(w, got.sessions, slots.length))
             }
           }
           return errors
@@ -241,6 +247,40 @@ export function planDayNo(plan: Plan, date: string) {
 }
 
 /** Progression du volume : départ proche du volume actuel, hausse limitée d'une semaine à l'autre. */
+/**
+ * Périodisation selon la durée du plan : un plan court n'a pas le temps d'une phase de base sans intensité.
+ * Envoyé avec la structure et avec l'écriture des séances.
+ */
+export function periodizationRules(weeks: number, goal: Pick<Goal, 'level' | 'days'>) {
+  const twoQuality = goal.level !== 'beginner' && goal.days.length >= 4
+  if (weeks <= 6)
+    return `Plan COURT (${weeks} semaines) : pas de phase base. La semaine 1 est déjà en build, avec du travail spécifique (fractionné VMA, seuil, allure course).
+- Chaque semaine contient au moins une séance de qualité dédiée (type interval ou tempo, avec un bloc work en zone 4 ou 5)${twoQuality ? ', et deux séances de qualité les semaines de build et de peak (la sortie longue avec blocs à allure course peut compter comme la deuxième)' : ''}.
+- Pas de semaine allégée en cours de plan : seul l'affûtage allège, sur la dernière semaine (ou les 7 à 10 derniers jours), et il garde une séance d'intensité courte.
+- Le focus de chaque semaine nomme sa séance clé.`
+  if (weeks <= 9)
+    return `Plan de ${weeks} semaines : base d'une à deux semaines au plus, et même en base une séance de qualité légère chaque semaine (côtes courtes, fartlek, seuil court).
+- Chaque semaine hors course contient au moins une séance de qualité dédiée (type interval ou tempo)${twoQuality ? ', deux en build et en peak' : ''}.
+- Une seule semaine allégée en cours de plan au plus ; affûtage d'une semaine (10 km, semi) à deux (marathon).`
+  const base = weeks >= 14 ? '4 à 6 semaines' : '3 à 4 semaines'
+  return `Plan LONG (${weeks} semaines) : on a le temps de bien préparer le corps avant l'intensité.
+- Base de ${base} : volume et sortie longue qui montent progressivement, endurance surtout, avec chaque semaine des lignes droites, des côtes courtes ou un fartlek léger (pas encore de fractionné dur ni de seuil long).
+- Semaine allégée toutes les 3 à 4 semaines.
+- Dès la phase build, au moins une séance de qualité dédiée (type interval ou tempo) chaque semaine${twoQuality ? ', deux en build et en peak' : ''}, en durcissant progressivement (volume de travail d'abord, intensité ensuite).
+- Affûtage d'une semaine (10 km) à deux ou trois (marathon).`
+}
+
+/** Plans de moins de 10 semaines : chaque semaine hors course a au moins une vraie séance de qualité. */
+export function checkQuality(week: Week, sessions: SessionInput[], planWeeks: number) {
+  if (planWeeks >= 10 || sessions.some((s) => s.type === 'race')) return []
+  const hard = (b: SessionInput['blocks'][number]): boolean =>
+    'steps' in b && Array.isArray(b.steps) ? b.steps.some(hard as never) : 'zone' in b && typeof b.zone === 'number' && b.zone >= 4
+  const quality = sessions.filter((s) => (s.type === 'interval' || s.type === 'tempo') && s.blocks.some(hard))
+  return quality.length
+    ? []
+    : [`Semaine ${week.number} : aucune séance de qualité (type interval ou tempo avec un bloc work en zone 4 ou 5). Sur un plan de ${planWeeks} semaines, chaque semaine doit en avoir au moins une : remplace une sortie facile par un fractionné ou un seuil.`]
+}
+
 export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
   const errors: string[] = []
   const first = weeks[0]
