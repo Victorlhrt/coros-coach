@@ -44,6 +44,7 @@ import { formatDay, toIso } from '@/lib/coach/dates'
 import { useAutoLink } from '@/lib/coach/links'
 import { usePlanEnglish } from '@/lib/coach/translate'
 import { useWeeklyReview } from '@/lib/coach/review'
+import { WeeklyRecap } from './WeeklyRecap'
 import { useCorosCallback } from '@/lib/coros/callback'
 import { initVault, setupAutoLock, useVault } from '@/lib/lock/vault'
 import { startStateSync } from '@/lib/server/state-sync'
@@ -526,13 +527,18 @@ function OnboardingAnalytics() {
 
 // ---------- Coach ----------
 
-/** Pacer : une seule carte, le bilan de la semaine se fait dans la conversation. */
+/** Pacer : le récap IA de la semaine écoulée en tête, puis la conversation. */
 function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
   if (me?.entitlements?.coachChat === 'none') return <UpgradePrompt title="Pacer coach chat is on Pro" />
-  return <CoachChat firstName={first} className="mx-auto h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] w-full max-w-4xl md:h-[calc(100dvh-8.5rem)]" />
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+      <WeeklyRecap />
+      <CoachChat firstName={first} className="h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] w-full md:h-[calc(100dvh-8.5rem)]" />
+    </div>
+  )
 }
 
 // ---------- Equipment ----------

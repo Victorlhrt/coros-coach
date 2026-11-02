@@ -162,3 +162,15 @@ export const AdjustmentSchema = z.object({
   ),
 })
 export type Adjustment = z.infer<typeof AdjustmentSchema>
+
+/** Récap de la semaine écoulée, rédigé par Claude pour l'onglet Coach (lecture seule, aucun changement du plan). */
+export const WeeklyRecapSchema = z.object({
+  headline: z.string().describe('le verdict de la semaine en une phrase courte (10 à 14 mots)'),
+  adherence: z.enum(['on_track', 'partly', 'off_track']).describe('plan respecté : séances faites et allures/structure tenues'),
+  plan: z.string().describe('plan respecté ou non : séances faites, manquées, hors plan ; structure et allures tenues d’après les splits ; 2 à 3 phrases'),
+  feelings: z.string().describe('ressentis du coureur (notes, RPE, sensations, commentaires) et ce qu’ils disent ; si aucun ressenti saisi, le dire et l’inviter à noter ses séances ; 2 à 3 phrases'),
+  pain: z.string().nullable().describe('douleurs signalées (séance, commentaire) et conduite à tenir, ou null si aucune'),
+  load: z.string().describe('charge : volume réel vs prévu, évolution sur les semaines précédentes, récupération/HRV/sommeil si disponibles ; 2 phrases'),
+  nextWeek: z.string().describe('le point d’attention pour la semaine qui commence, 1 à 2 phrases'),
+})
+export type WeeklyRecap = z.infer<typeof WeeklyRecapSchema>

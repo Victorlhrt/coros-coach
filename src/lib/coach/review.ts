@@ -16,7 +16,7 @@ import { autoLinks } from './links'
 import { isRun, sessionTotals } from './metrics'
 import type { Session } from './schema'
 
-function describeActivity(a: Activity) {
+export function describeActivity(a: Activity) {
   return [
     a.meters ? `${(a.meters / 1000).toFixed(2)} km` : null,
     a.seconds ? formatClock(a.seconds) : null,
@@ -26,7 +26,7 @@ function describeActivity(a: Activity) {
     .join(', ')
 }
 
-async function describeLaps(a: Activity) {
+export async function describeLaps(a: Activity) {
   try {
     const raw = await fetchLaps(a.labelId, a.sportType)
     const laps = normalizeLaps(raw, a.meters)

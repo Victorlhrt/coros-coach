@@ -9,7 +9,7 @@ import { ApiError, api } from './api'
  * la version du serveur si un autre appareil l'a changée. En cas de conflit, la version du serveur gagne.
  */
 
-const PLAN_KEYS = ['goal', 'profile', 'zones', 'plan', 'coros', 'links', 'reviews', 'records', 'volume', 'feedback'] as const
+const PLAN_KEYS = ['goal', 'profile', 'zones', 'plan', 'coros', 'links', 'reviews', 'recaps', 'records', 'volume', 'feedback'] as const
 const SETTINGS_KEYS = ['model', 'units', 'autoReview'] as const
 
 interface Snapshot {
