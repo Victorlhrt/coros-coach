@@ -11,7 +11,7 @@ import { fetchRunRecords } from './data'
  * (gardées seulement quand aucune montre n'a la même sortie : même jour, distance à 2 % près).
  * Une source en échec n'empêche pas les autres ; si toutes échouent, l'erreur remonte.
  */
-async function loadActivities(days: number, coros: boolean, garmin: boolean, imported = false) {
+export async function loadActivities(days: number, coros: boolean, garmin: boolean, imported = false) {
   const [c, g, s] = await Promise.allSettled([
     coros ? fetchRunRecords(days) : Promise.resolve(null),
     garmin ? fetchGarminActivities(days) : Promise.resolve([]),

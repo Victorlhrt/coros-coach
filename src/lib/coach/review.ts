@@ -4,7 +4,6 @@ import { useCorosAuth } from '@/lib/coros/auth-store'
 import { fetchRecentData } from '@/lib/coros/data'
 import { fetchLaps, normalizeLaps } from '@/lib/coros/laps'
 import { allSessions, usePlan } from '@/lib/store/plan'
-import { useSettings } from '@/lib/store/settings'
 import { toast } from '@/lib/toast'
 import { proposeAdjustment } from './adapt'
 import { claudeErrorMessage } from './claude'
@@ -106,12 +105,11 @@ export function useWeeklyReview(allowed = true) {
   const plan = usePlan((s) => s.plan)
   const reviews = usePlan((s) => s.reviews)
   const connected = useCorosAuth((s) => s.connected)
-  const autoReview = useSettings((s) => s.autoReview)
   const now = today()
   const week = plan?.weeks.find((w) => w.start <= now && w.end >= now)
 
   useEffect(() => {
-    if (!allowed || !plan || !week || week.number < 2 || !connected || !autoReview) return
+    if (!allowed || !plan || !week || week.number < 2 || !connected) return
     const key = `${plan.id}:${week.number}`
     if (reviews[week.number] || attempted === key) return
     attempted = key
@@ -124,5 +122,5 @@ export function useWeeklyReview(allowed = true) {
         ),
       )
       .catch((err) => toast.error(`Weekly review: ${claudeErrorMessage(err)}`))
-  }, [allowed, plan, week, reviews, connected, autoReview])
+  }, [allowed, plan, week, reviews, connected])
 }

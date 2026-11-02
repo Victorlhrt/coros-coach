@@ -43,20 +43,6 @@ export function SettingsPage({ children }: { children?: ReactNode }) {
           </div>
         </Card>
 
-        <Card>
-          <label className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle>Weekly review</CardTitle>
-            </div>
-            <input
-              type="checkbox"
-              className="size-6 shrink-0 accent-[var(--accent)]"
-              checked={settings.autoReview}
-              onChange={(e) => settings.set({ autoReview: e.target.checked })}
-            />
-          </label>
-        </Card>
-
         <PlanData />
 
       </div>

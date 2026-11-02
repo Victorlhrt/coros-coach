@@ -1,31 +1,21 @@
-import { useMutation } from '@tanstack/react-query'
 import { Trophy } from 'lucide-react'
 import { formatClock, formatPace, parseClock } from '@/lib/coach/format'
-import { mergeRecords } from '@/lib/coach/records'
 import { RECORD_DISTANCES, bestVdot, predictTime, thresholdPace, type RecordKey } from '@/lib/coach/vdot'
 import { zonesFromThreshold } from '@/lib/coach/zones'
-import { useCorosAuth } from '@/lib/coros/auth-store'
-import { fetchRecords } from '@/lib/coros/data'
+import { useAutoRecords } from '@/lib/coach/auto-records'
 import { usePlan } from '@/lib/store/plan'
 import { toast } from '@/lib/toast'
 import { Button } from './ui/button'
 import { Card, CardTitle } from './ui/card'
 import { Input } from './ui/input'
 
-/** Records des 12 derniers mois (COROS ou saisis) → VDOT, allure seuil et prédictions. */
+/** Records des 12 derniers mois (montre, Strava ou saisis) → VDOT, allure seuil et prédictions. */
+const SOURCE = { coros: 'COROS', garmin: 'Garmin', strava: 'Strava', manual: 'manual' } as const
+
 export function RecordsCard() {
   const { records, setRecords, retuneZones, profile, setProfile } = usePlan()
-  const connected = useCorosAuth((s) => s.connected)
+  const auto = useAutoRecords()
   const vdot = bestVdot(records)
-
-  const load = useMutation({
-    mutationFn: fetchRecords,
-    onSuccess: (fresh) => {
-      setRecords(mergeRecords(usePlan.getState().records, fresh))
-      toast.success(fresh.length ? `${fresh.length} record${fresh.length > 1 ? 's' : ''} found` : 'No races at these distances in the last 12 months')
-    },
-    onError: toast.error,
-  })
 
   function edit(key: RecordKey, text: string) {
     const others = records.filter((r) => r.key !== key)
@@ -53,8 +43,8 @@ export function RecordsCard() {
                 defaultValue={r ? formatClock(r.seconds) : ''}
                 onBlur={(e) => edit(d.key, e.target.value)}
               />
-              <span className="w-20 text-right text-xs text-muted-foreground">
-                {r ? (r.source === 'manual' ? 'manual' : r.date) : vdot ? 'predicted' : ''}
+              <span className="w-28 text-right text-xs text-muted-foreground">
+                {r ? (r.source === 'manual' ? 'manual' : `${SOURCE[r.source]} · ${r.date ?? ''}`) : vdot ? 'predicted' : ''}
               </span>
             </div>
           )
@@ -74,13 +64,13 @@ export function RecordsCard() {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button size="sm" variant="secondary" disabled={!connected || load.isPending} onClick={() => load.mutate()}>
-          {load.isPending ? 'Searching…' : 'Fetch (COROS)'}
-        </Button>
+      {auto.isFetching && <p className="mt-3 text-muted-foreground text-xs">Looking for your best times…</p>}
+
+      <div className="mt-4">
         <Button
           size="sm"
           variant="secondary"
+          className="w-full"
           disabled={!vdot}
           onClick={() => {
             const pace = thresholdPace(vdot!)
