@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ExternalLinkIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
+import { Button } from '@/components/shadcn/button'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { SortableDataTable, type DataColumn } from '@/components/arc/sortable-data-table/sortable-data-table'
 import { Switch } from '@/components/arc/switch/switch'
-import { api } from '../api'
-import { formatDateTime } from '../format'
+import { api, type UserStatus } from '../api'
+import { USER_STATUS, formatDateTime } from '../format'
 import { ErrorNote, PageTitle } from './ui'
 
 /**
@@ -21,7 +22,7 @@ type Customer = {
   email: string
   name: string
   role: string
-  status: string
+  status: UserStatus
   plan: PlanId
   plan_status: string | null
   plan_interval: string | null
@@ -72,6 +73,12 @@ export function CustomersPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   })
 
+  // Le statut du compte (liste d'attente, actif) est distinct de l'offre et de l'accès anticipé.
+  const approve = useMutation({
+    mutationFn: (id: string) => api(`/admin/users/${id}`, { method: 'PATCH', body: { status: 'active' } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
+  })
+
   const setPlan = (c: Customer, plan: PlanId) => {
     if (plan === c.plan) return
     if (isStripeLive(c) && !window.confirm(`${c.email} pays through Stripe. This doesn’t change their Stripe subscription, and the next Stripe update will overwrite it. Change anyway?`)) return
@@ -102,6 +109,23 @@ export function CustomersPage() {
             {c.name} {c.role === 'admin' && <Badge size="sm">admin</Badge>}
           </div>
           <div className="truncate text-muted-foreground text-xs">{c.email}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Account',
+      sortable: true,
+      render: (_, c) => (
+        <div className="flex flex-col items-start gap-1.5">
+          <Badge size="sm" tone={USER_STATUS[c.status].tone}>
+            {USER_STATUS[c.status].label}
+          </Badge>
+          {c.status !== 'active' && (
+            <Button size="xs" disabled={approve.isPending} onClick={() => approve.mutate(c.id)}>
+              {c.status === 'waitlist' ? 'Approve' : 'Reactivate'}
+            </Button>
+          )}
         </div>
       ),
     },
@@ -153,7 +177,7 @@ export function CustomersPage() {
     <>
       <PageTitle
         title="Customers"
-        description={`Change anyone’s plan or early access. A plan set here is complimentary: nothing is charged or changed in Stripe.${
+        description={`Change anyone’s plan or early access. Early access unlocks features, it doesn’t let a waitlisted account in: approve the account for that. A plan set here is complimentary: nothing is charged or changed in Stripe.${
           customers.data && !customers.data.enforced ? ' Billing isn’t enforced yet, so everyone has full access for now.' : ''
         }`}
       />
@@ -169,7 +193,7 @@ export function CustomersPage() {
         </div>
       </div>
       <div className="flex flex-col gap-3">
-        <ErrorNote error={customers.error ?? update.error} />
+        <ErrorNote error={customers.error ?? update.error ?? approve.error} />
         <SortableDataTable
           rows={rows}
           columns={columns}
