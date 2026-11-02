@@ -64,6 +64,8 @@ export interface Plan {
   startDate: string
   raceDate: string
   weeks: Week[]
+  /** Version des règles de génération (absente : plan écrit avant la périodisation selon la durée). */
+  generator?: number
 }
 
 // --- Objectif et profil ---

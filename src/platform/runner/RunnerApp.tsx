@@ -45,6 +45,7 @@ import { useAutoLink } from '@/lib/coach/links'
 import { usePlanEnglish } from '@/lib/coach/translate'
 import { useWeeklyReview } from '@/lib/coach/review'
 import { WeeklyRecap } from './WeeklyRecap'
+import { PlanUpdateModal } from './PlanUpdateModal'
 import { useCorosCallback } from '@/lib/coros/callback'
 import { initVault, setupAutoLock, useVault } from '@/lib/lock/vault'
 import { startStateSync } from '@/lib/server/state-sync'
@@ -213,6 +214,8 @@ function CoachRoutes() {
   // Offre limitée à un plan : pas de nouveau plan tant qu'il y en a un (le plan du coach est unique sur l'appareil).
   const planCapped = hasPlan && entitlements?.maxPlans != null && entitlements.maxPlans <= 1
   return (
+    <>
+    {hasPlan && <PlanUpdateModal />}
     <Routes>
       <Route index element={<Navigate to="home" replace />} />
       <Route path="home" element={hasPlan ? <HomeTab /> : <OnboardingPlanPage />} />
@@ -230,6 +233,7 @@ function CoachRoutes() {
       <Route path="debug" element={<DebugPage />} />
       <Route path="*" element={<Navigate to="home" replace />} />
     </Routes>
+    </>
   )
 }
 

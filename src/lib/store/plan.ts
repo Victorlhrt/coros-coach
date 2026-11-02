@@ -59,6 +59,8 @@ interface PlanState {
   /** Semaines à venir : la sortie longue redevient la plus longue sortie de la semaine. */
   repairLongRuns: () => void
   setPlan: (plan: Plan) => void
+  /** Remplace les semaines à venir par celles d'un plan regénéré ; les semaines passées, liaisons et ressentis restent. */
+  replaceUpcoming: (next: Plan) => void
   setCoros: (patch: Partial<CorosSync>) => void
   markSynced: (hashes: Record<string, string>) => void
   applyChanges: (changes: Adjustment['changes']) => void
@@ -124,6 +126,31 @@ export const usePlan = create<PlanState>()(
         if (changed.length) set({ plan })
       },
       setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
+      replaceUpcoming: (next) =>
+        set((s) => {
+          if (!s.plan || !next.weeks.length) return { plan: next }
+          const cut = next.weeks[0].start
+          const past = s.plan.weeks.filter((w) => w.end < cut)
+          // Semaine en cours coupée au milieu : ses séances d'avant la coupure restent dans la première nouvelle semaine.
+          const current = s.plan.weeks.find((w) => w.start < cut && w.end >= cut)
+          const earlier = current?.sessions.filter((x) => x.date < cut) ?? []
+          const weeks = [
+            ...past,
+            ...next.weeks.map((w, i) => ({
+              ...w,
+              number: past.length + i + 1,
+              start: i === 0 && current ? current.start : w.start,
+              sessions: i === 0 ? [...earlier, ...w.sessions] : w.sessions,
+            })),
+          ]
+          const kept = new Set(weeks.flatMap((w) => w.sessions.map((x) => x.id)))
+          const only = <T,>(rec: Record<string, T>) => Object.fromEntries(Object.entries(rec).filter(([id]) => kept.has(id)))
+          return {
+            plan: { ...s.plan, name: next.name, overview: next.overview, raceStrategy: next.raceStrategy, raceDate: next.raceDate, generator: next.generator, weeks },
+            links: only(s.links),
+            feedback: only(s.feedback),
+          }
+        }),
       setCoros: (patch) => set((s) => ({ coros: { ...s.coros, ...patch } })),
       markSynced: (hashes) => set((s) => ({ coros: { ...s.coros, synced: { ...s.coros.synced, ...hashes } } })),
       applyChanges: (changes) =>

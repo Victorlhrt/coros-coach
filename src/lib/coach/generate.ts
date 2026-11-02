@@ -233,6 +233,7 @@ Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séanc
     startDate: start,
     raceDate: goal.raceDate,
     weeks,
+    generator: PLAN_GENERATOR,
   }
 }
 
@@ -247,6 +248,9 @@ export function planDayNo(plan: Plan, date: string) {
 }
 
 /** Progression du volume : départ proche du volume actuel, hausse limitée d'une semaine à l'autre. */
+/** Version des règles de génération : 2 = périodisation selon la durée du plan (plans courts sans phase de base). */
+export const PLAN_GENERATOR = 2
+
 /**
  * Périodisation selon la durée du plan : un plan court n'a pas le temps d'une phase de base sans intensité.
  * Envoyé avec la structure et avec l'écriture des séances.
