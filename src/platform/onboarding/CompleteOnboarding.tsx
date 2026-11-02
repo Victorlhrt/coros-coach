@@ -1056,6 +1056,21 @@ function ConnectStep({ answers, patch, sessionId, guideOpen }: StepProps & { ses
     }
   }
 
+  // Connexions déjà enregistrées sur le serveur (clé Garmin collée avant un rechargement de la page, COROS fini
+  // dans l'autre fenêtre) : relues à l'affichage et au retour sur l'onglet, pour ne jamais redemander « Connect ».
+  useEffect(() => {
+    if (!sessionId) return
+    const sync = async () => {
+      const res = await api<{ providers: string[] }>(`/connect/status?session=${sessionId}`).catch(() => null)
+      const found = (res?.providers ?? []).filter((p) => (p === 'coros' || p === 'garmin') && !connected.includes(p))
+      if (found.length) patch({ connected: [...new Set([...connected, ...found])] })
+    }
+    void sync()
+    const onVisible = () => document.visibilityState === 'visible' && void sync()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [sessionId, connected.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Pendant que la fenêtre COROS est ouverte, on demande au serveur si la connexion a abouti.
   useEffect(() => {
     if (!waiting || !sessionId) return
