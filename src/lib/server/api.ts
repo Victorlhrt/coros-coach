@@ -26,7 +26,9 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   if (!res.ok) {
     if (res.status === 401) onUnauthorized()
     const message = (body as { error?: string | { message?: string } } | null)?.error
-    throw new ApiError(res.status, typeof message === 'string' ? message : (message?.message ?? `Erreur serveur ${res.status}`), body)
+    // 502/503/504 : le serveur redémarre (mise à jour) ou ne répond pas, rien à voir avec ce que la personne a fait.
+    const fallback = [502, 503, 504].includes(res.status) ? 'Raice.run is updating. Try again in a few seconds.' : `Server error ${res.status}`
+    throw new ApiError(res.status, typeof message === 'string' ? message : (message?.message ?? fallback), body)
   }
   return body as T
 }
