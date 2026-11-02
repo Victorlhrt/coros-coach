@@ -27,6 +27,7 @@ export default function AdminApp() {
       </AppShell>
     )
   }
+  if (me.isError) return <AppShell><DashboardSkeleton /></AppShell>
   if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
   if (me.data.role !== 'admin') return <Navigate to="/account" replace />
 

@@ -44,6 +44,11 @@ expect(laps[0]?.meters === 1000, `tour en mètres (${laps[0]?.meters})`)
 expect(laps[0]?.paceSecPerKm === 422, `allure du tour (${laps[0]?.paceSecPerKm})`)
 expect(normalizeLaps({ laps: [{ distance: 1000, time: 300 }] }, 1000)[0]?.meters === 1000, 'tours déjà en mètres inchangés')
 
+// Fractionné : les tours de la séance l'emportent sur les splits auto au kilomètre (qui lissent les répétitions).
+const km = (time: number) => ({ distance: 100000, time })
+const workout = normalizeLaps({ lapList: [{ type: 1, items: [km(300), km(300), km(300), { distance: 60000, time: 180 }] }, { type: 2, items: [{ distance: 150000, time: 480 }, { distance: 40000, time: 84 }, { distance: 20000, time: 70 }, { distance: 40000, time: 85 }, { distance: 110000, time: 360 }] }] }, 3600)
+expect(workout.length === 5 && Math.round(workout[1]?.paceSecPerKm ?? 0) === 210, `tours de séance préférés aux splits km (${workout.length} tours)`)
+
 if (errors.length) {
   console.error(errors.join('\n'))
   process.exit(1)

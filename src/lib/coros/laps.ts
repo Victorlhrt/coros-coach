@@ -14,22 +14,33 @@ export interface Lap {
 
 const LAP_KEY = /distance|time|pace|duration/i
 
-/** Premier tableau d'objets qui ressemble à des tours (distance / temps / allure). */
-function findLaps(node: unknown): Obj[] {
+/** Tous les tableaux d'objets qui ressemblent à des tours (distance / temps / allure). */
+function findLapSets(node: unknown, out: Obj[][] = []): Obj[][] {
   if (Array.isArray(node)) {
     const objs = node.filter((x): x is Obj => !!x && typeof x === 'object' && !Array.isArray(x))
-    if (objs.length >= 1 && objs.every((o) => Object.keys(o).filter((k) => LAP_KEY.test(k)).length >= 2)) return objs
-    for (const x of node) {
-      const r = findLaps(x)
-      if (r.length) return r
-    }
+    if (objs.length >= 1 && objs.every((o) => Object.keys(o).filter((k) => LAP_KEY.test(k)).length >= 2)) out.push(objs)
+    else node.forEach((x) => findLapSets(x, out))
   } else if (node && typeof node === 'object') {
-    for (const v of Object.values(node)) {
-      const r = findLaps(v)
-      if (r.length) return r
-    }
+    Object.values(node).forEach((v) => findLapSets(v, out))
   }
-  return []
+  return out
+}
+
+/**
+ * Tours découpés à distance fixe (1 km auto) : tous identiques sauf le dernier. Ils lissent un fractionné
+ * (un 400 m rapide et sa récup tombent dans le même kilomètre) : on préfère les tours de la séance ou manuels.
+ */
+function isAutoSplit(objs: Obj[]) {
+  const meters = objs.map(parseMeters).slice(0, -1).filter((m): m is number => m !== null && m > 0)
+  if (meters.length < 2) return false
+  const mean = meters.reduce((a, m) => a + m, 0) / meters.length
+  return meters.every((m) => Math.abs(m - mean) <= mean * 0.03)
+}
+
+/** Le jeu de tours le plus parlant : d'abord ceux qui ne sont pas des splits fixes, puis le plus détaillé. */
+function findLaps(node: unknown): Obj[] {
+  const sets = findLapSets(node)
+  return sets.sort((a, b) => Number(isAutoSplit(a)) - Number(isAutoSplit(b)) || b.length - a.length)[0] ?? []
 }
 
 /**

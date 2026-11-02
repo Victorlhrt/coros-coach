@@ -167,6 +167,8 @@ export default function RunnerApp() {
   }, [me.data, active])
 
   if (me.isPending) return <div className="min-h-dvh" />
+  // Seul un « pas de session » du serveur renvoie vers la connexion, jamais une erreur passagère.
+  if (me.isError) return <ServerUnreachable onRetry={() => void me.refetch()} />
   if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (locked) return <LockScreen />
 
@@ -846,5 +848,19 @@ function InvitePanel() {
         text={`Join me on Raice.run, an AI running coach that builds a plan just for you. My code: ${d.code}.`}
       />
     </Panel>
+  )
+}
+
+function ServerUnreachable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="grid min-h-dvh place-items-center p-6 text-center">
+      <div className="space-y-3">
+        <p className="font-medium">Can’t reach Raice.run right now</p>
+        <p className="text-muted-foreground text-sm">You’re still signed in. Check your connection and try again.</p>
+        <button type="button" onClick={onRetry} className="rounded-full border px-4 py-1.5 text-sm hover:bg-muted">
+          Try again
+        </button>
+      </div>
+    </div>
   )
 }

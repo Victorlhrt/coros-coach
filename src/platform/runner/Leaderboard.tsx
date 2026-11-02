@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckIcon, CrownIcon, MapPinIcon, PencilIcon, RouteIcon, SparklesIcon, TrendingUpIcon, TrophyIcon, UserPlusIcon, UsersIcon, XIcon } from 'lucide-react'
+import { CheckIcon, CrownIcon, Loader2, MapPinIcon, PencilIcon, RouteIcon, SparklesIcon, TrendingUpIcon, TrophyIcon, UserPlusIcon, UsersIcon, XIcon } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '@/components/arc/avatar/avatar'
@@ -415,19 +415,43 @@ function CityMap({ city, children }: { city: string; children?: ReactNode }) {
     }
     return list
   }, [geo.data])
+  // Les tuiles apparaissent ensemble, en fondu, une fois toutes chargées (ou en échec) : pas d'arrivée d'un coup.
+  const [settled, setSettled] = useState(0)
+  useEffect(() => setSettled(0), [tiles])
+  const ready = !!tiles && settled >= tiles.length
+  const loading = geo.isPending || (!!tiles && !ready)
 
   return (
     <div className="relative h-52 overflow-hidden rounded-[28px] border bg-[#0b0b0b]">
       {tiles && (
-        <div aria-hidden="true" className={cn('pointer-events-none absolute select-none [filter:grayscale(1)_brightness(0.95)_contrast(1.08)]', PIN_AT)}>
+        <div
+          aria-hidden="true"
+          className={cn('pointer-events-none absolute select-none transition-opacity duration-700 [filter:grayscale(1)_brightness(0.95)_contrast(1.08)]', ready ? 'opacity-100' : 'opacity-0', PIN_AT)}
+        >
           {tiles.map((t) => (
-            <img key={t.key} src={t.src} alt="" width={TILE} height={TILE} draggable={false} className="absolute max-w-none" style={{ left: t.left, top: t.top, width: TILE, height: TILE }} />
+            <img
+              key={t.key}
+              src={t.src}
+              alt=""
+              width={TILE}
+              height={TILE}
+              draggable={false}
+              onLoad={() => setSettled((n) => n + 1)}
+              onError={() => setSettled((n) => n + 1)}
+              className="absolute max-w-none"
+              style={{ left: t.left, top: t.top, width: TILE, height: TILE }}
+            />
           ))}
+        </div>
+      )}
+      {loading && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 grid animate-pulse place-items-center bg-white/[0.03]">
+          <Loader2 className={cn('absolute size-5 -translate-x-1/2 -translate-y-1/2 animate-spin text-white/40', PIN_AT)} />
         </div>
       )}
       {/* Fondu vers le bas pour la lisibilité du texte, épingle discrète au centre. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-      {tiles && (
+      {ready && (
         <span aria-hidden="true" className={cn('pointer-events-none absolute -translate-x-1/2 -translate-y-1/2', PIN_AT)}>
           <span className="absolute -inset-3 rounded-full bg-white/10 ring-1 ring-white/15" />
           <span className="relative block size-2.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(0,0,0,0.6)]" />

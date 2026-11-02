@@ -11,9 +11,9 @@ import { db } from './db.js'
  * la paire `default`, sinon la première en rotation, sinon la première. Une sortie du jour de la saisie compte :
  * si le kilométrage saisi l'incluait déjà, elle est comptée deux fois (le coureur corrige à la main).
  *
- * Une activité peut être rattachée à une autre paire (`activity_shoes`, depuis la séance) : sa distance quitte
- * la paire créditée (si elle est après son `since`) et s'ajoute à la paire choisie (si elle est après le `since`
- * de celle-ci). Chaque paire a un `id` stable, attribué à la première lecture et gardé par la sauvegarde.
+ * Une activité peut être rattachée à une paire (`activity_shoes`, depuis la séance) : sa distance quitte
+ * la paire créditée (si elle est après son `since`) et s'ajoute à la paire choisie, même si elle précède la saisie
+ * (le choix explicite du coureur l'emporte). Chaque paire a un `id` stable, attribué à la première lecture et gardé par la sauvegarde.
  */
 
 /** Forme rangée dans `answers.shoes` (`km` = `baseKm`, pour ce qui lit encore l'ancien champ). */
@@ -55,9 +55,16 @@ async function extraKm(userId: string, shoes: { id: string; since: string; rotat
     select label_id, to_char(activity_date, 'YYYY-MM-DD') as day, meters, shoe_id from activity_shoes where user_id = ${userId}`
   for (const r of rows) {
     const j = shoes.findIndex((s) => s.id === r.shoe_id)
-    if (j < 0 || j === ci) continue
-    if (r.day >= shoes[ci].since) extra[ci] -= r.meters / 1000
-    if (r.day >= shoes[j].since) extra[j] += r.meters / 1000
+    if (j < 0) continue
+    const inCredited = r.day >= shoes[ci].since
+    if (j === ci) {
+      // Déjà dans la synchro de la paire créditée, sauf si elle précède la saisie du kilométrage.
+      if (!inCredited) extra[ci] += r.meters / 1000
+      continue
+    }
+    if (inCredited) extra[ci] -= r.meters / 1000
+    // Un rattachement choisi par le coureur compte toujours, même pour une sortie d'avant la saisie.
+    extra[j] += r.meters / 1000
   }
   // Une activité rattachée mais pas encore synchronisée ne doit pas rendre le total négatif.
   extra[ci] = Math.max(0, extra[ci])

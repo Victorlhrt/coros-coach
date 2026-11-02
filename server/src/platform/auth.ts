@@ -16,7 +16,8 @@ import { createPlanFromSession } from './onboarding.js'
  * Distinct du passkey du coach personnel (`/api/auth`), qui garde son propre cookie.
  */
 const SESSION_COOKIE = 'psid'
-const SESSION_DAYS = 30
+/** Session glissante : chaque visite la repousse à 90 jours (au plus une écriture par jour). */
+const SESSION_DAYS = 90
 const cookieOpts = { httpOnly: true, secure: config.production, sameSite: 'Lax' as const, path: '/' }
 
 const scryptAsync = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>
@@ -41,11 +42,16 @@ export type SessionUser = { id: string; email: string; name: string; role: UserR
 export async function currentUser(c: Context): Promise<SessionUser | null> {
   const token = getCookie(c, SESSION_COOKIE)
   if (!token) return null
-  const [user] = await db<SessionUser[]>`
-    select u.id, u.email, u.name, u.role, u.status
+  const [user] = await db<(SessionUser & { stale: boolean })[]>`
+    select u.id, u.email, u.name, u.role, u.status, s.expires_at < now() + ${`${SESSION_DAYS - 1} days`}::interval as stale
     from user_sessions s join users u on u.id = s.user_id
     where s.token_hash = ${hashToken(token)} and s.expires_at > now()`
   if (!user) return null
+  if (user.stale) {
+    await db`update user_sessions set expires_at = now() + ${`${SESSION_DAYS} days`}::interval where token_hash = ${hashToken(token)}`
+    setCookie(c, SESSION_COOKIE, token, { ...cookieOpts, maxAge: SESSION_DAYS * 86400 })
+  }
+  delete (user as { stale?: boolean }).stale
   // Seuls les e-mails d'ADMIN_EMAILS sont administrateurs, même si un rôle admin traîne en base.
   if (user.role === 'admin' && !config.adminEmails.includes(user.email.toLowerCase())) user.role = 'runner'
   return user

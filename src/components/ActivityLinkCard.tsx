@@ -264,10 +264,12 @@ function Splits({ laps, units }: { laps: Lap[]; units: Units }) {
   )
 }
 
-type ActivityShoe = { id: string; brand: string; model: string; km: number; credited: boolean }
+type ActivityShoe = { id: string; brand: string; model: string; km: number; credited: boolean; since: string }
 type ActivityShoes = { shoes: ActivityShoe[]; assignments: Record<string, string> }
 
 /** Chaussure portée pour l'activité : la paire par défaut tant qu'aucune autre n'est choisie. */
+const NOT_COUNTED = '__not_counted'
+
 function ShoePicker({ activity }: { activity: Activity }) {
   const qc = useQueryClient()
   const key = ['account', 'activity-shoes', activity.labelId]
@@ -298,14 +300,19 @@ function ShoePicker({ activity }: { activity: Activity }) {
         </Link>
       </p>
     )
-  const current = data.assignments[activity.labelId] ?? data.shoes.find((s) => s.credited)?.id ?? data.shoes[0].id
+  // Sans rattachement, la sortie va à la paire créditée, mais seulement si elle suit la saisie de son kilométrage.
+  const credited = data.shoes.find((s) => s.credited) ?? data.shoes[0]
+  const current = data.assignments[activity.labelId] ?? (activity.date >= credited.since ? credited.id : NOT_COUNTED)
   return (
     <Select
       label="Shoes"
       value={current}
       disabled={save.isPending}
-      onValueChange={(v) => v !== current && save.mutate(v)}
-      options={data.shoes.map((s) => ({ value: s.id, label: `${s.brand} ${s.model}`.trim() + ` · ${Math.round(s.km)} km` }))}
+      onValueChange={(v) => v !== current && v !== NOT_COUNTED && save.mutate(v)}
+      options={[
+        ...(current === NOT_COUNTED ? [{ value: NOT_COUNTED, label: 'Not counted (before your mileage entry)' }] : []),
+        ...data.shoes.map((s) => ({ value: s.id, label: `${s.brand} ${s.model}`.trim() + ` · ${Math.round(s.km)} km` })),
+      ]}
     />
   )
 }
