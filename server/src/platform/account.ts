@@ -182,4 +182,32 @@ accountRoutes.get('/photo/:userId', async (c) => {
 })
 
 // Paires de chaussures (Equipment) et leur kilométrage automatique : voir shoes.ts.
+
+// ---------- Récap IA de la semaine ----------
+
+const RECAP_KEY = /^[\w-]{1,80}$/
+
+/** Récap déjà rédigé pour cette semaine du plan, ou null. */
+accountRoutes.get('/recaps/:planId/:week', async (c) => {
+  const { planId, week } = c.req.param()
+  if (!RECAP_KEY.test(planId) || !/^\d{1,3}$/.test(week)) return c.json({ error: 'Invalid week.' }, 400)
+  const [row] = await db<{ data: unknown }[]>`
+    select data from weekly_recaps where user_id = ${c.get('user').id} and plan_id = ${planId} and week = ${Number(week)}`
+  return c.json({ recap: row?.data ?? null })
+})
+
+/** Enregistre le récap de la semaine s'il n'existe pas encore ; sinon renvoie celui déjà écrit (un seul par semaine). */
+accountRoutes.put('/recaps/:planId/:week', async (c) => {
+  const { planId, week } = c.req.param()
+  if (!RECAP_KEY.test(planId) || !/^\d{1,3}$/.test(week)) return c.json({ error: 'Invalid week.' }, 400)
+  const body = await c.req.json<{ recap?: unknown }>().catch(() => null)
+  if (!body?.recap || typeof body.recap !== 'object' || JSON.stringify(body.recap).length > 20_000) return c.json({ error: 'Invalid recap.' }, 400)
+  const userId = c.get('user').id
+  await db`
+    insert into weekly_recaps (user_id, plan_id, week, data) values (${userId}, ${planId}, ${Number(week)}, ${db.json(body.recap as never)})
+    on conflict do nothing`
+  const [row] = await db<{ data: unknown }[]>`select data from weekly_recaps where user_id = ${userId} and plan_id = ${planId} and week = ${Number(week)}`
+  return c.json({ recap: row?.data ?? null })
+})
+
 accountRoutes.route('/', shoeRoutes)

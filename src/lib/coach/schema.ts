@@ -165,12 +165,12 @@ export type Adjustment = z.infer<typeof AdjustmentSchema>
 
 /** Récap de la semaine écoulée, rédigé par Claude pour l'onglet Coach (lecture seule, aucun changement du plan). */
 export const WeeklyRecapSchema = z.object({
-  headline: z.string().describe('le verdict de la semaine en une phrase courte (10 à 14 mots)'),
+  headline: z.string().describe('le verdict de la semaine, 10 mots maximum'),
   adherence: z.enum(['on_track', 'partly', 'off_track']).describe('plan respecté : séances faites et allures/structure tenues'),
-  plan: z.string().describe('plan respecté ou non : séances faites, manquées, hors plan ; structure et allures tenues d’après les splits ; 2 à 3 phrases'),
-  feelings: z.string().describe('ressentis du coureur (notes, RPE, sensations, commentaires) et ce qu’ils disent ; si aucun ressenti saisi, le dire et l’inviter à noter ses séances ; 2 à 3 phrases'),
-  pain: z.string().nullable().describe('douleurs signalées (séance, commentaire) et conduite à tenir, ou null si aucune'),
-  load: z.string().describe('charge : volume réel vs prévu, évolution sur les semaines précédentes, récupération/HRV/sommeil si disponibles ; 2 phrases'),
-  nextWeek: z.string().describe('le point d’attention pour la semaine qui commence, 1 à 2 phrases'),
+  plan: z.string().describe('plan respecté ou non, d’après les splits : UNE phrase de 20 mots maximum'),
+  feelings: z.string().describe('ce que disent les ressentis (notes, RPE, sensations, commentaires) : UNE phrase de 20 mots maximum ; si aucun ressenti, invite à noter ses séances'),
+  pain: z.string().nullable().describe('douleur signalée et conduite à tenir en UNE phrase, ou null si aucune'),
+  load: z.string().describe('charge et récupération : UNE phrase de 20 mots maximum'),
+  nextWeek: z.string().describe('LE conseil pour la semaine qui commence : UNE phrase de 15 mots maximum'),
 })
 export type WeeklyRecap = z.infer<typeof WeeklyRecapSchema>

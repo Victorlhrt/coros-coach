@@ -6,7 +6,7 @@ import { withIds } from '@/lib/coach/generate'
 import { fixLongRuns } from '@/lib/coach/longrun'
 import { fixPaces, repacePlan } from '@/lib/coach/repace'
 import type { Feedback } from '@/lib/coach/feedback'
-import type { Adjustment, Goal, Plan, Profile, Session, WeeklyRecap, Zone } from '@/lib/coach/schema'
+import type { Adjustment, Goal, Plan, Profile, Session, Zone } from '@/lib/coach/schema'
 import type { RaceRecord } from '@/lib/coach/vdot'
 import type { Volume } from '@/lib/coach/volume'
 import { DEFAULT_ZONES } from '@/lib/coach/zones'
@@ -34,13 +34,6 @@ export interface Review {
   status: 'pending' | 'applied' | 'dismissed'
 }
 
-/** Récap IA d'une semaine terminée, avec les chiffres calculés au moment où il a été rédigé. */
-export interface Recap {
-  createdAt: string
-  recap: WeeklyRecap
-  stats: { done: number; planned: number; km: number; plannedKm: number; avgRpe: number | null; rated: number; pain: number }
-}
-
 interface PlanState {
   goal: Goal | null
   profile: Profile | null
@@ -56,8 +49,6 @@ interface PlanState {
   volume: Volume | null
   /** Bilans par numéro de semaine */
   reviews: Record<number, Review>
-  /** Récaps IA par numéro de semaine */
-  recaps: Record<number, Recap>
   setGoal: (goal: Goal) => void
   setProfile: (profile: Profile | null) => void
   setZones: (zones: Zone[]) => void
@@ -77,7 +68,6 @@ interface PlanState {
   setVolume: (volume: Volume | null) => void
   saveReview: (week: number, adjustment: Adjustment) => void
   setReviewStatus: (week: number, status: Review['status']) => void
-  saveRecap: (week: number, recap: Recap) => void
   importData: (data: unknown) => void
   reset: () => void
 }
@@ -108,7 +98,6 @@ export const usePlan = create<PlanState>()(
       coros: EMPTY_SYNC,
       links: {},
       reviews: {},
-      recaps: {},
       records: [],
       volume: null,
       feedback: {},
@@ -134,7 +123,7 @@ export const usePlan = create<PlanState>()(
         const { plan, changed } = fixLongRuns(s.plan, s.zones, today(), done)
         if (changed.length) set({ plan })
       },
-      setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, recaps: {}, feedback: {} }),
+      setPlan: (plan) => set({ plan, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
       setCoros: (patch) => set((s) => ({ coros: { ...s.coros, ...patch } })),
       markSynced: (hashes) => set((s) => ({ coros: { ...s.coros, synced: { ...s.coros.synced, ...hashes } } })),
       applyChanges: (changes) =>
@@ -165,7 +154,6 @@ export const usePlan = create<PlanState>()(
         set((s) => ({ reviews: { ...s.reviews, [week]: { createdAt: new Date().toISOString(), adjustment, status: 'pending' } } })),
       setReviewStatus: (week, status) =>
         set((s) => (s.reviews[week] ? { reviews: { ...s.reviews, [week]: { ...s.reviews[week], status } } } : s)),
-      saveRecap: (week, recap) => set((s) => ({ recaps: { ...s.recaps, [week]: recap } })),
       importData: (data) => {
         const d = data as Partial<PlanState>
         if (!d || typeof d !== 'object' || !d.plan?.weeks) throw new Error('Invalid file: no plan found.')
@@ -177,13 +165,12 @@ export const usePlan = create<PlanState>()(
           coros: d.coros ?? EMPTY_SYNC,
           links: d.links ?? {},
           reviews: d.reviews ?? {},
-          recaps: d.recaps ?? {},
           records: d.records ?? [],
           feedback: d.feedback ?? {},
           volume: d.volume ?? null,
         })
       },
-      reset: () => set({ plan: null, coros: EMPTY_SYNC, links: {}, reviews: {}, recaps: {}, feedback: {} }),
+      reset: () => set({ plan: null, coros: EMPTY_SYNC, links: {}, reviews: {}, feedback: {} }),
     }),
     {
       name: 'coach.plan',
@@ -192,7 +179,7 @@ export const usePlan = create<PlanState>()(
       migrate: (state, version) => {
         const s = state as Record<string, unknown>
         if (version < 1) s.goal = migrateGoal(s.goal)
-        return { links: {}, reviews: {}, recaps: {}, records: [], volume: null, feedback: {}, ...s } as unknown as PlanState
+        return { links: {}, reviews: {}, records: [], volume: null, feedback: {}, ...s } as unknown as PlanState
       },
     },
   ),

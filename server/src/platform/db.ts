@@ -249,6 +249,16 @@ export async function migratePlatform() {
     )`
   await db`create unique index if not exists friendships_pair_idx on friendships (least(requester_id, addressee_id), greatest(requester_id, addressee_id))`
   await db`create index if not exists friendships_addressee_idx on friendships (addressee_id, status)`
+  // Récap IA de la semaine écoulée (onglet Coach) : rédigé une seule fois par plan et par semaine, jamais réécrit.
+  await db`
+    create table if not exists weekly_recaps (
+      user_id uuid not null references users(id) on delete cascade,
+      plan_id text not null,
+      week int not null,
+      data jsonb not null,
+      created_at timestamptz not null default now(),
+      primary key (user_id, plan_id, week)
+    )`
   // Abonnements Stripe : offre courante recopiée par le webhook (Stripe reste la source de vérité).
   await db`alter table users add column if not exists plan text not null default 'free'`
   await db`

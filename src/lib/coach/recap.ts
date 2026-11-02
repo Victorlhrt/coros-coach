@@ -1,6 +1,6 @@
 import type { Activity } from '@/lib/coros/activities'
 import { fetchRecentData } from '@/lib/coros/data'
-import { usePlan, type Recap } from '@/lib/store/plan'
+import { usePlan } from '@/lib/store/plan'
 import { callStructured } from './claude'
 import { addDays } from './dates'
 import { formatClock } from './format'
@@ -9,7 +9,14 @@ import { describeTrend, trainingTrend } from './guardrails'
 import { isRun, sessionTotals } from './metrics'
 import { COACH_SYSTEM, describeGoal } from './prompts'
 import { describeActivity, describeLaps } from './review'
-import { WeeklyRecapSchema, type Week } from './schema'
+import { WeeklyRecapSchema, type Week, type WeeklyRecap } from './schema'
+
+/** Récap d'une semaine terminée, avec les chiffres calculés au moment où il a été rédigé (gardé sur le serveur). */
+export interface Recap {
+  createdAt: string
+  recap: WeeklyRecap
+  stats: { done: number; planned: number; km: number; plannedKm: number; avgRpe: number | null; rated: number; pain: number }
+}
 
 /** Dernière semaine du plan terminée avant `now` (le récap porte sur elle). */
 export function lastFinishedWeek(weeks: Week[], now: string) {
@@ -83,9 +90,9 @@ ${watch ? `Données de la montre (7 derniers jours) :\n${watch}\n\n` : ''}${desc
 - ressentis : c'est le plus important, appuie-toi sur les notes, RPE, sensations et commentaires ; un RPE élevé sur une séance facile est un signal ;
 - douleurs : toute douleur signalée est prise au sérieux (conduite à tenir, consulter si elle persiste) ;
 - charge : volume réel vs prévu, tendance, récupération si la montre la donne.
-Sois concret et bref, sans répéter les chiffres déjà affichés à côté. N'invente rien : si une donnée manque, dis-le simplement.`,
+Très court : une phrase par rubrique, aucune énumération séance par séance, aucun chiffre déjà affiché à côté (séances faites, km, RPE moyen). Tout en anglais, y compris « watch ». N'invente rien : si une donnée manque, n'en parle pas.`,
     schema: WeeklyRecapSchema,
-    maxTokens: 4000,
+    maxTokens: 1500,
   })
   return { createdAt: new Date().toISOString(), recap, stats }
 }

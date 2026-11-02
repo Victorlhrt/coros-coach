@@ -1,21 +1,21 @@
-import { useMutation } from '@tanstack/react-query'
-import { Activity as ActivityIcon, CalendarCheck, HeartPulse, Loader2, RefreshCw, Smile, Sparkles, TriangleAlert } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Activity as ActivityIcon, CalendarCheck, Compass, Loader2, Smile, Sparkles, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
-import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
-import { Button } from '@/components/shadcn/button'
+import { Panel, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { Skeleton } from '@/components/shadcn/skeleton'
 import { claudeErrorMessage } from '@/lib/coach/claude'
 import { formatDay, today } from '@/lib/coach/dates'
-import { buildRecap, lastFinishedWeek } from '@/lib/coach/recap'
+import { buildRecap, lastFinishedWeek, type Recap } from '@/lib/coach/recap'
 import type { WeeklyRecap as RecapText } from '@/lib/coach/schema'
 import { useActivities } from '@/lib/coros/activity-hooks'
+import { api } from '@/lib/server/api'
 import { usePlan } from '@/lib/store/plan'
 import { cn } from '@/lib/utils'
 
 /**
  * Onglet Coach : récap IA de la semaine écoulée (plan respecté, ressentis, douleurs, charge).
- * Rédigé une fois par semaine à la première visite, gardé avec le plan et synchronisé avec le compte.
+ * Rédigé une seule fois par semaine, à la première visite, et gardé sur le serveur : tous les appareils lisent le même.
  */
 
 const ADHERENCE: Record<RecapText['adherence'], { label: string; tone: BadgeTone }> = {
@@ -24,33 +24,43 @@ const ADHERENCE: Record<RecapText['adherence'], { label: string; tone: BadgeTone
   off_track: { label: 'Off plan', tone: 'danger' },
 }
 
-/** Une tentative automatique par semaine et par page : une erreur ne relance pas Claude en boucle. */
-let attempted: number | null = null
+/** Une rédaction au plus par semaine et par page : une erreur ne relance pas Claude en boucle. */
+let attempted: string | null = null
 
 export function WeeklyRecap({ className }: { className?: string }) {
   const plan = usePlan((s) => s.plan)
-  const recaps = usePlan((s) => s.recaps) ?? {}
-  const saveRecap = usePlan((s) => s.saveRecap)
   const activities = useActivities()
+  const qc = useQueryClient()
   const [now] = useState(today)
   const week = plan ? lastFinishedWeek(plan.weeks, now) : undefined
-  const saved = week ? recaps[week.number] : undefined
+  const path = plan && week ? `/account/recaps/${encodeURIComponent(plan.id)}/${week.number}` : null
 
-  const generate = useMutation({
-    mutationFn: () => buildRecap(week!.number, activities.data?.activities ?? []),
-    onSuccess: (r) => saveRecap(week!.number, r),
+  const saved = useQuery({
+    queryKey: ['recap', path],
+    queryFn: () => api<{ recap: Recap | null }>(path!).then((r) => r.recap),
+    enabled: !!path,
+    staleTime: Number.POSITIVE_INFINITY,
   })
-  const run = useRef(generate.mutate)
-  run.current = generate.mutate
+  const write = useMutation({
+    mutationFn: async () => {
+      const recap = await buildRecap(week!.number, activities.data?.activities ?? [])
+      // Si un autre appareil l'a écrit entre-temps, le serveur garde le premier et le renvoie.
+      return (await api<{ recap: Recap | null }>(path!, { method: 'PUT', body: { recap } })).recap ?? recap
+    },
+    onSuccess: (r) => qc.setQueryData(['recap', path], r),
+  })
+  const run = useRef(write.mutate)
+  run.current = write.mutate
 
-  const ready = !!week && !activities.isPending
+  const missing = saved.isSuccess && saved.data === null
   useEffect(() => {
-    if (!ready || saved || attempted === week!.number) return
-    attempted = week!.number
+    if (!path || !missing || activities.isPending || attempted === path) return
+    attempted = path
     run.current()
-  }, [ready, saved, week])
+  }, [path, missing, activities.isPending])
 
   if (!plan || !week) return null
+  const recap = saved.data
   const range = `${formatDay(week.start, { day: 'numeric', month: 'short' })} – ${formatDay(week.end, { day: 'numeric', month: 'short' })}`
 
   return (
@@ -64,92 +74,75 @@ export function WeeklyRecap({ className }: { className?: string }) {
           </Badge>
         }
       />
-      {saved ? (
-        <RecapBody recap={saved.recap} stats={saved.stats} />
-      ) : generate.isError ? (
+      {recap ? (
+        <RecapBody recap={recap} />
+      ) : write.isError || saved.isError ? (
         <PanelSection divided>
-          <p className="text-muted-foreground text-sm">Couldn’t write your recap: {claudeErrorMessage(generate.error)}</p>
+          <p className="text-muted-foreground text-sm">Couldn’t write your recap: {claudeErrorMessage(write.error ?? saved.error)}</p>
         </PanelSection>
       ) : (
         <PanelSection divided className="space-y-3">
           <p className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Loader2 className="size-4 animate-spin" /> Pacer is going over your week: sessions, splits, how you felt…
+            <Loader2 className="size-4 animate-spin" /> Pacer is going over your week…
           </p>
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-16" />
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="h-12" />
         </PanelSection>
-      )}
-      {(saved || generate.isError) && (
-        <PanelFooter>
-          <p className="text-muted-foreground text-xs">
-            {saved ? `Written ${formatDay(saved.createdAt.slice(0, 10), { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}
-          </p>
-          <Button variant="outline" size="sm" disabled={generate.isPending} onClick={() => generate.mutate()}>
-            {generate.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {saved ? 'Rewrite' : 'Try again'}
-          </Button>
-        </PanelFooter>
       )}
     </Panel>
   )
 }
 
-function RecapBody({ recap, stats }: { recap: RecapText; stats: NonNullable<ReturnType<typeof usePlan.getState>['recaps'][number]>['stats'] }) {
+function RecapBody({ recap: { recap, stats } }: { recap: Recap }) {
   const adherence = ADHERENCE[recap.adherence]
+  const figures = [
+    `${stats.done}/${stats.planned} sessions`,
+    `${stats.km} of ${stats.plannedKm} km`,
+    stats.avgRpe !== null ? `RPE ${stats.avgRpe}` : null,
+    stats.pain > 0 ? `${stats.pain} pain report${stats.pain > 1 ? 's' : ''}` : null,
+  ].filter(Boolean)
   return (
-    <>
-      <div className="grid grid-cols-2 gap-px border-t bg-border sm:grid-cols-4">
-        <Stat label="Sessions" value={`${stats.done} / ${stats.planned}`} />
-        <Stat label="Distance" value={`${stats.km} km`} sub={`of ${stats.plannedKm} km planned`} />
-        <Stat label="Avg effort (RPE)" value={stats.avgRpe !== null ? `${stats.avgRpe} / 10` : '—'} sub={`${stats.rated} session${stats.rated === 1 ? '' : 's'} rated`} />
-        <Stat label="Pain reported" value={String(stats.pain)} alert={stats.pain > 0} />
+    <PanelSection divided className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge size="sm" tone={adherence.tone}>
+            {adherence.label}
+          </Badge>
+          <span className="text-muted-foreground text-xs tabular-nums">{figures.join(' · ')}</span>
+        </div>
+        <p className="font-heading font-medium text-lg leading-snug tracking-tight">{recap.headline}</p>
       </div>
-      <PanelSection divided className="space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="max-w-2xl font-heading font-medium text-xl tracking-tight">{recap.headline}</p>
-          <Badge tone={adherence.tone}>{adherence.label}</Badge>
-        </div>
+      <ul className="space-y-2.5">
         {recap.pain && (
-          <Section icon={<TriangleAlert />} title="Pain" className="rounded-2xl border border-red-500/30 bg-red-500/[0.06] p-4" iconClass="text-red-400">
+          <Line icon={<TriangleAlert />} label="Pain" alert>
             {recap.pain}
-          </Section>
+          </Line>
         )}
-        <Section icon={<Smile />} title="How you felt" className="rounded-2xl border bg-foreground/[0.03] p-4">
+        <Line icon={<Smile />} label="Feel">
           {recap.feelings}
-        </Section>
-        <div className="grid gap-5 md:grid-cols-2">
-          <Section icon={<CalendarCheck />} title="Your plan">
-            {recap.plan}
-          </Section>
-          <Section icon={<ActivityIcon />} title="Load">
-            {recap.load}
-          </Section>
-        </div>
-        <Section icon={<HeartPulse />} title="This week">
+        </Line>
+        <Line icon={<CalendarCheck />} label="Plan">
+          {recap.plan}
+        </Line>
+        <Line icon={<ActivityIcon />} label="Load">
+          {recap.load}
+        </Line>
+        <Line icon={<Compass />} label="Next">
           {recap.nextWeek}
-        </Section>
-      </PanelSection>
-    </>
+        </Line>
+      </ul>
+    </PanelSection>
   )
 }
 
-function Stat({ label, value, sub, alert }: { label: string; value: string; sub?: string; alert?: boolean }) {
+function Line({ icon, label, alert, children }: { icon: ReactNode; label: string; alert?: boolean; children: ReactNode }) {
   return (
-    <div className="bg-card px-6 py-4">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className={cn('mt-0.5 font-medium text-xl tabular-nums tracking-tight', alert && 'text-red-400')}>{value}</p>
-      {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
-    </div>
-  )
-}
-
-function Section({ icon, title, children, className, iconClass }: { icon: ReactNode; title: string; children: ReactNode; className?: string; iconClass?: string }) {
-  return (
-    <div className={className}>
-      <p className={cn('flex items-center gap-2 font-medium text-sm [&>svg]:size-4', iconClass ?? '[&>svg]:text-muted-foreground')}>
+    <li className={cn('flex gap-3 text-sm', alert && 'rounded-xl bg-red-500/[0.08] p-2.5 -mx-2.5')}>
+      <span className={cn('flex w-16 shrink-0 items-center gap-1.5 font-medium [&>svg]:size-3.5', alert ? 'text-red-400' : '[&>svg]:text-muted-foreground')}>
         {icon}
-        {title}
-      </p>
-      <p className="mt-1.5 text-muted-foreground text-sm leading-relaxed">{children}</p>
-    </div>
+        {label}
+      </span>
+      <span className="min-w-0 text-muted-foreground leading-relaxed">{children}</span>
+    </li>
   )
 }
