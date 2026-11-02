@@ -534,7 +534,7 @@ function CoachTab() {
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
   if (me?.entitlements?.coachChat === 'none') return <UpgradePrompt title="Pacer coach chat is on Pro" />
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       <WeeklyRecap />
       <CoachChat firstName={first} className="h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] w-full md:h-[calc(100dvh-8.5rem)]" />
     </div>

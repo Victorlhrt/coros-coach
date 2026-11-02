@@ -137,18 +137,21 @@ leaderboardRoutes.delete('/friends/:id', async (c) => {
 
 // ---------- Classements ----------
 
-type Period = 'week' | 'month'
+type Period = 'week' | 'last_week' | 'month'
 type Totals = { id: string; name: string; meters: number; seconds: number; runs: number; synced: boolean; rank: number }
 
 /** Semaine (lundi–dimanche) ou mois calendaire en cours, à Paris. */
 async function bounds(period: Period) {
+  // Semaine passée : la semaine en cours décalée de 7 jours (le lundi, la semaine en cours est encore vide).
+  const unit = period === 'month' ? 'month' : 'week'
+  const shift = period === 'last_week' ? '7 days' : '0 days'
   const [b] = await db<{ start: string; end: string }[]>`
-    with t as (select date_trunc(${period}, (now() at time zone ${TZ})::date::timestamp) s)
-    select to_char(s, 'YYYY-MM-DD') "start", to_char(s + ${period === 'week' ? '1 week' : '1 month'}::interval - interval '1 day', 'YYYY-MM-DD') "end" from t`
+    with t as (select date_trunc(${unit}, ((now() at time zone ${TZ}) - ${shift}::interval)::date::timestamp) s)
+    select to_char(s, 'YYYY-MM-DD') "start", to_char(s + ${unit === 'week' ? '1 week' : '1 month'}::interval - interval '1 day', 'YYYY-MM-DD') "end" from t`
   return b!
 }
 
-const periodOf = (raw: string | undefined): Period => (raw === 'month' ? 'month' : 'week')
+const periodOf = (raw: string | undefined): Period => (raw === 'month' || raw === 'last_week' ? raw : 'week')
 /** Hors amis, on n'affiche que le prénom et l'initiale du nom. */
 function shortName(name: string) {
   const [first = '', ...rest] = name.trim().split(/\s+/)

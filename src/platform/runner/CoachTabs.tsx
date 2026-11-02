@@ -510,15 +510,6 @@ export function PlanTab() {
           onOpenSession={(id) => navigate(ROUTES.session(id))}
           footerCaption={week.number === current ? 'This week' : week.number < current ? 'Past week' : 'Upcoming'}
           footerSummary={`${week.sessions.filter((s) => isDone(s, links, feedback)).length} / ${week.sessions.length} sessions done · ${formatDistance(volumes[week.number - 1], units, 0)} planned`}
-          footerAction={
-            week.number === current ? (
-              <Button asChild>
-                <Link to={ROUTES.adjust}>
-                  <Wand2 /> Adjust my week
-                </Link>
-              </Button>
-            ) : undefined
-          }
         />
 
         <div className="grid gap-4 xl:grid-cols-2">

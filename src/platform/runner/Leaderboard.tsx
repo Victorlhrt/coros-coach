@@ -27,7 +27,7 @@ import { formatDuration } from '../onboarding/estimate'
  * Les activités COROS restent lues sur l'appareil ; on pousse au serveur seulement les totaux par jour.
  */
 
-type Period = 'week' | 'month'
+type Period = 'week' | 'last_week' | 'month'
 type Row = { id: string; name: string; meters: number; seconds: number; runs: number; synced: boolean; rank: number; me: boolean; friend: boolean; paceSecPerKm: number | null; n?: number }
 type Board = { period: Period; start: string; end: string; rows: Row[] }
 type CityBoard = Board & { city: string | null; runners: number }
@@ -81,7 +81,8 @@ function rangeLabel(b: Pick<Board, 'start' | 'end' | 'period'>) {
 }
 
 const PERIODS = [
-  { value: 'week', label: 'Week' },
+  { value: 'week', label: 'This week' },
+  { value: 'last_week', label: 'Last week' },
   { value: 'month', label: 'Month' },
 ]
 
@@ -89,6 +90,12 @@ export function LeaderboardPage() {
   useRunSync()
   const [tab, setTab] = useState('friends')
   const [period, setPeriod] = useState<Period>('week')
+  // Début de semaine sans aucune sortie (le lundi) : on montre d'emblée la semaine passée, tant que le coureur n'a rien choisi.
+  const [picked, setPicked] = useState(false)
+  const thisWeek = useQuery({ queryKey: ['leaderboard', 'friends', 'week'], queryFn: () => api<Board>('/account/leaderboard?period=week') })
+  useEffect(() => {
+    if (!picked && period === 'week' && thisWeek.data && thisWeek.data.rows.every((r) => r.meters === 0)) setPeriod('last_week')
+  }, [picked, period, thisWeek.data])
   const [adding, setAdding] = useState(false)
   const connected = useHasWatch()
 
@@ -99,7 +106,10 @@ export function LeaderboardPage() {
           <h1 className="font-heading text-2xl">Leaderboard</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl label="Period" options={PERIODS} value={period} onValueChange={(v) => setPeriod(v as Period)} />
+          <SegmentedControl label="Period" options={PERIODS} value={period} onValueChange={(v) => {
+              setPicked(true)
+              setPeriod(v as Period)
+            }} />
           <Button size="sm" onClick={() => setAdding(true)}>
             <UserPlusIcon className="size-4" /> Add a friend
           </Button>
