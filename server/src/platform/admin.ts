@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAdmin, type SessionUser } from './auth.js'
 import { config } from '../config.js'
 import { audit, db, getSetting } from './db.js'
+import { billingEnforced } from './entitlements.js'
 import { sendEmail, sendEmailLater } from './email.js'
 import { CATALOG, accountApproved, invited, planReady, type TemplateId } from './emails/templates.js'
 import { REMINDERS_SETTING, runOnboardingReminders } from './reminders.js'
@@ -104,6 +105,46 @@ adminRoutes.patch('/users/:id', async (c) => {
   }
   if (patch.status === 'suspended') await db`delete from user_sessions where user_id = ${id}`
   await audit(me.id, 'user.update', row.email as string, patch)
+  return c.json(row)
+})
+
+// ---------- Clients (offres et abonnements) ----------
+
+adminRoutes.get('/customers', async (c) => {
+  const rows = await db`
+    select id, email, name, role, status, plan, plan_status, plan_interval, plan_period_end, plan_cancel_at_period_end,
+           early_access, stripe_customer_id, stripe_subscription_id, created_at
+    from users order by (plan <> 'free') desc, created_at desc limit 2000`
+  return c.json({ customers: rows, enforced: await billingEnforced() })
+})
+
+const CustomerPatch = z.object({
+  plan: z.enum(['free', 'pro', 'expert']).optional(),
+  earlyAccess: z.boolean().optional(),
+})
+
+/**
+ * Change l'offre d'un compte à la main (offert, geste commercial, test). Rien n'est facturé ni modifié côté Stripe :
+ * un compte qui a un abonnement Stripe actif sera réécrit par le prochain événement Stripe.
+ */
+adminRoutes.patch('/customers/:id', async (c) => {
+  const me = c.get('user')
+  const id = c.req.param('id')
+  const parsed = CustomerPatch.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success || (parsed.data.plan === undefined && parsed.data.earlyAccess === undefined)) return c.json({ error: 'Invalid request' }, 400)
+  const { plan, earlyAccess } = parsed.data
+  const [row] = await db`
+    update users set
+      plan = coalesce(${plan ?? null}::text, plan),
+      plan_status = case when ${plan ?? null}::text is null then plan_status when ${plan ?? null}::text = 'free' then null else 'manual' end,
+      plan_interval = case when ${plan ?? null}::text is null then plan_interval else null end,
+      plan_period_end = case when ${plan ?? null}::text is null then plan_period_end else null end,
+      plan_cancel_at_period_end = case when ${plan ?? null}::text is null then plan_cancel_at_period_end else false end,
+      early_access = coalesce(${earlyAccess ?? null}::boolean, early_access)
+    where id = ${id}
+    returning id, email, plan, plan_status, early_access`
+  if (!row) return c.json({ error: 'Account not found' }, 404)
+  await audit(me.id, 'customer.update', row.email as string, parsed.data)
   return c.json(row)
 })
 

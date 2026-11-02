@@ -28,6 +28,7 @@ const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   incomplete_expired: { label: 'Expired', tone: 'neutral' },
   canceled: { label: 'Canceled', tone: 'neutral' },
   paused: { label: 'Paused', tone: 'neutral' },
+  manual: { label: 'Complimentary', tone: 'info' },
 }
 const formatDate = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
 
