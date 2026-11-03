@@ -25,8 +25,8 @@ interface StructuredOptions<T> {
   system: string
   prompt: string
   schema: z.ZodType<T>
-  /** Contrôles métier en plus du schéma ; renvoie la liste des erreurs. */
-  validate?: (value: T) => string[]
+  /** Contrôles métier en plus du schéma ; renvoie la liste des erreurs. `last` : dernière tentative (contrôles assouplis possibles). */
+  validate?: (value: T, last: boolean) => string[]
   maxTokens?: number
   retries?: number
 }
@@ -67,7 +67,7 @@ export async function callStructured<T>({
         throw new Error('Claude declined the request.')
       } else {
         parsed = (message.parsed_output as T | null) ?? null
-        lastErrors = parsed === null ? ['Réponse vide ou non conforme au schéma.'] : (validate?.(parsed) ?? [])
+        lastErrors = parsed === null ? ['Réponse vide ou non conforme au schéma.'] : (validate?.(parsed, attempt === retries) ?? [])
       }
     } catch (err) {
       if (err instanceof Anthropic.APIError) throw err

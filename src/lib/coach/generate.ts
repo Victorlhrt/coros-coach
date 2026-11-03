@@ -201,14 +201,16 @@ ${part.map((w) => `Semaine ${w.number} : ${allowed.get(w.number)!.map((d) => `${
 ${goal.raceDate <= part[part.length - 1].end ? `La course a lieu le ${goal.raceDate} : séance de type race ce jour-là, avec l’allure objectif.` : ''}
 Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séances au volume visé.`,
         schema: WeeksSessionsSchema,
-        validate: (r) => {
+        retries: 3,
+        validate: (r, last) => {
           const errors: string[] = []
           for (const w of part) {
             const got = r.weeks.find((x) => x.number === w.number)
             if (!got) errors.push(`Semaine ${w.number} manquante.`)
             else {
               errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`, { zones, goalPace: goalPace(goal) }))
-              errors.push(...checkWeekTotals(w, got.sessions, zones))
+              // Dernière tentative : volume accepté à ±25 % plutôt que d'échouer toute la génération.
+              errors.push(...checkWeekTotals(w, got.sessions, zones, last ? 0.25 : 0.15))
               errors.push(...checkQuality(w, got.sessions, slots.length))
             }
           }
@@ -282,7 +284,7 @@ export function checkQuality(week: Week, sessions: SessionInput[], planWeeks: nu
   const quality = sessions.filter((s) => (s.type === 'interval' || s.type === 'tempo') && s.blocks.some(hard))
   return quality.length
     ? []
-    : [`Semaine ${week.number} : aucune séance de qualité (type interval ou tempo avec un bloc work en zone 4 ou 5). Sur un plan de ${planWeeks} semaines, chaque semaine doit en avoir au moins une : remplace une sortie facile par un fractionné ou un seuil.`]
+    : [`Semaine ${week.number} : aucune séance de qualité (type interval ou tempo avec un bloc work en zone 4 ou 5). Sur un plan de ${planWeeks} semaines, chaque semaine doit en avoir au moins une, même une semaine plus légère : remplace une sortie facile par un fractionné ou un seuil (type interval ou tempo), en gardant le volume de la semaine.`]
 }
 
 export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
@@ -316,15 +318,19 @@ export function checkLongRuns(weeks: Skeleton['weeks']) {
     )
 }
 
-/** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 %). */
-export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[]) {
+/** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 % par défaut). */
+export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[], tolerance = 0.15) {
   // Semaine de course : son volume dépend surtout de la course, la fourchette ne s'applique pas.
   if (!week.targetKm || sessions.some((s) => s.type === 'race')) return []
-  const km = sessions.reduce((a, s) => a + sessionTotals({ ...s, id: '' }, zones).meters, 0) / 1000
+  const each = sessions.map((s) => ({ s, km: sessionTotals({ ...s, id: '' }, zones).meters / 1000 }))
+  const km = each.reduce((a, x) => a + x.km, 0)
   const errors: string[] = []
-  if (km < week.targetKm * 0.85 || km > week.targetKm * 1.15) {
+  if (km < week.targetKm * (1 - tolerance) || km > week.targetKm * (1 + tolerance)) {
+    // Détail par séance : sans lui, Claude ne sait pas quelle séance raccourcir ou allonger.
+    const detail = each.filter((x) => x.km > 0).map((x) => `${x.s.date} ${x.s.type} ${x.km.toFixed(1)} km`).join(', ')
+    const delta = week.targetKm - km
     errors.push(
-      `Semaine ${week.number} : les séances totalisent ${km.toFixed(1)} km (estimés avec les zones d’allure) au lieu de ${week.targetKm} km visés. Ajuste les durées/distances pour être à ±10 %.`,
+      `Semaine ${week.number} : les séances totalisent ${km.toFixed(1)} km (estimés avec les zones d’allure) au lieu de ${week.targetKm} km visés (${detail}). ${delta > 0 ? 'Ajoute' : 'Retire'} environ ${Math.abs(delta).toFixed(1)} km en modifiant les durées/distances des sorties faciles ou de la sortie longue, pour être à ±10 %.`,
     )
   }
   if (week.longRunKm > 0) {
