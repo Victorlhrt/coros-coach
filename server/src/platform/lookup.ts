@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { KNOWN_RACES } from './data/races.js'
+import { sportsNConnectRaces, traceDeTrailRaces, type SourcedRace } from './race-sources.js'
 import { db } from './db.js'
 import { SHOES } from './data/shoes.js'
 import { findGravatar, gravatarHash, searchWebProfile, type WebProfile } from './profile-search.js'
@@ -194,13 +195,18 @@ const DIST: Record<string, (km: number) => boolean> = {
 
 const EUROPE = /switzerland|suisse|italy|italie|spain|espagne|andorra|andorre|austria|autriche|germany|allemagne|portugal|madeira|belgium|belgique|united kingdom|england|scotland|wales|slovenia|croatia|greece|norway|sweden|finland|poland|czech|netherlands/i
 
+const EUROPE_ISO = new Set(['CH', 'IT', 'ES', 'AD', 'AT', 'DE', 'PT', 'BE', 'LU', 'GB', 'IE', 'SI', 'HR', 'GR', 'NO', 'SE', 'FI', 'DK', 'PL', 'CZ', 'NL', 'MC'])
+
 /** 0 : France (ou événement Mont-Blanc, sans lieu dans l'API), 1 : Europe, 2 : ailleurs. */
 function nearness(detail: string, url?: string | null) {
   if (/france/i.test(detail) || /montblanc\.utmb/i.test(url ?? '')) return 0
   return EUROPE.test(detail) ? 1 : 2
 }
 
-type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb'; url?: string | null }
+type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb' | 'tdt' | 'snc'; url?: string | null }
+
+// Les calendriers se chargent en arrière-plan peu après le démarrage, pour que la première recherche soit complète.
+setTimeout(() => void Promise.all([traceDeTrailRaces(), sportsNConnectRaces()]), 10_000).unref?.()
 
 lookupRoutes.get('/races', async (c) => {
   if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
@@ -243,8 +249,24 @@ lookupRoutes.get('/races', async (c) => {
       // UTMB indisponible : on garde les courses connues.
     }
   }
-  // Le client affiche les courses par pages de 4 : on renvoie assez de résultats pour atteindre les courses UTMB.
-  return c.json([...known, ...utmb].filter((r) => inDist(r.km)).slice(0, 150))
+  // Calendriers publics (Trace de Trail, Sports'n Connect) : pendant leur premier chargement, on n'attend pas plus d'1,5 s.
+  const quick = (load: () => Promise<SourcedRace[]>) => Promise.race([load(), new Promise<SourcedRace[]>((r) => setTimeout(() => r([]), 1500))])
+  const sourced: (RaceOut & { rank: number })[] = (await Promise.all([quick(traceDeTrailRaces), quick(sportsNConnectRaces)]))
+    .flat()
+    .filter((r) => r.terrain === type && (!q || normalize(r.haystack).includes(q)))
+    .map(({ terrain: _t, haystack: _h, country, ...r }) => ({ ...r, rank: country === 'FR' ? 0 : country && EUROPE_ISO.has(country) ? 1 : 2 }))
+  // Même course vue par deux sources (même nom, même distance à 1 km près) : on garde la première.
+  const seen = new Set<string>()
+  // Après les courses connues : UTMB et calendriers mêlés, France puis Europe, par date.
+  const dated = [...utmb.map((r) => ({ ...r, rank: nearness(r.detail, r.url) })), ...sourced]
+    .sort((a, b) => a.rank - b.rank || (a.date ?? '9').localeCompare(b.date ?? '9'))
+    .map(({ rank: _r, ...r }) => r)
+  const all = [...known, ...dated].filter((r) => {
+    const key = `${normalize(r.name).replace(/\b20\d\d\b/g, '').replace(/[^a-z0-9]/g, '')}:${Math.round(r.km)}`
+    return !seen.has(key) && seen.add(key)
+  })
+  // Le client affiche les courses par pages de 4 : on renvoie assez de résultats pour atteindre les autres sources.
+  return c.json(all.filter((r) => inDist(r.km)).slice(0, 150))
 })
 
 /** Page de course UTMB (https://<événement>.utmb.world/…) et liens des GPX officiels qu'elle publie. */

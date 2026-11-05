@@ -66,7 +66,7 @@ type Race = {
   km: number
   elevation: number
   date: string | null
-  source: 'raice' | 'utmb' | 'saisie'
+  source: 'raice' | 'utmb' | 'tdt' | 'snc' | 'saisie'
   /** Page de la course sur UTMB (son GPX officiel y est souvent publié). */
   url?: string | null
 }

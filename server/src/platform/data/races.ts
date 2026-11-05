@@ -1,7 +1,8 @@
 /**
  * Courses connues, saisies à la main pour l'onboarding (route et trail, France et grands rendez-vous
  * internationaux). Pas de date : elle change chaque année, le coureur la confirme. Distances et dénivelés
- * des trails sont indicatifs (ils varient selon les éditions). Le reste du trail vient de l'API UTMB.
+ * des trails sont indicatifs (ils varient selon les éditions). Le reste vient de l'API UTMB et des calendriers
+ * publics (race-sources.ts : Trace de Trail, Sports'n Connect).
  * Pour une base exhaustive, il faudra un partenariat (Finishers, plateformes d'inscription, ITRA).
  */
 export type KnownRace = {
