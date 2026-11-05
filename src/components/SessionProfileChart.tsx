@@ -99,21 +99,41 @@ export function SessionProfileChart({ blocks, zones, units, laps, stream, classN
     }
   })
   const withActual = real.length > 0 || !!speeds
-  // Séance tenue : au moins 80 % du temps prévu couru dans la zone visée ou plus vite, et 90 % de la durée faite.
-  const compared = data.filter((d, n) => (n / samples) * total <= Math.min(planned, realTotal) && d.values.actual !== undefined)
-  const hit = compared.filter((d) => (d.values.actual ?? 0) >= d.values.zone - 0.5).length
-  const met = withActual && realTotal >= planned * 0.9 && compared.length > 0 && hit / compared.length >= 0.8
-  // Précision vs le plan (0–100) : à chaque instant, écart entre la zone courue et la zone visée (tolérance de ±45 s pour
-  // un léger décalage des répétitions) ; plein crédit dans la zone, zéro à 1,5 zone d'écart. Pondéré par la durée faite.
-  const slack = Math.round((45 / total) * samples)
-  const scores = compared.map((d) => {
-    const n = Number(d.key)
-    let err = Infinity
-    for (let k = Math.max(0, n - slack); k <= Math.min(samples, n + slack); k++) err = Math.min(err, Math.abs((d.values.actual ?? 0) - data[k].values.zone))
-    return Math.max(0, Math.min(1, 1.5 - err))
-  })
-  const accuracy = withActual && scores.length ? Math.round((scores.reduce((a, x) => a + x, 0) / scores.length) * Math.min(1, realTotal / planned) * 100) : null
-  const series = withActual ? [...SERIES, { key: 'actual', label: met ? 'Actual · on target' : 'Actual · off target', area: false, color: met ? ACTUAL_COLOR.good : ACTUAL_COLOR.off }] : SERIES
+  // Précision vs le plan (0–100), étape par étape : zone médiane courue au cœur de chaque étape (15 % retirés à chaque
+  // bout, la courbe lissée y fait la transition), comparée à la zone visée. Une répétition plus rapide que prévu ou une
+  // récup plus lente (marche, arrêt) ne coûtent rien ; crédit dégressif au-delà, zéro à 1 zone hors cible.
+  // Le décalage global entre la sortie et le plan (échauffement plus long…) est recalé jusqu'à ±90 s ; pondéré par la durée.
+  const actualAt = (t: number) => (t < 0 || t > realTotal ? undefined : data[Math.min(samples, Math.round((t / total) * samples))].values.actual)
+  const stepScore = (st: (typeof steps)[number], from: number, offset: number) => {
+    const core = st.seconds * 0.15
+    const vals: number[] = []
+    for (let t = from + core; t <= from + st.seconds - core; t += Math.max(1, total / samples)) {
+      const v = actualAt(t + offset)
+      if (v !== undefined) vals.push(v)
+    }
+    if (!vals.length) return 0
+    const med = vals.sort((x, y) => x - y)[Math.floor(vals.length / 2)]
+    const hard = st.kind === 'work' && st.zone >= 3
+    const miss = hard ? Math.max(0, st.zone - 0.5 - med, med - (st.zone + 1.5)) : Math.max(0, med - (st.zone + 0.5))
+    return Math.max(0, 1 - miss)
+  }
+  // Les répétitions comptent double : c'est le cœur de la séance.
+  const weight = (st: (typeof steps)[number]) => st.seconds * (st.kind === 'work' && st.zone >= 3 ? 2 : 1)
+  const totalWeight = steps.reduce((a, st) => a + weight(st), 0)
+  const scoreWith = (offset: number) => {
+    let from = 0
+    let got = 0
+    for (const st of steps) {
+      got += stepScore(st, from, offset) * weight(st)
+      from += st.seconds
+    }
+    return got / totalWeight
+  }
+  let best = 0
+  if (withActual) for (let off = -90; off <= 90; off += 5) best = Math.max(best, scoreWith(off))
+  const accuracy = withActual ? Math.round(best * 100) : null
+  const onTarget = accuracy !== null && accuracy >= 80
+  const series = withActual ? [...SERIES, { key: 'actual', label: onTarget ? 'Actual · on target' : 'Actual · off target', area: false, color: onTarget ? ACTUAL_COLOR.good : ACTUAL_COLOR.off }] : SERIES
   return (
     <div className={className}>
       {accuracy !== null && (
