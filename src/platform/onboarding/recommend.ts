@@ -80,3 +80,39 @@ export function formatMinutes(min: number) {
   const m = min % 60
   return h ? `${h} h${m ? ` ${String(m).padStart(2, '0')}` : ''}` : `${m} min`
 }
+
+/** Ce qu'offre le terrain autour du coureur pour travailler le dénivelé. */
+export type TerrainAccess = 'hills' | 'mountain' | 'stairs' | 'treadmill' | 'flat'
+
+export type GainInput = {
+  raceKm: number
+  raceGain: number
+  /** D+ hebdomadaire actuel (m). */
+  currentGain: number
+  daysToRace: number | null
+  level?: string
+  access: TerrainAccess[]
+  /** Volume de pointe recommandé (km/semaine), pour garder une densité de D+ réaliste. */
+  peakKm: number
+}
+
+/**
+ * D+ hebdomadaire de pointe recommandé en trail : le volume compte autant que le dénivelé.
+ * Repère : la semaine la plus chargée approche le D+ de la course sur un format court, puis une part décroissante
+ * avec la longueur (75 % jusqu'à 100 km, 60 % au-delà), corrigée par le niveau. Densité plafonnée à 1,3 fois celle
+ * de la course, progression ≤ +10 % par semaine depuis le D+ actuel, et plafond selon le terrain disponible
+ * (sans relief proche, escaliers et tapis incliné ne remplacent pas une montagne).
+ */
+export function recommendGain(i: GainInput) {
+  const share = i.raceKm <= 30 ? 1.2 : i.raceKm <= 60 ? 1 : i.raceKm <= 100 ? 0.75 : 0.6
+  let peak = i.raceGain * share * (LEVEL_FACTOR[i.level ?? 'intermediaire'] ?? 1)
+  peak = Math.min(peak, i.peakKm * (i.raceGain / Math.max(1, i.raceKm)) * 1.3, 6000)
+  if (i.daysToRace !== null) {
+    const start = Math.max(i.currentGain, 200)
+    peak = Math.min(peak, start * Math.pow(1.1, Math.max(0, Math.floor(i.daysToRace / 7) - 2)))
+  }
+  const outdoors = i.access.includes('mountain') || i.access.includes('hills')
+  const indoor = i.access.includes('stairs') || i.access.includes('treadmill')
+  if (!outdoors) peak = Math.min(peak, indoor ? 2000 : 1000)
+  return Math.max(Math.round(peak / 100) * 100, Math.round(i.currentGain / 100) * 100)
+}

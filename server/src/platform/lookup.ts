@@ -168,7 +168,16 @@ lookupRoutes.post('/web-profile', async (c) => {
 // ---------- Courses ----------
 
 type UtmbRaces = {
-  races: { id: number; name: string; startDate: string; startLocation: string; details?: { statsUp?: { name: string; value: number | string }[] } }[]
+  races: { id: number; name: string; startDate: string; startLocation: string; slug?: string | null; details?: { statsUp?: { name: string; value: number | string }[] } }[]
+}
+
+const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+
+/** « 27 août 2027 » (dates de l'API UTMB en lang=fr) → « 2027-08-27 », null si illisible. */
+export function frenchDate(text: string | null | undefined) {
+  const m = text?.trim().toLowerCase().match(/^(\d{1,2})\s+(\S+)\s+(\d{4})$/)
+  const month = m ? MONTHS_FR.indexOf(m[2]) : -1
+  return m && month >= 0 ? `${m[3]}-${String(month + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}` : null
 }
 
 /** Tranches de distance du filtre : route en catégories classiques, trail par longueur. */
@@ -183,7 +192,7 @@ const DIST: Record<string, (km: number) => boolean> = {
   ultra: (km) => km >= 100,
 }
 
-type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb' }
+type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb'; url?: string | null }
 
 lookupRoutes.get('/races', async (c) => {
   if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
@@ -213,7 +222,8 @@ lookupRoutes.get('/races', async (c) => {
       utmb = data.races
         .map((r) => {
           const stat = (n: string) => Number(r.details?.statsUp?.find((s) => s.name === n)?.value ?? 0)
-          return { id: `utmb:${r.id}`, name: r.name, detail: `${stat('distance')} km · ${stat('elevationGain')} m D+ · ${r.startLocation}`, km: stat('distance'), elevation: stat('elevationGain'), date: r.startDate, source: 'utmb' as const }
+          const detail = [`${stat('distance')} km`, `${stat('elevationGain')} m D+`, r.startLocation].filter(Boolean).join(' · ')
+          return { id: `utmb:${r.id}`, name: r.name, detail, km: stat('distance'), elevation: stat('elevationGain'), date: frenchDate(r.startDate), source: 'utmb' as const, url: r.slug ?? null }
         })
         // L'API UTMB ne filtre pas toujours sur le nom : on le fait ici.
         .filter((r) => !q || normalize(`${r.name} ${r.detail}`).includes(q))
@@ -222,6 +232,58 @@ lookupRoutes.get('/races', async (c) => {
     }
   }
   return c.json([...known, ...utmb].filter((r) => inDist(r.km)).slice(0, 30))
+})
+
+/** Page de course UTMB (https://<événement>.utmb.world/…) et liens des GPX officiels qu'elle publie. */
+const UTMB_PAGE = /^https:\/\/[a-z0-9-]+\.utmb\.world(\/|$)/i
+const UTMB_GPX = /https:\/\/pdf\.utmb\.world\/[^"'\s<>]+?\.gpx/gi
+const GPX_MAX = 8 * 1024 * 1024
+
+/**
+ * Pages où chercher le GPX : la recherche UTMB donne souvent la page de l'événement (montblanc.utmb.world) et non
+ * celle de la course ; on essaie alors /races/<code>, le code étant la fin du nom (« HOKA UTMB Mont-Blanc - CCC »).
+ */
+function gpxPages(url: string, name: string) {
+  const u = new URL(url)
+  const code = name.split(' - ').pop()?.trim().replace(/\s+/g, '') ?? ''
+  const pages = u.pathname.includes('/races/') ? [url] : []
+  if (code) pages.push(`${u.origin}/races/${encodeURIComponent(code)}`)
+  pages.push(url)
+  return { pages: [...new Set(pages)], code: code.toLowerCase() }
+}
+
+/**
+ * GPX officiel d'une course UTMB, lu sur sa page publique (toutes les courses n'en publient pas : 404 alors).
+ * Sur une page qui en liste plusieurs, on prend celui dont le nom de fichier contient le code de la course.
+ * Renvoyé brut : le navigateur l'analyse comme un GPX déposé par le coureur.
+ */
+lookupRoutes.get('/utmb/race-gpx', async (c) => {
+  if (limited(c)) return c.json({ error: 'Too many searches, wait a minute.' }, 429)
+  const url = c.req.query('url') ?? ''
+  const name = (c.req.query('name') ?? '').slice(0, 200)
+  if (!UTMB_PAGE.test(url)) return c.json({ error: 'Invalid race page' }, 400)
+  try {
+    const gpx = await cached(`utmb:gpx:${url}|${name}`, async () => {
+      const { pages, code } = gpxPages(url, name)
+      for (const pageUrl of pages) {
+        const page = await fetch(pageUrl, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(15_000) })
+        if (!page.ok) continue
+        const links = [...new Set((await page.text()).match(UTMB_GPX) ?? [])]
+        const file = (l: string) => decodeURIComponent(l.split('/').pop() ?? '').toLowerCase()
+        const link = links.length === 1 && pageUrl.includes('/races/') ? links[0] : links.find((l) => code && file(l).startsWith(code))
+        if (!link) continue
+        const res = await fetch(link, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(20_000) })
+        if (!res.ok || Number(res.headers.get('content-length') ?? 0) > GPX_MAX) continue
+        const text = await res.text()
+        if (text.length <= GPX_MAX && text.includes('<gpx')) return text
+      }
+      return null
+    })
+    if (!gpx) return c.json({ error: 'No official GPX for this race.' }, 404)
+    return c.body(gpx, 200, { 'content-type': 'application/gpx+xml; charset=utf-8', 'cache-control': 'private, max-age=86400' })
+  } catch {
+    return c.json({ error: 'UTMB is unavailable right now.' }, 502)
+  }
 })
 
 // ---------- Chaussures ----------

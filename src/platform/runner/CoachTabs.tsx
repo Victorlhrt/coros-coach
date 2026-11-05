@@ -490,7 +490,7 @@ export function PlanTab() {
 
         <WeekPicker
           title={`Week ${week.number} · ${formatDay(days[0], { day: 'numeric', month: 'short' })} – ${formatDay(days[6], { day: 'numeric', month: 'short' })}`}
-          subtitle={`${PHASE_LABEL[week.phase]} · ${formatDistance(volumes[week.number - 1], units, 0)} planned · ${week.sessions.length} session${week.sessions.length > 1 ? 's' : ''}`}
+          subtitle={`${PHASE_LABEL[week.phase]} · ${formatDistance(volumes[week.number - 1], units, 0)}${week.targetGain ? ` · ${week.targetGain.toLocaleString('en-GB')} m D+` : ''} planned · ${week.sessions.length} session${week.sessions.length > 1 ? 's' : ''}`}
           actions={
             <>
               <Button variant="outline" size="icon" aria-label="Previous week" disabled={week.number <= 1} onClick={() => goWeek(week.number - 1)}>

@@ -1,7 +1,9 @@
 // Tests hors ligne des règles du coach : volume, liaison automatique, records.
 import './node-env'
 import { addDays, today } from '../src/lib/coach/dates'
-import { checkLongRuns, checkVolumes, checkWeekTotals } from '../src/lib/coach/generate'
+import { checkGains, checkLongRuns, checkVolumes, checkWeekGain, checkWeekTotals } from '../src/lib/coach/generate'
+import { courseShape } from '../src/lib/coach/course-shape'
+import { analyzePoints } from '../src/lib/coach/gpx'
 import { autoLinks } from '../src/lib/coach/links'
 import { fixLongRuns } from '../src/lib/coach/longrun'
 import { sessionTotals } from '../src/lib/coach/metrics'
@@ -80,5 +82,21 @@ const merged = mergeRecords(
 )
 expect(merged.find((r) => r.key === '10k')?.source === 'manual', 'record saisi conservé')
 expect(merged.find((r) => r.key === '5k')?.seconds === 1320, 'record COROS remplacé par la fenêtre de 12 mois')
+
+// Trail : forme du parcours (D+ par tiers) et contrôles du D+ hebdomadaire.
+const climbFirst = analyzePoints(
+  'trail',
+  Array.from({ length: 1501 }, (_, i) => {
+    const km = i / 50
+    // 600 m de montée sur les 5 premiers km, puis plat, puis 150 m sur les 3 derniers.
+    const ele = 500 + Math.min(km, 5) * 120 + Math.max(0, km - 27) * 50
+    return { lat: 45 + (i * 20) / 111_195, lon: 6, ele }
+  }),
+)
+const shape = courseShape(climbFirst)
+expect(shape.focus === 'start' && shape.gainThirds[0] >= 70, `D+ concentré au début (${shape.gainThirds})`)
+expect(checkGains([{ number: 1, phase: 'base', focus: '', targetKm: 40, longRunKm: 15, targetGain: 1300 }, { number: 2, phase: 'base', focus: '', targetKm: 44, longRunKm: 16, targetGain: 1450 }], 1200).length === 0, 'progression de D+ raisonnable acceptée')
+expect(checkGains([{ number: 1, phase: 'base', focus: '', targetKm: 40, longRunKm: 15, targetGain: 2000 }], 1200).length === 1, 'D+ de départ trop haut refusé')
+expect(checkWeekGain({ number: 2, targetGain: 1500 } as Week, [{ ...run(d, 10), elevationGain: 300 }, { ...run(d, 20), elevationGain: 600 }]).length === 1, 'D+ des séances trop bas refusé')
 
 console.log(fails.length ? `ÉCHEC :\n${fails.join('\n')}` : 'OK')

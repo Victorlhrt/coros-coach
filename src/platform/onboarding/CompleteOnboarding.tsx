@@ -49,7 +49,10 @@ import { CodeStep } from './CodeStep'
 import { readStravaExport, type StravaSummary } from './strava'
 import { InsightTiles, hasInsights, watchName, watchPerformances, type WatchInsights } from './WatchInsights'
 import { distanceCategory, formatDuration, formatPace, parseDuration, predict, type Performance } from './estimate'
-import { formatMinutes, recommendVolume, reducedOptions, type Recommendation } from './recommend'
+import { formatMinutes, recommendGain, recommendVolume, reducedOptions, type Recommendation, type TerrainAccess } from './recommend'
+import { ElevationChart } from '@/components/ElevationChart'
+import { courseShape, shapeSummary } from '@/lib/coach/course-shape'
+import { analyzeGpx, type CourseProfile } from '@/lib/coach/gpx'
 
 /**
  * Parcours « Complet » (version de test) : motivation, montre, identité et profil UTMB, objectif et course,
@@ -64,6 +67,8 @@ type Race = {
   elevation: number
   date: string | null
   source: 'raice' | 'utmb' | 'saisie'
+  /** Page de la course sur UTMB (son GPX officiel y est souvent publié). */
+  url?: string | null
 }
 type UtmbRunner = {
   uri: string
@@ -143,13 +148,20 @@ export type CompleteAnswers = {
   weekly_km?: number
   /** Volume de pointe visé par le plan (km/semaine) : le recommandé, ou celui que permet le temps donné. */
   target_weekly_km?: number
+  /** Trail : D+ hebdomadaire de pointe visé (m). */
+  target_weekly_gain?: number
+  utmb_index?: number | null
   strava?: StravaSummary | null
   about?: { sex: string | null; birthYear: number | null }
   experience?: string
   schedule?: { days: string[]; longDay: string | null }
   session_max?: string
+  /** Profil de la course de trail (GPX officiel UTMB ou déposé par le coureur), null : pas de GPX. */
+  course?: CourseProfile | null
+  /** Trail : relief disponible autour du coureur et D+ qu'il fait aujourd'hui par semaine. */
+  terrain_access?: { access: TerrainAccess[]; currentGain: number }
   /** Volume recommandé (étape Recommendation) et choix du coureur ; `weeklyMinutes` seulement s'il a réduit. */
-  volume_plan?: { peakKm: number; recommendedMinutes: number; easyPace: number; choice: 'accept' | 'reduce'; weeklyMinutes?: number }
+  volume_plan?: { peakKm: number; recommendedMinutes: number; easyPace: number; choice: 'accept' | 'reduce'; weeklyMinutes?: number; peakGain?: number }
   days?: string[]
   level?: string
   strava_need?: string
@@ -173,11 +185,13 @@ const STEPS = [
   { id: 'experience', label: 'Experience' },
   { id: 'goal', label: 'Goal' },
   { id: 'target', label: 'Race' },
+  { id: 'course', label: 'Course profile' },
   { id: 'estimate', label: 'Estimate' },
   { id: 'volume', label: 'Volume' },
   { id: 'pains', label: 'Pain' },
   { id: 'events', label: 'Recent' },
   { id: 'days', label: 'Availability' },
+  { id: 'terrain', label: 'Terrain' },
   { id: 'recommend', label: 'Recommendation' },
   { id: 'duration', label: 'Weekly time' },
   { id: 'gear', label: 'Gear' },
@@ -324,6 +338,16 @@ const DURATIONS = [
   { value: '60', label: '1 h' },
   { value: '90', label: '1 h 30 or more' },
 ]
+/** Relief disponible autour du coureur (étape Terrain). */
+const TERRAIN_OPTIONS: { value: TerrainAccess; label: string; description: string }[] = [
+  { value: 'mountain', label: 'Mountains', description: 'Within an hour, for long climbs.' },
+  { value: 'hills', label: 'Hills', description: 'Climbs of 50 m or more nearby.' },
+  { value: 'stairs', label: 'Stairs or steep streets', description: 'Stadium steps, towers, steep lanes.' },
+  { value: 'treadmill', label: 'Incline treadmill', description: 'At home or at the gym.' },
+  { value: 'flat', label: 'Mostly flat', description: 'Nothing much to climb.' },
+]
+const FOCUS_LABEL = { start: 'climbing up front', middle: 'climbing mid-race', end: 'climbing late', even: 'climbing all along' }
+
 /** Villes proposées d'office ; « Other » ouvre une saisie libre. */
 const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille', 'Toulouse', 'Nantes', 'Annecy', 'Chamonix', 'Grenoble']
 const OTHER_CITY = '__other'
@@ -365,6 +389,7 @@ function flowFor(a: CompleteAnswers, gated: boolean) {
   return STEPS.filter((s) => {
     if (s.id === 'code') return gated
     if (s.id === 'target') return a.goal?.type !== 'train'
+    if (s.id === 'course' || s.id === 'terrain') return isTrail(a)
     if (s.id === 'wearables') return a.has_watch === 'yes'
     if (s.id === 'connect') return a.has_watch === 'yes' && (a.wearables ?? []).some((w) => w === 'coros' || w === 'garmin')
     if (s.id === 'nowatch') return a.has_watch === 'no'
@@ -466,6 +491,8 @@ export function CompleteOnboarding({
     experience: !!a.experience,
     days: (a.schedule?.days.length ?? 0) > 0,
     recommend: true,
+    course: true,
+    terrain: (a.terrain_access?.access.length ?? 0) > 0,
     duration: !!a.volume_plan?.weeklyMinutes,
     goal: !!a.goal?.type,
     target: !!a.goal?.race && (a.goal.type !== 'race' || !!a.goal.date),
@@ -626,7 +653,7 @@ export function CompleteOnboarding({
           />
         ) : (
           <>
-            {NOTHING[step.id] && (
+            {NOTHING[step.id] && !(step.id === 'course' && a.course) && (
               <div className="flex animate-[fade-in_300ms_ease-out] justify-end">
                 <button
                   type="button"
@@ -656,6 +683,8 @@ export function CompleteOnboarding({
               {step.id === 'estimate' && <EstimateStep answers={a} patch={patch} />}
               {step.id === 'volume' && <VolumeStep answers={a} patch={patch} />}
               {step.id === 'pains' && <PainsStep answers={a} patch={patch} />}
+              {step.id === 'course' && <CourseStep answers={a} patch={patch} />}
+              {step.id === 'terrain' && <TerrainStep answers={a} patch={patch} />}
               {step.id === 'events' && <EventsStep answers={a} patch={patch} />}
               {step.id === 'gear' && <GearStep answers={a} patch={patch} />}
               {error && (
@@ -859,14 +888,42 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
       const r = recommendationFor(a)
       const current = a.health?.weeklyKm ?? 0
       const goal = a.estimate?.target ? `run ${formatDuration(a.estimate.target)}` : a.goal?.race ? 'reach your goal' : 'keep improving'
+      const gain = gainFor(a, r.peakKm)
+      const intro = isTrail(a)
+        ? a.terrain_access?.access.some((x) => x === 'mountain' || x === 'hills')
+          ? 'Good terrain to work with, we’ll use it.'
+          : 'No big hills nearby: we’ll get the climbing from stairs, the treadmill and a few weekend trips.'
+        : n >= 5
+          ? `${n} days a week, that’s motivation!`
+          : n >= 3
+            ? `${n} days is perfect for making progress.`
+            : 'Few days but well used, that works really well.'
+      if (gain !== undefined)
+        return [
+          intro,
+          `Here’s what I’d recommend for your level, so you ${goal}: build up to ${r.peakKm} km and ${gain.toLocaleString('en-GB')} m of climbing a week at the peak, instead of ${current} km now. About ${formatMinutes(r.weeklyMinutes)} of running a week.`,
+          'In trail, the climbing matters as much as the distance. That’s what gives you the best shot. Does it work for you?',
+        ]
       return [
-        n >= 5 ? `${n} days a week, that’s motivation!` : n >= 3 ? `${n} days is perfect for making progress.` : 'Few days but well used, that works really well.',
+        intro,
         r.peakKm > current
           ? `Here’s what I’d recommend for your level, so you improve and ${goal}: build up to ${r.peakKm} km a week instead of ${current} km now. That’s about ${formatMinutes(r.weeklyMinutes)} of running a week at the peak.`
           : `Here’s what I’d recommend for your level, so you ${goal}: keep around ${r.peakKm} km a week (about ${formatMinutes(r.weeklyMinutes)} of running), with more structure.`,
         'That’s the volume that gives you the best shot. Does it work for you?',
       ]
     }
+    case 'course': {
+      const r = a.goal?.race
+      return [
+        a.utmb?.index ? `${r?.name ?? 'Great race'}. With a UTMB index of ${a.utmb.index}, I know where you stand.` : `${r?.name ?? 'Great race'}, nice challenge.`,
+        'Let’s look at the course profile: where the climbing sits changes how we train. I’m fetching the official GPX, or you can drop yours.',
+      ]
+    }
+    case 'terrain':
+      return [
+        'Noted.',
+        `What do you have around ${a.city?.trim() || 'you'} to train the climbing? Pick everything that applies, and tell me how much you climb in a typical week now.`,
+      ]
     case 'duration':
       return [
         'Understood.',
@@ -875,7 +932,7 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
     case 'gear':
       return [
         a.volume_plan?.choice === 'accept'
-          ? `Deal, we build up to ${a.volume_plan.peakKm} km a week.`
+          ? `Deal, we build up to ${a.volume_plan.peakKm} km${a.volume_plan.peakGain ? ` and ${a.volume_plan.peakGain.toLocaleString('en-GB')} m of climbing` : ''} a week.`
           : a.volume_plan?.weeklyMinutes
             ? `Noted, I’ll fit your plan in ${formatMinutes(a.volume_plan.weeklyMinutes)} a week, around ${plannedKm(a)} km at the peak.`
             : 'Noted, I’ll fit your sessions around that.',
@@ -928,7 +985,15 @@ function summarize(step: string, a: CompleteAnswers): string {
         : '—'
     }
     case 'recommend':
-      return a.volume_plan?.choice === 'reduce' ? 'I’d like to run less' : `Works for me · ${a.volume_plan?.peakKm ?? '—'} km a week`
+      return a.volume_plan?.choice === 'reduce'
+        ? 'I’d like to run less'
+        : `Works for me · ${a.volume_plan?.peakKm ?? '—'} km${a.volume_plan?.peakGain ? ` · ${a.volume_plan.peakGain.toLocaleString('en-GB')} m D+` : ''} a week`
+    case 'course':
+      return a.course ? `${a.course.distanceKm} km · ${a.course.gain.toLocaleString('en-GB')} m D+ · ${FOCUS_LABEL[courseShape(a.course).focus]}` : 'No GPX, go with the numbers'
+    case 'terrain': {
+      const t = a.terrain_access
+      return t ? `${t.access.map((x) => TERRAIN_OPTIONS.find((o) => o.value === x)?.label ?? x).join(', ')} · ${t.currentGain} m D+ a week now` : '—'
+    }
     case 'duration':
       return a.volume_plan?.weeklyMinutes ? `${formatMinutes(a.volume_plan.weeklyMinutes)} a week` : `${DURATIONS.find((x) => x.value === a.session_max)?.label ?? '—'} per session`
     case 'goal':
@@ -966,6 +1031,8 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
     race_date: a.goal?.date ?? null,
     weekly_km: a.health?.weeklyKm,
     target_weekly_km: plannedKm(a),
+    target_weekly_gain: plannedGain(a),
+    utmb_index: a.utmb?.index ?? null,
     days: a.schedule?.days ?? a.days,
     level: EXPERIENCES.find((e) => e.value === a.experience)?.level ?? a.level,
     city: a.city?.trim() || undefined,
@@ -1644,10 +1711,10 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
   const [page, setPage] = useState({ key: '', n: RACES_PAGE })
   const pageKey = `${dist}|${query}`
   const shown = page.key === pageKey ? page.n : RACES_PAGE
-  // Le trail est fermé pour l'instant : recherche sur route uniquement.
+  const terrain = goal.terrain ?? 'road'
   const races = useQuery({
-    queryKey: ['races', 'road', dist, query],
-    queryFn: () => api<Race[]>(`/lookup/races?type=road&dist=${dist}&q=${encodeURIComponent(query)}`),
+    queryKey: ['races', terrain, dist, query],
+    queryFn: () => api<Race[]>(`/lookup/races?type=${terrain}&dist=${dist}&q=${encodeURIComponent(query)}`),
     enabled: goal.type === 'race',
     staleTime: 600_000,
   })
@@ -1689,8 +1756,22 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
     <div className="flex flex-col gap-4">
       {!custom ? (
         <>
-          <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS.road} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
-          <SearchField label="Search for a race" placeholder="E.g. Paris Marathon" value={q} onValueChange={setQ} />
+          <ChipGroup
+            label="Type"
+            multiple={false}
+            options={[
+              { value: 'road', label: 'Road' },
+              { value: 'trail', label: 'Trail' },
+            ]}
+            value={[terrain]}
+            onValueChange={([v]) => {
+              if (!v || v === terrain) return
+              setDist('')
+              patch({ goal: { ...goal, terrain: v as 'road' | 'trail', race: null }, course: undefined })
+            }}
+          />
+          <ChipGroup label="Distance" multiple={false} options={DIST_FILTERS[terrain]} value={dist ? [dist] : []} onValueChange={([v]) => setDist(v ?? '')} />
+          <SearchField label="Search for a race" placeholder={terrain === 'trail' ? 'E.g. CCC, Maxi-Race, SaintéLyon' : 'E.g. Paris Marathon'} value={q} onValueChange={setQ} />
           {list.length > 0 ? (
             <div className="flex flex-col gap-2">
               <div className="relative">
@@ -1698,12 +1779,17 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
                   aria-label="Race"
                   layout="list"
                   value={goal.race?.id ?? null}
-                  onValueChange={(id) => set({ race: list.find((r) => r.id === id) ?? null })}
+                  onValueChange={(id) => {
+                    const race = list.find((r) => r.id === id) ?? null
+                    // Date connue (UTMB) et future : elle remplit la date de course.
+                    const date = race?.date && /^\d{4}-\d{2}-\d{2}$/.test(race.date) && race.date > new Date().toISOString().slice(0, 10) ? race.date : goal.date
+                    patch({ goal: { ...goal, race, date }, course: undefined })
+                  }}
                   options={list.slice(0, shown).map((r) => ({
                     value: r.id,
                     label: r.name,
                     description: r.detail,
-                    meta: r.date ? <span className="text-muted-foreground text-xs">{r.date}</span> : undefined,
+                    meta: r.date ? <span className="text-muted-foreground text-xs">{/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? new Date(`${r.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : r.date}</span> : undefined,
                   }))}
                 />
                 {more && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card to-transparent" />}
@@ -1783,6 +1869,7 @@ function TargetStep({ answers, patch }: { answers: CompleteAnswers; patch: (p: P
 /** Réponse « rien à signaler », envoyée d'un clic sans remplir le formulaire. */
 const NOTHING: Record<string, { label: string; answer: (a: CompleteAnswers) => Partial<CompleteAnswers> }> = {
   pains: { label: 'No issues', answer: (a) => ({ health: { ...defaultHealth(a), pains: [], painLevel: 0 } }) },
+  course: { label: 'I don’t have the GPX', answer: () => ({ course: null }) },
   events: { label: 'Nothing in particular', answer: (a) => ({ health: { ...defaultHealth(a), events: [], notes: '' } }) },
 }
 
@@ -1826,7 +1913,7 @@ const QUICK: Record<
     ],
     answer: (choice, a) => {
       const r = recommendationFor(a)
-      return { volume_plan: { peakKm: r.peakKm, recommendedMinutes: r.weeklyMinutes, easyPace: r.easyPace, choice: choice as 'accept' | 'reduce' } }
+      return { volume_plan: { peakKm: r.peakKm, recommendedMinutes: r.weeklyMinutes, easyPace: r.easyPace, choice: choice as 'accept' | 'reduce', peakGain: gainFor(a, r.peakKm) } }
     },
   },
   duration: {
@@ -1846,8 +1933,8 @@ function recommendationFor(a: CompleteAnswers): Recommendation {
   const date = a.goal?.date ?? race?.date ?? null
   return recommendVolume({
     currentKm: a.health?.weeklyKm ?? 20,
-    raceKm: race?.km ?? null,
-    elevation: race?.elevation ?? 0,
+    raceKm: a.course?.distanceKm ?? race?.km ?? null,
+    elevation: a.course?.gain ?? race?.elevation ?? 0,
     daysToRace: date ? Math.round((Date.parse(`${date}T12:00:00`) - Date.now()) / 86_400_000) : null,
     level: EXPERIENCES.find((e) => e.value === a.experience)?.level,
     target: a.estimate?.target ?? null,
@@ -1856,11 +1943,158 @@ function recommendationFor(a: CompleteAnswers): Recommendation {
   })
 }
 
+/** D+ visé : le recommandé, réduit dans la même proportion que le volume si le coureur a réduit. */
+function plannedGain(a: CompleteAnswers) {
+  const v = a.volume_plan
+  if (!v?.peakGain) return undefined
+  const km = plannedKm(a)
+  return km && km < v.peakKm ? Math.round((v.peakGain * km) / v.peakKm / 100) * 100 : v.peakGain
+}
+
+/** Objectif trail : course choisie en trail, ou parcours avec plus de 15 m D+ par km. */
+function isTrail(a: CompleteAnswers) {
+  const r = a.goal?.race
+  return a.goal?.type === 'race' && (a.goal.terrain === 'trail' || (!!r && r.km > 0 && r.elevation / r.km > 15))
+}
+
+/** D+ hebdomadaire de pointe recommandé (trail seulement). */
+function gainFor(a: CompleteAnswers, peakKm: number): number | undefined {
+  const r = a.goal?.race
+  if (!isTrail(a) || !r) return undefined
+  const date = a.goal?.date ?? r.date ?? null
+  return recommendGain({
+    raceKm: a.course?.distanceKm ?? r.km,
+    raceGain: a.course?.gain ?? r.elevation,
+    currentGain: a.terrain_access?.currentGain ?? 0,
+    daysToRace: date ? Math.round((Date.parse(`${date}T12:00:00`) - Date.now()) / 86_400_000) : null,
+    level: EXPERIENCES.find((e) => e.value === a.experience)?.level,
+    access: a.terrain_access?.access ?? [],
+    peakKm,
+  })
+}
+
 /** Volume visé par le plan : le recommandé, ou ce que permet le temps donné à allure d'endurance. */
 function plannedKm(a: CompleteAnswers) {
   const v = a.volume_plan
   if (!v) return undefined
   return v.choice === 'reduce' && v.weeklyMinutes ? Math.max(a.health?.weeklyKm ?? 0, Math.round((v.weeklyMinutes * 60) / v.easyPace)) : v.peakKm
+}
+
+// ---------- Trail : profil de la course et terrain ----------
+
+/** GPX officiel de la course UTMB (si sa page en publie un) ou GPX déposé, analysé dans le navigateur. */
+function CourseStep({ answers, patch }: StepProps) {
+  const race = answers.goal?.race
+  const course = answers.course
+  const [error, setError] = useState('')
+  const official = useQuery({
+    queryKey: ['utmb', 'gpx', race?.url],
+    queryFn: async () => {
+      const res = await fetch(`/api/platform/lookup/utmb/race-gpx?url=${encodeURIComponent(race!.url!)}&name=${encodeURIComponent(race!.name)}`)
+      if (!res.ok) return null
+      return analyzeGpx(await res.text())
+    },
+    enabled: !!race?.url && !course,
+    staleTime: Infinity,
+    retry: false,
+  })
+  useEffect(() => {
+    if (official.data && !course) patch({ course: { ...official.data, name: race?.name ?? official.data.name } })
+  }, [official.data]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const shape = course ? courseShape(course) : null
+  return (
+    <div className="flex flex-col gap-4">
+      {course && shape ? (
+        <>
+          <div className="grid grid-cols-3 gap-2 rounded-[20px] border bg-background p-4 text-center">
+            <div>
+              <p className="font-semibold text-xl tabular-nums">{course.distanceKm} km</p>
+              <p className="text-muted-foreground text-xs">distance</p>
+            </div>
+            <div>
+              <p className="font-semibold text-xl tabular-nums">{course.gain.toLocaleString('en-GB')} m</p>
+              <p className="text-muted-foreground text-xs">climbing</p>
+            </div>
+            <div>
+              <p className="font-semibold text-xl tabular-nums">{course.maxEle.toLocaleString('en-GB')} m</p>
+              <p className="text-muted-foreground text-xs">highest point</p>
+            </div>
+          </div>
+          <ElevationChart course={course} />
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            {(['Start', 'Middle', 'End'] as const).map((label, i) => (
+              <div key={label} className={`rounded-[14px] border p-2 ${shape.focus === ['start', 'middle', 'end'][i] ? 'border-primary' : ''}`}>
+                <p className="font-medium text-base tabular-nums">{shape.gainThirds[i]}%</p>
+                <p className="text-muted-foreground">of the climbing · {label.toLowerCase()}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-sm">{shapeSummary(shape)}</p>
+          <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => patch({ course: undefined })}>
+            Use another GPX
+          </Button>
+        </>
+      ) : official.isFetching ? (
+        <div className="rounded-[20px] border bg-background p-4">
+          <TextShimmer>Fetching the official GPX from UTMB…</TextShimmer>
+        </div>
+      ) : (
+        <>
+          {race?.url && official.isFetched && <p className="text-muted-foreground text-sm">UTMB doesn’t publish a GPX for this race. Drop yours: race websites usually offer it.</p>}
+          <FileDropzone
+            accept=".gpx,application/gpx+xml"
+            multiple={false}
+            maxFiles={1}
+            label="Drop the race GPX"
+            description="or choose the file on your device"
+            dropLabel="Drop the GPX here"
+            note="Read in your browser"
+            onUpload={async (item, { onProgress }) => {
+              if (!item.file) throw new Error('File not found')
+              setError('')
+              try {
+                const c = analyzeGpx(await item.file.text())
+                onProgress(100)
+                patch({ course: { ...c, name: race?.name ?? c.name } })
+              } catch (e) {
+                setError(e instanceof Error ? e.message : String(e))
+                throw e
+              }
+            }}
+          />
+          {error && <p className="text-destructive text-sm">{error}</p>}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Relief autour du coureur et D+ actuel : ils décident d'où viendra le dénivelé du plan. */
+function TerrainStep({ answers, patch }: StepProps) {
+  const t = answers.terrain_access ?? { access: [], currentGain: 0 }
+  const set = (p: Partial<typeof t>) => patch({ terrain_access: { ...t, ...p } })
+  const toggle = (v: TerrainAccess, on: boolean) => {
+    // « Mostly flat » exclut le reste, et inversement.
+    const rest = t.access.filter((x) => x !== v && (v === 'flat' ? false : x !== 'flat'))
+    set({ access: on ? [...rest, v] : rest })
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {TERRAIN_OPTIONS.map((o) => (
+          <label key={o.value} className={`flex cursor-pointer items-center gap-3 rounded-[20px] border bg-card p-4 ${t.access.includes(o.value) ? 'border-primary' : ''}`}>
+            <span className="flex-1 text-sm">
+              {o.label}
+              <span className="block text-muted-foreground text-xs">{o.description}</span>
+            </span>
+            <Checkbox aria-label={o.label} checked={t.access.includes(o.value)} onCheckedChange={(c) => toggle(o.value, c === true)} />
+          </label>
+        ))}
+      </div>
+      <NumberField label="Elevation you climb per week now" value={t.currentGain} min={0} max={15000} step={100} suffix=" m" locale="en-GB" onValueChange={(currentGain) => set({ currentGain })} />
+    </div>
+  )
 }
 
 // ---------- 5. Estimation ----------

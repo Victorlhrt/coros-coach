@@ -1,6 +1,7 @@
 import { DISTANCES_FR as DISTANCES, TERRAINS_FR as TERRAINS, type Goal, type Profile, type Zone } from './schema'
 import { WEEKDAYS_FR as WEEKDAYS, formatDayFr as formatDay } from './dates'
 import { formatClock, formatPace } from './format'
+import { courseShape, describeShape } from './course-shape'
 import { RECORD_DISTANCES, bestVdot, predictTime, thresholdPace, type RaceRecord } from './vdot'
 
 export const COACH_SYSTEM = `Tu es un coach de course à pied expérimenté (méthodes type Daniels, Pfitzinger, Canova adaptées au niveau).
@@ -48,7 +49,48 @@ export function describeCourse(goal: Goal) {
   return [
     `Parcours (GPX « ${c.name} ») : ${c.distanceKm} km, ${c.gain} m D+, ${c.loss} m D-, altitude ${c.minEle}–${c.maxEle} m, terrain ${TERRAINS[goal.terrain].toLowerCase()}.`,
     segments.length > 0 ? `Segments marquants :\n${segments.join('\n')}` : 'Parcours roulant, sans montée marquée.',
+    describeShape(courseShape(c)),
   ].join('\n')
+}
+
+/** Plan trail : objectif trail, ou parcours à plus de 15 m D+ par km. */
+export function isTrailGoal(goal: Goal) {
+  const km = goal.courseKm ?? goal.course?.distanceKm ?? 0
+  const gain = goal.course?.gain ?? goal.elevationGain ?? 0
+  return goal.distance === 'trail' || goal.terrain === 'trail' || (km > 0 && gain / km > 15)
+}
+
+const ACCESS_FR: Record<string, string> = {
+  mountain: 'montagne à moins d’une heure',
+  hills: 'collines proches (montées de 50 m et plus)',
+  stairs: 'escaliers ou rues raides',
+  treadmill: 'tapis de course inclinable',
+  flat: 'environnement plat',
+}
+
+/** Règles et données propres au trail : le plan travaille autant le dénivelé que le volume. */
+export function describeTrail(goal: Goal) {
+  if (!isTrailGoal(goal)) return ''
+  const access = goal.terrainAccess ?? []
+  const outdoors = access.includes('mountain') || access.includes('hills')
+  return [
+    'PLAN TRAIL : le dénivelé compte autant que le volume.',
+    '- Chaque semaine a un D+ visé (targetGain) qui progresse comme le volume : +10 % par semaine au plus, recul les semaines allégées, -40 à -60 % en affûtage. Chaque séance indique son D+ (elevationGain, 0 sur le plat) et la somme des séances d’une semaine respecte targetGain à ±20 %.',
+    '- Sorties longues en durée (target "time"), sur terrain vallonné, avec le D+ concentré là où la course le demande ; marche active en côte raide (> 15 %) comme en course, avec bâtons si la course les autorise.',
+    '- Séances spécifiques : côtes courtes en zone 5 (30 s à 2 min), côtes longues au seuil (5 à 15 min), montées continues en endurance, descentes techniques et excentriques (la descente use les quadriceps), renforcement (squats, fentes, step-ups, gainage) une fois par semaine.',
+    '- Pour les ultras (> 60 km), week-ends chargés (sortie longue le samedi + sortie moyenne le dimanche) en phase spécifique, et répétition du ravitaillement et du matériel.',
+    `- Profil de la course : adapte le plan à sa forme. D+ concentré au début → montées longues dès l’échauffement et départ prudent ; au milieu → enchaînement montée/descente sur fatigue ; à la fin → montées et descentes en fin de sortie longue, quand les jambes sont fatiguées. Longue descente finale → excentrique et descentes en fin de séance.`,
+    access.length
+      ? `- Terrain disponible : ${access.map((a) => ACCESS_FR[a] ?? a).join(', ')}. ${outdoors ? 'Utilise ce relief pour les séances de côtes et les sorties longues.' : 'Pas de relief proche : le D+ vient des escaliers, du tapis incliné (10-15 %) et de séances de côtes sur les pentes disponibles ; propose une sortie en relief le week-end toutes les 2 à 3 semaines (à indiquer dans la description).'} Écris dans la description où faire la séance (« on the treadmill at 12% », « on your local hill », « stadium stairs »).`
+      : '',
+    goal.currentWeeklyGain != null ? `D+ actuel : environ ${goal.currentWeeklyGain} m par semaine. La semaine 1 en part.` : '',
+    goal.peakWeeklyGain ? `D+ de pointe visé : ${goal.peakWeeklyGain} m par semaine, atteint avant l’affûtage.` : '',
+    goal.utmbIndex
+      ? `Index UTMB : ${goal.utmbIndex} (repères : 300-450 débutant à intermédiaire, 450-600 bon coureur, 600-750 très bon, > 750 élite). Il donne le niveau réel en trail : calibre l’intensité des côtes et l’objectif de temps avec lui.`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 export function describeGoal(goal: Goal) {
@@ -68,8 +110,9 @@ export function describeGoal(goal: Goal) {
       ? `Volume de pointe visé : ${goal.peakWeeklyKm} km/semaine (recommandé au coureur et accepté). Monte progressivement jusqu’à ce volume pour la semaine la plus chargée avant l’affûtage, sans dépasser +10 % d’une semaine à l’autre.`
       : '',
     describeCourse(goal),
+    describeTrail(goal),
   ]
-  return lines.join('\n')
+  return lines.filter(Boolean).join('\n')
 }
 
 export function describeRecords(records: RaceRecord[]) {

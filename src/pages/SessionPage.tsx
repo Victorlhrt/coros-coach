@@ -81,7 +81,11 @@ export function SessionPage() {
             <Kpi label="Duration" value={formatDuration(seconds)} />
             <Kpi label="Estimated distance" value={meters > 0 ? formatDistance(meters, units) : '—'} />
             <Kpi label={`Average pace ${paceUnit(units)}`} value={pace > 0 ? formatPace(pace, units) : '—'} />
-            <Kpi label="Intensity" value={['', 'Easy', 'Moderate', 'Hard'][INTENSITY[session.type]]} />
+            {session.elevationGain ? (
+              <Kpi label="Elevation gain" value={`${session.elevationGain.toLocaleString('en-GB')} m`} />
+            ) : (
+              <Kpi label="Intensity" value={['', 'Easy', 'Moderate', 'Hard'][INTENSITY[session.type]]} />
+            )}
           </div>
           {session.blocks.length > 0 && (
             <PanelSection divided>

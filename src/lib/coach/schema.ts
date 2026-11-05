@@ -37,6 +37,7 @@ export const SessionSchema = z.object({
   description: z.string().describe('consigne claire pour l’athlète, 1 à 3 phrases'),
   blocks: z.array(BlockSchema).describe('vide pour le renforcement'),
   strengthMinutes: z.number().int().nullable().describe('durée du renforcement, null sinon'),
+  elevationGain: z.number().int().nullable().describe('trail : D+ visé de la séance en mètres (0 sur le plat) ; null hors plan trail'),
 })
 export type SessionInput = z.infer<typeof SessionSchema>
 export type Session = SessionInput & { id: string }
@@ -51,6 +52,8 @@ export interface Week {
   focus: string
   targetKm: number
   longRunKm: number
+  /** Trail : D+ hebdomadaire visé (m). */
+  targetGain?: number
   sessions: Session[]
 }
 
@@ -92,6 +95,13 @@ export interface Goal {
   currentWeeklyKm: number | null
   /** Volume de pointe visé (km/semaine), recommandé à l'onboarding de la plateforme ; absent : au jugement du coach. */
   peakWeeklyKm?: number | null
+  /** Trail : D+ hebdomadaire actuel et de pointe visé (m). */
+  currentWeeklyGain?: number | null
+  peakWeeklyGain?: number | null
+  /** Trail : relief disponible autour du coureur (mountain, hills, stairs, treadmill, flat). */
+  terrainAccess?: string[]
+  /** Index de performance UTMB du coureur. */
+  utmbIndex?: number | null
   raceDate: string
   targetTime: number | null
   level: 'beginner' | 'intermediate' | 'advanced'
@@ -140,6 +150,7 @@ export const SkeletonSchema = z.object({
       focus: z.string().describe('objectif de la semaine en une phrase'),
       targetKm: z.number().describe('volume course visé'),
       longRunKm: z.number().describe('distance de la sortie longue, 0 si aucune'),
+      targetGain: z.number().describe('trail : D+ hebdomadaire visé en mètres ; 0 hors plan trail'),
     }),
   ),
 })

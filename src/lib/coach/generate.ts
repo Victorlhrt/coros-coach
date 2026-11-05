@@ -1,6 +1,6 @@
 import { callStructured } from './claude'
 import { WEEKDAYS_FR as WEEKDAYS, addDays, diffDays, planWeeks, today, weekday, type WeekSlot } from './dates'
-import { COACH_SYSTEM, describeGoal, describeProfile, describeZones } from './prompts'
+import { COACH_SYSTEM, describeGoal, describeProfile, describeZones, isTrailGoal } from './prompts'
 import {
   ProfileSchema,
   SkeletonSchema,
@@ -127,6 +127,7 @@ async function buildPlan(
   const chunks = Math.ceil(slots.length / CHUNK)
   const total = chunks + 1
   const context = `${describeGoal(goal)}\n\n${describeProfile(profile, records)}\n\nZones d’allure :\n${describeZones(zones)}`
+  const trail = isTrailGoal(goal)
   const draft: PlanDraft = resume ? { ...resume, failed: false } : { goal, skeleton: null, sessions: {} }
   saveDraft(draft)
 
@@ -142,7 +143,7 @@ ${slots.map((s) => `Semaine ${s.number} : ${s.start} → ${s.end}`).join('\n')}
 
 ${periodizationRules(slots.length, goal)}
 
-Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine. La dernière semaine contient la course, et son volume inclut la distance de la course.
+Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine${trail ? ', et le D+ hebdomadaire (targetGain)' : ' (targetGain à 0, ce n’est pas un plan trail)'}. La dernière semaine contient la course, et son volume inclut la distance de la course.
 Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parcours : où gérer, où relancer, allure cible par portion.`,
       schema: SkeletonSchema,
       maxTokens: 8000,
@@ -156,6 +157,7 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
         if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
         errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
         errors.push(...checkLongRuns(s.weeks))
+        if (trail) errors.push(...checkGains(s.weeks, goal.currentWeeklyGain ?? null))
         if (slots.length <= 6 && s.weeks.some((w) => w.phase === 'base')) errors.push(`Plan de ${slots.length} semaines : pas de phase base, commence en build.`)
         return errors
       },
@@ -169,10 +171,11 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
     focus: skeleton.weeks[i].focus,
     targetKm: skeleton.weeks[i].targetKm,
     longRunKm: skeleton.weeks[i].longRunKm,
+    ...(trail ? { targetGain: Math.round(skeleton.weeks[i].targetGain) } : {}),
     sessions: [],
   }))
   const outline = weeks
-    .map((w) => `Semaine ${w.number} (${w.start} → ${w.end}) : ${w.phase}, ${w.targetKm} km, sortie longue ${w.longRunKm} km — ${w.focus}`)
+    .map((w) => `Semaine ${w.number} (${w.start} → ${w.end}) : ${w.phase}, ${w.targetKm} km${w.targetGain ? `, ${w.targetGain} m D+` : ''}, sortie longue ${w.longRunKm} km — ${w.focus}`)
     .join('\n')
 
   const parts = Array.from({ length: chunks }, (_, c) => weeks.slice(c * CHUNK, (c + 1) * CHUNK))
@@ -199,7 +202,8 @@ Les autres semaines sont écrites en parallèle selon cette même structure : re
 Dates autorisées (et seulement celles-ci) :
 ${part.map((w) => `Semaine ${w.number} : ${allowed.get(w.number)!.map((d) => `${d} (${WEEKDAYS[weekday(d)]})`).join(', ')}`).join('\n')}
 ${goal.raceDate <= part[part.length - 1].end ? `La course a lieu le ${goal.raceDate} : séance de type race ce jour-là, avec l’allure objectif.` : ''}
-Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séances au volume visé.`,
+Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séances au volume visé.
+${trail ? 'Plan trail : renseigne elevationGain pour chaque séance (0 sur le plat) ; leur somme respecte le D+ de la semaine.' : 'elevationGain : null pour toutes les séances (pas un plan trail).'}`,
         schema: WeeksSessionsSchema,
         retries: 3,
         validate: (r, last) => {
@@ -212,6 +216,7 @@ Tu n’es pas obligé d’utiliser toutes les dates : adapte le nombre de séanc
               // Dernière tentative : volume accepté à ±25 % plutôt que d'échouer toute la génération.
               errors.push(...checkWeekTotals(w, got.sessions, zones, last ? 0.25 : 0.15))
               errors.push(...checkQuality(w, got.sessions, slots.length))
+              if (trail) errors.push(...checkWeekGain(w, got.sessions, last ? 0.35 : 0.2))
             }
           }
           return errors
@@ -306,6 +311,33 @@ export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
     peak = Math.max(peak, w.targetKm)
   }
   return errors
+}
+
+/** Trail : D+ de la semaine 1 proche de l'actuel, puis +15 % au plus d'une semaine à l'autre (hors affûtage). */
+export function checkGains(weeks: Skeleton['weeks'], current: number | null) {
+  const errors: string[] = []
+  const first = weeks[0]
+  if (first && current && first.targetGain > Math.max(current * 1.2, current + 200)) {
+    errors.push(`Semaine 1 : ${first.targetGain} m D+ est trop haut, le coureur fait aujourd'hui ${current} m par semaine. Vise au plus ${Math.round(Math.max(current * 1.15, current + 150))} m.`)
+  }
+  if (weeks.some((w) => w.phase !== 'race' && w.targetGain <= 0)) errors.push('Plan trail : chaque semaine (hors course) doit avoir un targetGain positif.')
+  let peak = Math.max(current ?? 0, first?.targetGain ?? 0)
+  for (const w of weeks.slice(1)) {
+    if (w.phase !== 'taper' && w.phase !== 'race' && w.targetGain > peak * 1.15 + 100) {
+      errors.push(`Semaine ${w.number} : ${w.targetGain} m D+ dépasse +10 % par rapport au plus haut D+ précédent (${Math.round(peak)} m).`)
+    }
+    peak = Math.max(peak, w.targetGain)
+  }
+  return errors
+}
+
+/** Trail : la somme des D+ des séances respecte le D+ de la semaine. */
+export function checkWeekGain(week: Week, sessions: SessionInput[], tolerance = 0.2) {
+  if (!week.targetGain || sessions.some((s) => s.type === 'race')) return []
+  const gain = sessions.reduce((a, s) => a + (s.elevationGain ?? 0), 0)
+  if (gain >= week.targetGain * (1 - tolerance) && gain <= week.targetGain * (1 + tolerance)) return []
+  const detail = sessions.map((s) => `${s.date} ${s.elevationGain ?? 0} m`).join(', ')
+  return [`Semaine ${week.number} : les séances totalisent ${gain} m D+ (${detail}) au lieu de ${week.targetGain} m visés. Ajuste elevationGain (et le contenu des séances) pour être à ±15 %.`]
 }
 
 /** La sortie longue pèse au moins 30 % du volume (30 à 40 % visés), hors affûtage et semaine de course. */

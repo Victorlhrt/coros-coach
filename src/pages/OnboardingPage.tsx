@@ -13,6 +13,7 @@ import { WEEKDAYS, WEEKDAYS_SHORT, addDays, planWeeks, today } from '@/lib/coach
 import { formatClock, formatPace, parseClock } from '@/lib/coach/format'
 import { clearDraft, extractProfile, generatePlan, isGenerating, loadDraft, markDraftFailed, type PlanDraft, type Progress } from '@/lib/coach/generate'
 import { DISTANCES, type Goal, type GoalDistance, type Profile } from '@/lib/coach/schema'
+import type { CourseProfile } from '@/lib/coach/gpx'
 import { bestVdot, thresholdPace } from '@/lib/coach/vdot'
 import { computeVolume } from '@/lib/coach/volume'
 import { zonesFromThreshold } from '@/lib/coach/zones'
@@ -33,6 +34,16 @@ const PREDICTION_KEY: Partial<Record<GoalDistance, keyof Profile['predictions']>
   '10k': 'tenK',
   half: 'half',
   marathon: 'marathon',
+}
+
+/** Réponses de l'onboarding de la plateforme lues ici (trail, volume recommandé). */
+type OnboardingAnswers = {
+  target_weekly_km?: number
+  target_weekly_gain?: number
+  utmb_index?: number | null
+  goal?: { terrain?: string; date?: string | null; race?: { km: number; elevation: number } | null }
+  course?: CourseProfile | null
+  terrain_access?: { access: string[]; currentGain: number }
 }
 
 const DEFAULT_GOAL: Goal = {
@@ -68,14 +79,38 @@ export function OnboardingPage() {
   // Volume de pointe recommandé à l'onboarding de la plateforme (hors session plateforme : rien).
   const overview = useQuery({
     queryKey: ['account', 'overview'],
-    queryFn: () => api<{ answers: { target_weekly_km?: number } | null }>('/account/overview'),
+    queryFn: () => api<{ answers: OnboardingAnswers | null }>('/account/overview'),
     retry: false,
     staleTime: 5 * 60 * 1000,
   })
-  const recommendedPeak = overview.data?.answers?.target_weekly_km
+  const answers = overview.data?.answers
+  const recommendedPeak = answers?.target_weekly_km
+  const recommendedGain = answers?.target_weekly_gain
   useEffect(() => {
-    if (recommendedPeak && goal.peakWeeklyKm == null) update({ peakWeeklyKm: recommendedPeak })
-  }, [recommendedPeak]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!answers) return
+    const patch: Partial<Goal> = {}
+    if (recommendedPeak && goal.peakWeeklyKm == null) patch.peakWeeklyKm = recommendedPeak
+    // Trail préparé à l'onboarding (course, profil, terrain, index UTMB) : repris tant que le coach n'a pas d'autre parcours.
+    const race = answers.goal?.race
+    const trail = answers.goal?.terrain === 'trail' || (!!race && race.km > 0 && race.elevation / race.km > 15)
+    if (trail && race && !goal.course && goal.distance !== 'trail') {
+      Object.assign(patch, {
+        distance: 'trail',
+        terrain: 'trail',
+        courseKm: answers.course?.distanceKm ?? race.km,
+        elevationGain: answers.course?.gain ?? race.elevation,
+        course: answers.course ?? null,
+        ...(answers.goal?.date ? { raceDate: answers.goal.date } : {}),
+      } satisfies Partial<Goal>)
+    }
+    if (trail) {
+      if (goal.peakWeeklyGain == null && recommendedGain) patch.peakWeeklyGain = recommendedGain
+      if (goal.currentWeeklyGain == null && answers.terrain_access) patch.currentWeeklyGain = answers.terrain_access.currentGain
+      if (!goal.terrainAccess && answers.terrain_access) patch.terrainAccess = answers.terrain_access.access
+      if (goal.utmbIndex == null && answers.utmb_index) patch.utmbIndex = answers.utmb_index
+    }
+    if (Object.keys(patch).length) update(patch)
+  }, [answers]) // eslint-disable-line react-hooks/exhaustive-deps
   const weeks = planWeeks(goal.raceDate)
   const prediction = PREDICTION_KEY[goal.distance] && store.profile?.predictions[PREDICTION_KEY[goal.distance]!]
 
@@ -235,6 +270,21 @@ export function OnboardingPage() {
             {recommendedPeak ? `Recommended for your goal: ${recommendedPeak} km/wk at the peak, before the taper.` : 'Highest weekly volume before the taper. Leave empty to let the coach decide.'}
           </p>
         </Field>
+
+        {(goal.distance === 'trail' || goal.terrain === 'trail') && (
+          <Field label="Peak climbing (m D+ per week)">
+            <Input
+              inputMode="numeric"
+              placeholder="Coach decides"
+              value={goal.peakWeeklyGain ?? ''}
+              onChange={(e) => update({ peakWeeklyGain: Number(e.target.value) || null })}
+            />
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {recommendedGain ? `Recommended for your race: ${recommendedGain.toLocaleString('en-GB')} m a week at the peak.` : 'In trail, climbing matters as much as distance.'}
+              {goal.utmbIndex ? ` UTMB index ${goal.utmbIndex}.` : ''}
+            </p>
+          </Field>
+        )}
 
         <Field label="Race date">
           <Input type="date" min={addDays(today(), 28)} value={goal.raceDate} onChange={(e) => update({ raceDate: e.target.value })} />

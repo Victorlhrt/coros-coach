@@ -119,6 +119,7 @@ export function PlanPage() {
           <div>
             <p className="text-sm font-medium text-accent">{PHASE_LABEL[week.phase]}</p>
             <h2 className="text-2xl font-medium tracking-tight">Week {week.number}</h2>
+            {!!week.targetGain && <p className="text-sm text-muted-foreground">{week.targetGain.toLocaleString('en-GB')} m D+ planned</p>}
           </div>
           <SlotText value={formatDistance(volumes[week.number - 1], units, 0)} className="text-2xl font-medium" />
         </div>

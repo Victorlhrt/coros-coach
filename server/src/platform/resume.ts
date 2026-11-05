@@ -47,6 +47,13 @@ export const resumeToken = (sessionId: string) => sign('resume', sessionId, RESU
 export const unsubscribeToken = (leadId: string) => sign('unsub', leadId, 365)
 export const verifyUnsubscribeToken = (token: string | undefined) => verify('unsub', token)
 
+/** Même règle que isTrail dans CompleteOnboarding.tsx : course en trail, ou plus de 15 m D+ par km. */
+function isTrail(a: Record<string, unknown>) {
+  const g = a.goal as { type?: string; terrain?: string; race?: { km?: number; elevation?: number } | null } | undefined
+  const r = g?.race
+  return g?.type === 'race' && (g.terrain === 'trail' || (!!r?.km && (r.elevation ?? 0) / r.km > 15))
+}
+
 /**
  * Ordre des étapes du parcours Complet, recopié de STEPS dans src/platform/onboarding/CompleteOnboarding.tsx
  * (à tenir à jour) avec les mêmes conditions d'affichage : sert à nommer l'étape où la personne s'est arrêtée.
@@ -67,11 +74,13 @@ const FLOW: { id: string; shown?: (a: Record<string, unknown>) => boolean }[] = 
   { id: 'experience' },
   { id: 'goal' },
   { id: 'target', shown: (a) => (a.goal as { type?: string } | undefined)?.type !== 'train' },
+  { id: 'course', shown: isTrail },
   { id: 'estimate' },
   { id: 'volume' },
   { id: 'pains' },
   { id: 'events' },
   { id: 'days' },
+  { id: 'terrain', shown: isTrail },
   { id: 'recommend' },
   { id: 'duration', shown: (a) => (a.volume_plan as { choice?: string } | undefined)?.choice === 'reduce' },
   { id: 'gear' },

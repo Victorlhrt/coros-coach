@@ -27,6 +27,7 @@ export function SessionCard({ session }: { session: Session }) {
         <p className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
           <span>{formatDuration(seconds)}</span>
           {meters > 0 && <span>· {formatDistance(meters, units)}</span>}
+          {!!session.elevationGain && <span>· {session.elevationGain.toLocaleString('en-GB')} m D+</span>}
         </p>
       </div>
       <ChevronRight className="size-5 text-muted-foreground" />
