@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { requireUser, type SessionUser } from './auth.js'
 import { db } from './db.js'
-import { GARMIN_PREFIX, extractToken, jwtExpiry, lapsFromActivityFile, normalizeGarminActivities, type GarminActivity, type GarminLap } from './garmin-normalize.js'
+import { GARMIN_PREFIX, extractToken, jwtExpiry, lapsFromActivityFile, normalizeGarminActivities, streamFromActivityFile, type ActivityStream, type GarminActivity, type GarminLap } from './garmin-normalize.js'
 
 /**
  * Garmin Connect par la clé « Personal API » de chaque coureur (lecture seule).
@@ -254,14 +254,25 @@ export async function fetchGarminRuns(connection: GarminConnection, days: number
   return runs
 }
 
-/** Tours d'une activité, lus dans son fichier FIT d'origine (le JSON Garmin ne donne que des splits agrégés par type). */
-export async function fetchGarminLaps(connection: GarminConnection, activityId: string): Promise<GarminLap[]> {
+/** Fichier d'origine d'une activité (ZIP contenant le .FIT), null s'il dépasse 25 Mo. */
+async function fetchGarminFile(connection: GarminConnection, activityId: string): Promise<Uint8Array | null> {
   const id = activityId.replace(GARMIN_PREFIX, '')
   if (!/^\d+$/.test(id)) throw new GarminError(400, 'not_found', 'Invalid activity')
   const res = await garminGet(connection, `/download-service/files/activity/${id}`, 'application/zip, application/x-zip-compressed, application/octet-stream')
   const bytes = new Uint8Array(await res.arrayBuffer())
-  if (bytes.byteLength > 25 * 1024 * 1024) return []
-  return lapsFromActivityFile(bytes)
+  return bytes.byteLength > 25 * 1024 * 1024 ? null : bytes
+}
+
+/** Tours d'une activité, lus dans son fichier FIT d'origine (le JSON Garmin ne donne que des splits agrégés par type). */
+export async function fetchGarminLaps(connection: GarminConnection, activityId: string): Promise<GarminLap[]> {
+  const bytes = await fetchGarminFile(connection, activityId)
+  return bytes ? lapsFromActivityFile(bytes) : []
+}
+
+/** FC et vitesse seconde par seconde, lues dans le même fichier FIT. */
+export async function fetchGarminStream(connection: GarminConnection, activityId: string): Promise<ActivityStream | null> {
+  const bytes = await fetchGarminFile(connection, activityId)
+  return bytes ? streamFromActivityFile(bytes) : null
 }
 
 // ---------- Validation et enregistrement d'une clé ----------
@@ -393,6 +404,25 @@ garminAccountRoutes.get('/activities/:id/laps', async (c) => {
     if (lapsCache.size > 2000) lapsCache.clear()
     lapsCache.set(key, laps)
     return c.json(laps)
+  } catch (e) {
+    return fail(c, e)
+  }
+})
+
+const streamCache = new Map<string, ActivityStream | null>()
+
+garminAccountRoutes.get('/activities/:id/stream', async (c) => {
+  const userId = c.get('user').id
+  const id = c.req.param('id').replace(GARMIN_PREFIX, '')
+  const key = `${userId}:${id}`
+  if (streamCache.has(key)) return c.json(streamCache.get(key) ?? null)
+  const conn = await garminConnectionForUser(userId)
+  if (!conn) return c.json({ error: 'Garmin isn’t connected.', code: 'not_connected' }, 404)
+  try {
+    const stream = await fetchGarminStream(conn, id)
+    if (streamCache.size > 500) streamCache.clear()
+    streamCache.set(key, stream)
+    return c.json(stream)
   } catch (e) {
     return fail(c, e)
   }

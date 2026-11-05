@@ -3,7 +3,7 @@
 // startTimeLocal « yyyy-MM-dd HH:mm:ss », distance en m, duration en s, beginTimestamp en ms, activityType {typeId, typeKey, parentTypeId}).
 import { Encoder, Profile } from '@garmin/fitsdk'
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js'
-import { extractToken, garminSportType, jwtExpiry, lapsFromActivityFile, normalizeGarminActivities } from '../server/src/platform/garmin-normalize'
+import { extractToken, garminSportType, jwtExpiry, lapsFromActivityFile, normalizeGarminActivities, streamFromActivityFile } from '../server/src/platform/garmin-normalize'
 import { mergeActivities } from '../src/lib/garmin/merge'
 
 const errors: string[] = []
@@ -120,6 +120,34 @@ const main = async () => {
     expect(out[2]?.avgHr === 165, `${label} : FC du tour 3`)
   }
   expect((await lapsFromActivityFile(new Uint8Array([1, 2, 3, 4]))).length === 0, 'fichier illisible')
+
+  // Courbes : 10 min à 3 m/s puis 60 s de pause (timer stop/start) puis 5 min à 4 m/s, un enregistrement par seconde.
+  const enc = new Encoder()
+  const s0 = new Date('2026-11-05T11:17:00Z').getTime()
+  enc.writeMesg({ mesgNum: Profile.MesgNum.FILE_ID, manufacturer: 'garmin', product: 1, timeCreated: new Date(s0), type: 'activity' })
+  enc.writeMesg({ mesgNum: Profile.MesgNum.EVENT, timestamp: new Date(s0), event: 'timer', eventType: 'start' })
+  let dist = 0
+  for (let i = 0; i <= 600; i++) {
+    enc.writeMesg({ mesgNum: Profile.MesgNum.RECORD, timestamp: new Date(s0 + i * 1000), heartRate: 140, distance: dist, enhancedSpeed: 3 })
+    dist += 3
+  }
+  enc.writeMesg({ mesgNum: Profile.MesgNum.EVENT, timestamp: new Date(s0 + 600_000), event: 'timer', eventType: 'stopAll' })
+  enc.writeMesg({ mesgNum: Profile.MesgNum.EVENT, timestamp: new Date(s0 + 660_000), event: 'timer', eventType: 'start' })
+  dist -= 3
+  for (let i = 661; i <= 960; i++) {
+    dist += 4
+    enc.writeMesg({ mesgNum: Profile.MesgNum.RECORD, timestamp: new Date(s0 + i * 1000), heartRate: 170, distance: dist, enhancedSpeed: 4 })
+  }
+  const stream = await streamFromActivityFile(enc.close())
+  expect(!!stream, 'courbes lues')
+  if (stream) {
+    const at = (t: number) => Math.floor(t / stream.step)
+    expect(stream.step === 1, `pas d'une seconde (${stream.step})`)
+    expect(near(stream.speed.length * stream.step, 901, 2), `temps chronométré sans la pause (${stream.speed.length * stream.step} s)`)
+    expect(near(stream.speed[at(300)], 3, 0.05) && near(stream.speed[at(800)], 4, 0.05), `vitesses (${stream.speed[at(300)]}, ${stream.speed[at(800)]})`)
+    expect(stream.hr[at(300)] === 140 && stream.hr[at(800)] === 170, 'FC')
+    expect(stream.pauses.length === 1 && near(stream.pauses[0], 601, 2), `pause marquée (${stream.pauses})`)
+  }
 
   // Fusion : la sortie du 11 existe aussi sur COROS (distance à 0,3 %) → gardée une fois, côté COROS.
   const coros = [

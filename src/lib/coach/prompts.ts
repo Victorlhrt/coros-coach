@@ -64,6 +64,9 @@ export function describeGoal(goal: Goal) {
     goal.currentWeeklyKm
       ? `Volume actuel : ${goal.currentWeeklyKm} km/semaine. C’est le point de départ : la semaine 1 doit être proche de ce volume (jamais une baisse brutale), puis progresser.`
       : 'Volume actuel : inconnu, pars prudemment.',
+    goal.peakWeeklyKm
+      ? `Volume de pointe visé : ${goal.peakWeeklyKm} km/semaine (recommandé au coureur et accepté). Monte progressivement jusqu’à ce volume pour la semaine la plus chargée avant l’affûtage, sans dépasser +10 % d’une semaine à l’autre.`
+      : '',
     describeCourse(goal),
   ]
   return lines.join('\n')

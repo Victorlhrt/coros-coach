@@ -15,6 +15,7 @@ import {
   SendIcon,
   SproutIcon,
   TrashIcon,
+  TrendingDownIcon,
   TrendingUpIcon,
   WatchIcon,
 } from 'lucide-react'
@@ -48,6 +49,7 @@ import { CodeStep } from './CodeStep'
 import { readStravaExport, type StravaSummary } from './strava'
 import { InsightTiles, hasInsights, watchName, watchPerformances, type WatchInsights } from './WatchInsights'
 import { distanceCategory, formatDuration, formatPace, parseDuration, predict, type Performance } from './estimate'
+import { formatMinutes, recommendVolume, reducedOptions, type Recommendation } from './recommend'
 
 /**
  * Parcours « Complet » (version de test) : motivation, montre, identité et profil UTMB, objectif et course,
@@ -101,6 +103,8 @@ type StepProps = {
 export type CompleteAnswers = {
   reason?: string
   wearables?: string[]
+  /** Montre suggérée dans « Other » (pas encore prise en charge), lue dans le back office. */
+  otherWearable?: string
   has_watch?: 'yes' | 'no'
   data_source?: 'strava' | 'none'
   connected?: string[]
@@ -137,11 +141,15 @@ export type CompleteAnswers = {
   distance?: string
   race_date?: string | null
   weekly_km?: number
+  /** Volume de pointe visé par le plan (km/semaine) : le recommandé, ou celui que permet le temps donné. */
+  target_weekly_km?: number
   strava?: StravaSummary | null
   about?: { sex: string | null; birthYear: number | null }
   experience?: string
   schedule?: { days: string[]; longDay: string | null }
   session_max?: string
+  /** Volume recommandé (étape Recommendation) et choix du coureur ; `weeklyMinutes` seulement s'il a réduit. */
+  volume_plan?: { peakKm: number; recommendedMinutes: number; easyPace: number; choice: 'accept' | 'reduce'; weeklyMinutes?: number }
   days?: string[]
   level?: string
   strava_need?: string
@@ -170,7 +178,8 @@ const STEPS = [
   { id: 'pains', label: 'Pain' },
   { id: 'events', label: 'Recent' },
   { id: 'days', label: 'Availability' },
-  { id: 'duration', label: 'Duration' },
+  { id: 'recommend', label: 'Recommendation' },
+  { id: 'duration', label: 'Weekly time' },
   { id: 'gear', label: 'Gear' },
   { id: 'generate', label: 'Plan' },
 ]
@@ -360,6 +369,8 @@ function flowFor(a: CompleteAnswers, gated: boolean) {
     if (s.id === 'connect') return a.has_watch === 'yes' && (a.wearables ?? []).some((w) => w === 'coros' || w === 'garmin')
     if (s.id === 'nowatch') return a.has_watch === 'no'
     if (s.id === 'strava') return a.has_watch === 'no' && a.data_source === 'strava'
+    // Le temps disponible n'est demandé qu'à celui qui refuse le volume recommandé.
+    if (s.id === 'duration') return a.volume_plan?.choice === 'reduce'
     return true
   })
 }
@@ -446,7 +457,7 @@ export function CompleteOnboarding({
   const valid: Record<string, boolean> = {
     code: !!gate?.code,
     reason: !!a.reason,
-    wearables: (a.wearables?.length ?? 0) > 0,
+    wearables: (a.wearables?.length ?? 0) > 0 && (!a.wearables?.includes('other') || !!a.otherWearable?.trim()),
     connect: true,
     strava: true,
     identity: !!a.identity?.firstName.trim() && !!a.identity.lastName.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a.identity.email.trim()),
@@ -454,7 +465,8 @@ export function CompleteOnboarding({
     about: !!a.city?.trim(),
     experience: !!a.experience,
     days: (a.schedule?.days.length ?? 0) > 0,
-    duration: !!a.session_max,
+    recommend: true,
+    duration: !!a.volume_plan?.weeklyMinutes,
     goal: !!a.goal?.type,
     target: !!a.goal?.race && (a.goal.type !== 'race' || !!a.goal.date),
     estimate: true,
@@ -607,9 +619,9 @@ export function CompleteOnboarding({
           </div>
         ) : QUICK[step.id] ? (
           <QuickReplies
-            options={QUICK[step.id].options}
+            options={quickOptions(step.id, a)}
             disabled={!ready || busy}
-            onPick={(value) => void next(QUICK[step.id].answer(value))}
+            onPick={(value) => void next(QUICK[step.id].answer(value, a))}
             onBack={canBack ? () => setIndex(index - 1) : undefined}
           />
         ) : (
@@ -842,15 +854,32 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
           ? `From your ${watchName(a.watch_insights)}, you usually run on ${listDays(a.watch_insights.usualDays)}: I’ve pre-selected them. Change them if needed, and pick your long run day.`
           : 'Which days can you run? And which one for your long run?',
       ]
-    case 'duration': {
+    case 'recommend': {
       const n = a.schedule?.days.length ?? 0
+      const r = recommendationFor(a)
+      const current = a.health?.weeklyKm ?? 0
+      const goal = a.estimate?.target ? `run ${formatDuration(a.estimate.target)}` : a.goal?.race ? 'reach your goal' : 'keep improving'
       return [
         n >= 5 ? `${n} days a week, that’s motivation!` : n >= 3 ? `${n} days is perfect for making progress.` : 'Few days but well used, that works really well.',
-        'On weekdays, how much time can you give each session?',
+        r.peakKm > current
+          ? `Here’s what I’d recommend for your level, so you improve and ${goal}: build up to ${r.peakKm} km a week instead of ${current} km now. That’s about ${formatMinutes(r.weeklyMinutes)} of running a week at the peak.`
+          : `Here’s what I’d recommend for your level, so you ${goal}: keep around ${r.peakKm} km a week (about ${formatMinutes(r.weeklyMinutes)} of running), with more structure.`,
+        'That’s the volume that gives you the best shot. Does it work for you?',
       ]
     }
+    case 'duration':
+      return [
+        'Understood.',
+        `How much time can you give running each week? Every extra hour gets you closer to ${a.volume_plan?.peakKm ?? recommendationFor(a).peakKm} km, so pick the most you can realistically do.`,
+      ]
     case 'gear':
-      return ['Noted, I’ll fit your sessions around that.', 'Last question, I promise: which shoes do you run in? I’ll keep track of their wear.']
+      return [
+        a.volume_plan?.choice === 'accept'
+          ? `Deal, we build up to ${a.volume_plan.peakKm} km a week.`
+          : a.volume_plan?.weeklyMinutes
+            ? `Noted, I’ll fit your plan in ${formatMinutes(a.volume_plan.weeklyMinutes)} a week, around ${plannedKm(a)} km at the peak.`
+            : 'Noted, I’ll fit your sessions around that.',
+        'Last question, I promise: which shoes do you run in? I’ll keep track of their wear.']
     default:
       return [`Thanks${first ? `, ${first}` : ''}, that was perfect. I have everything I need.`, 'I’m building your plan, it takes a few seconds.']
   }
@@ -865,7 +894,7 @@ function summarize(step: string, a: CompleteAnswers): string {
     case 'watch':
       return a.has_watch === 'yes' ? 'Yes, a watch' : 'No'
     case 'wearables':
-      return (a.wearables ?? []).map((w) => WEARABLES.find((x) => x.id === w)?.name ?? w).join(', ') || '—'
+      return (a.wearables ?? []).map((w) => (w === 'other' ? a.otherWearable?.trim() || 'Other' : (WEARABLES.find((x) => x.id === w)?.name ?? w))).join(', ') || '—'
     case 'connect':
       return a.connected?.length ? `${a.connected.map((c) => WEARABLES.find((x) => x.id === c)?.name ?? c).join(', ')} connected` : 'I’ll connect later'
     case 'nowatch':
@@ -898,8 +927,10 @@ function summarize(step: string, a: CompleteAnswers): string {
             .join(', ')}${d.longDay ? ` · long run on ${DAY_NAMES[d.longDay]}` : ''}`
         : '—'
     }
+    case 'recommend':
+      return a.volume_plan?.choice === 'reduce' ? 'I’d like to run less' : `Works for me · ${a.volume_plan?.peakKm ?? '—'} km a week`
     case 'duration':
-      return `${DURATIONS.find((x) => x.value === a.session_max)?.label ?? '—'} per session`
+      return a.volume_plan?.weeklyMinutes ? `${formatMinutes(a.volume_plan.weeklyMinutes)} a week` : `${DURATIONS.find((x) => x.value === a.session_max)?.label ?? '—'} per session`
     case 'goal':
       return GOALS.find((x) => x.value === a.goal?.type)?.label ?? '—'
     case 'target': {
@@ -934,6 +965,7 @@ function withPlanFields(a: CompleteAnswers): CompleteAnswers {
     distance: race ? distanceCategory(race.km, race.elevation) : a.distance,
     race_date: a.goal?.date ?? null,
     weekly_km: a.health?.weeklyKm,
+    target_weekly_km: plannedKm(a),
     days: a.schedule?.days ?? a.days,
     level: EXPERIENCES.find((e) => e.value === a.experience)?.level ?? a.level,
     city: a.city?.trim() || undefined,
@@ -948,26 +980,56 @@ function WearablesStep({ answers, patch }: { answers: CompleteAnswers; patch: (p
   const value = answers.wearables ?? []
   const onChange = (wearables: string[]) => patch({ wearables })
   const toggle = (id: string, on: boolean) => onChange(on ? [...value, id] : value.filter((v) => v !== id))
+  // Montres choisies qu'on ne sait pas encore connecter (« coming soon » ou « Other »).
+  const pending = value.filter((v) => v === 'other' || WEARABLES.some((w) => w.id === v && !w.available))
+  const other = value.includes('other')
   return (
     <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {WEARABLES.map((w) => (
-          <label
-            key={w.id}
-            className={`flex items-center gap-3 rounded-[20px] border p-4 ${w.available ? 'cursor-pointer bg-card' : 'opacity-50'} ${value.includes(w.id) ? 'border-primary' : ''}`}
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-background">
+          <label key={w.id} className={`flex cursor-pointer items-center gap-3 rounded-[20px] border bg-card p-4 ${value.includes(w.id) ? 'border-primary' : ''}`}>
+            <span className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-background ${w.available ? '' : 'opacity-60'}`}>
               {w.logo ? (
                 <img src={w.logo} alt="" className={`size-full object-contain ${w.invert ? 'p-2 invert' : w.logo.endsWith('.svg') ? 'p-1.5' : ''}`} />
               ) : (
                 <WatchIcon className="size-5 text-muted-foreground" />
               )}
             </span>
-            <span className="flex-1 text-sm">{w.available ? w.name : `${w.name} · coming soon`}</span>
-            <Checkbox aria-label={w.name} disabled={!w.available} checked={value.includes(w.id)} onCheckedChange={(c) => toggle(w.id, c === true)} />
+            <span className="flex-1 text-sm">
+              {w.name}
+              {!w.available && <span className="block text-muted-foreground text-xs">Coming soon</span>}
+            </span>
+            <Checkbox aria-label={w.name} checked={value.includes(w.id)} onCheckedChange={(c) => toggle(w.id, c === true)} />
           </label>
         ))}
+        <label className={`flex cursor-pointer items-center gap-3 rounded-[20px] border bg-card p-4 ${other ? 'border-primary' : ''}`}>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] border bg-background">
+            <WatchIcon className="size-5 text-muted-foreground" />
+          </span>
+          <span className="flex-1 text-sm">
+            Other
+            <span className="block text-muted-foreground text-xs">Suggest a wearable</span>
+          </span>
+          <Checkbox aria-label="Other" checked={other} onCheckedChange={(c) => toggle('other', c === true)} />
+        </label>
       </div>
+      {other && (
+        <Input
+          className="mt-3"
+          label="Which wearable?"
+          placeholder="E.g. Wahoo, Amazfit, Fitbit, Whoop…"
+          autoFocus
+          maxLength={80}
+          value={answers.otherWearable ?? ''}
+          onChange={(e) => patch({ otherWearable: e.target.value })}
+        />
+      )}
+      {pending.length > 0 && (
+        <p className="mt-3 rounded-[16px] border bg-background p-3 text-muted-foreground text-xs">
+          {pending.length < value.length ? 'Some of these aren’t available yet' : pending.length > 1 ? 'These aren’t available yet' : 'This one isn’t available yet'}: we’re working on it and will let you know as soon as it
+          connects. You can keep going in the meantime.
+        </p>
+      )}
     </>
   )
 }
@@ -1728,8 +1790,8 @@ const NOTHING: Record<string, { label: string; answer: (a: CompleteAnswers) => P
 const QUICK: Record<
   string,
   {
-    options: { value: string; label: string; icon?: React.ReactNode }[]
-    answer: (value: string) => Partial<CompleteAnswers>
+    options: { value: string; label: string; icon?: React.ReactNode }[] | ((a: CompleteAnswers) => { value: string; label: string; icon?: React.ReactNode }[])
+    answer: (value: string, a: CompleteAnswers) => Partial<CompleteAnswers>
   }
 > = {
   reason: { options: REASONS, answer: (reason) => ({ reason }) },
@@ -1757,7 +1819,48 @@ const QUICK: Record<
       goal: { type, terrain: 'road', race: null, date: null },
     }),
   },
-  duration: { options: DURATIONS, answer: (session_max) => ({ session_max }) },
+  recommend: {
+    options: [
+      { value: 'accept', label: 'Works for me', icon: <CheckIcon /> },
+      { value: 'reduce', label: 'I’d like to run less', icon: <TrendingDownIcon /> },
+    ],
+    answer: (choice, a) => {
+      const r = recommendationFor(a)
+      return { volume_plan: { peakKm: r.peakKm, recommendedMinutes: r.weeklyMinutes, easyPace: r.easyPace, choice: choice as 'accept' | 'reduce' } }
+    },
+  },
+  duration: {
+    options: (a) => reducedOptions(a.volume_plan?.recommendedMinutes ?? recommendationFor(a).weeklyMinutes).map((m) => ({ value: String(m), label: formatMinutes(m) })),
+    answer: (m, a) => ({ volume_plan: { ...a.volume_plan!, weeklyMinutes: Number(m) } }),
+  },
+}
+
+function quickOptions(id: string, a: CompleteAnswers) {
+  const o = QUICK[id].options
+  return typeof o === 'function' ? o(a) : o
+}
+
+/** Volume recommandé d'après les réponses (volume actuel, objectif, niveau, jours, date de course). */
+function recommendationFor(a: CompleteAnswers): Recommendation {
+  const race = a.goal?.race
+  const date = a.goal?.date ?? race?.date ?? null
+  return recommendVolume({
+    currentKm: a.health?.weeklyKm ?? 20,
+    raceKm: race?.km ?? null,
+    elevation: race?.elevation ?? 0,
+    daysToRace: date ? Math.round((Date.parse(`${date}T12:00:00`) - Date.now()) / 86_400_000) : null,
+    level: EXPERIENCES.find((e) => e.value === a.experience)?.level,
+    target: a.estimate?.target ?? null,
+    predicted: a.estimate?.predicted ?? null,
+    runDays: a.schedule?.days.length ?? 0,
+  })
+}
+
+/** Volume visé par le plan : le recommandé, ou ce que permet le temps donné à allure d'endurance. */
+function plannedKm(a: CompleteAnswers) {
+  const v = a.volume_plan
+  if (!v) return undefined
+  return v.choice === 'reduce' && v.weeklyMinutes ? Math.max(a.health?.weeklyKm ?? 0, Math.round((v.weeklyMinutes * 60) / v.easyPace)) : v.peakKm
 }
 
 // ---------- 5. Estimation ----------

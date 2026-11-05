@@ -128,6 +128,7 @@ const STOPPED_AT: Record<string, string> = {
   pains: 'You stopped at aches and pains.',
   events: 'You stopped at your recent races.',
   days: 'You stopped at your availability.',
+  recommend: 'You stopped at your recommended volume.',
   duration: 'You stopped at your session length.',
   gear: 'You stopped at your gear.',
   generate: 'You were one step away from your plan.',

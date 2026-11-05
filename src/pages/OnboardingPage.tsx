@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { TextShimmer } from '@/components/arc/text-shimmer/text-shimmer'
 import { Activity, ChevronLeft, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -26,6 +26,7 @@ import { useCorosAuth } from '@/lib/coros/auth-store'
 import { fetchProfileData, fetchRecords } from '@/lib/coros/data'
 import { usePlan } from '@/lib/store/plan'
 import { ROUTES } from '@/lib/coach/routes'
+import { api } from '@/platform/api'
 
 const PREDICTION_KEY: Partial<Record<GoalDistance, keyof Profile['predictions']>> = {
   '5k': 'fiveK',
@@ -64,6 +65,17 @@ export function OnboardingPage() {
   const [progress, setProgress] = useState<Progress | null>(null)
 
   const update = (patch: Partial<Goal>) => setGoal((g) => ({ ...g, ...patch }))
+  // Volume de pointe recommandé à l'onboarding de la plateforme (hors session plateforme : rien).
+  const overview = useQuery({
+    queryKey: ['account', 'overview'],
+    queryFn: () => api<{ answers: { target_weekly_km?: number } | null }>('/account/overview'),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  })
+  const recommendedPeak = overview.data?.answers?.target_weekly_km
+  useEffect(() => {
+    if (recommendedPeak && goal.peakWeeklyKm == null) update({ peakWeeklyKm: recommendedPeak })
+  }, [recommendedPeak]) // eslint-disable-line react-hooks/exhaustive-deps
   const weeks = planWeeks(goal.raceDate)
   const prediction = PREDICTION_KEY[goal.distance] && store.profile?.predictions[PREDICTION_KEY[goal.distance]!]
 
@@ -209,6 +221,18 @@ export function OnboardingPage() {
             {store.volume
               ? `${source}: ${store.volume.avg4w} km/wk over 4 weeks · last month ${store.volume.lastMonthKm} km (${store.volume.lastMonthWeekly} km/wk) · this month ${store.volume.thisMonthKm} km.`
               : `Your plan starts from this volume. “Read my ${source} data” calculates it for you.`}
+          </p>
+        </Field>
+
+        <Field label="Peak volume (km per week)">
+          <Input
+            inputMode="numeric"
+            placeholder="Coach decides"
+            value={goal.peakWeeklyKm ?? ''}
+            onChange={(e) => update({ peakWeeklyKm: Number(e.target.value.replace(',', '.')) || null })}
+          />
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {recommendedPeak ? `Recommended for your goal: ${recommendedPeak} km/wk at the peak, before the taper.` : 'Highest weekly volume before the taper. Leave empty to let the coach decide.'}
           </p>
         </Field>
 

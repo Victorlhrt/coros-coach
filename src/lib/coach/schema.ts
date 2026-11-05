@@ -90,6 +90,8 @@ export interface Goal {
   course: CourseProfile | null
   /** Volume actuel (km/semaine) : point de départ du plan */
   currentWeeklyKm: number | null
+  /** Volume de pointe visé (km/semaine), recommandé à l'onboarding de la plateforme ; absent : au jugement du coach. */
+  peakWeeklyKm?: number | null
   raceDate: string
   targetTime: number | null
   level: 'beginner' | 'intermediate' | 'advanced'

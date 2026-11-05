@@ -18,6 +18,7 @@ import type { Block, Session, Step, Zone } from '@/lib/coach/schema'
 import { linkedActivity } from '@/lib/coach/links'
 import { useActivities } from '@/lib/coros/activity-hooks'
 import { useLaps } from '@/lib/coros/laps'
+import { useActivityStream } from '@/lib/coros/stream'
 import { STEP_LABEL, zoneColor } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
 import { allSessions, usePlan } from '@/lib/store/plan'
@@ -124,16 +125,17 @@ export function SessionPage() {
   )
 }
 
-/** Profil prévu, avec la courbe réelle (tours de l'activité COROS liée) par-dessus une fois la séance faite. */
+/** Profil prévu, avec la courbe réelle (allure seconde par seconde de l'activité liée, sinon ses tours) par-dessus une fois la séance faite. */
 function SessionProfile({ session, zones, units }: { session: Session; zones: Zone[]; units: Units }) {
   const links = usePlan((s) => s.links)
   const { data } = useActivities()
   const activity = linkedActivity(session, links, data?.activities ?? [])
   const laps = useLaps(activity?.labelId, activity?.sportType, activity?.meters)
+  const stream = useActivityStream(activity?.labelId, activity?.sportType)
   return (
     <>
-      <SessionProfileChart blocks={session.blocks} zones={zones} units={units} laps={laps.data?.laps} />
-      {activity && laps.data && !laps.data.laps.some((l) => l.paceSecPerKm) && (
+      <SessionProfileChart blocks={session.blocks} zones={zones} units={units} laps={stream.isPending && !stream.isError ? undefined : laps.data?.laps} stream={stream.data} />
+      {activity && laps.data && !stream.data && !stream.isPending && !laps.data.laps.some((l) => l.paceSecPerKm) && (
         <p className="mt-2 text-muted-foreground text-xs">No COROS splits</p>
       )}
     </>

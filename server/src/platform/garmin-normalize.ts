@@ -179,3 +179,119 @@ export function extractToken(body: string): string | null {
   v = v.replace(/^"|"$/g, '')
   return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/.test(v) ? v : null
 }
+
+/** Courbes d'une activité, rééchantillonnées toutes les `step` secondes de temps chronométré (pauses retirées). */
+export interface ActivityStream {
+  step: number
+  /** FC moyenne (bpm) de chaque pas, null sans capteur. */
+  hr: (number | null)[]
+  /** Vitesse moyenne (m/s) de chaque pas, null sans mesure. */
+  speed: (number | null)[]
+  /** Temps chronométré (s) où reprend chaque pause, pour la marquer sur le graphique. */
+  pauses: number[]
+}
+
+const STREAM_MAX_POINTS = 1500
+/** Sans événement de pause, un trou plus long que ça entre deux enregistrements est une pause. */
+const GAP_S = 15
+
+/**
+ * Messages `record` du FIT (FC et vitesse, en général chaque seconde) → courbes à pas fixe sur le temps chronométré.
+ * Les pauses viennent des événements `timer` (stop / start) ; à défaut, d'un trou de plus de 15 s.
+ * La vitesse d'un pas est la distance parcourue divisée par sa durée quand la distance est enregistrée (plus stable que
+ * la vitesse instantanée), sinon la moyenne des vitesses instantanées.
+ */
+export function streamFromFit(fit: Uint8Array): ActivityStream | null {
+  const decoder = new Decoder(Stream.fromByteArray(fit))
+  if (!decoder.isFIT()) return null
+  const { messages } = decoder.read({ convertDateTimesToDates: false })
+  const records = ((messages.recordMesgs ?? []) as Obj[])
+    .map((r) => ({
+      ts: num(r.timestamp),
+      hr: num(r.heartRate),
+      speed: num(r.enhancedSpeed) ?? num(r.speed),
+      dist: num(r.distance),
+    }))
+    .filter((r): r is { ts: number; hr: number | null; speed: number | null; dist: number | null } => r.ts !== null)
+    .sort((a, b) => a.ts - b.ts)
+  if (records.length < 2) return null
+
+  // Pauses du chronomètre : [début, fin] en horodatage FIT.
+  const events = ((messages.eventMesgs ?? []) as Obj[])
+    .filter((e) => e.event === 'timer' && num(e.timestamp) !== null)
+    .map((e) => ({ ts: num(e.timestamp)!, stop: e.eventType === 'stop' || e.eventType === 'stopAll' || e.eventType === 'stopDisableAll' }))
+    .sort((a, b) => a.ts - b.ts)
+  const paused: [number, number][] = []
+  let stopAt: number | null = null
+  for (const e of events) {
+    if (e.stop && stopAt === null) stopAt = e.ts
+    else if (!e.stop && stopAt !== null) {
+      if (e.ts > stopAt) paused.push([stopAt, e.ts])
+      stopAt = null
+    }
+  }
+
+  // Temps chronométré de chaque enregistrement.
+  const timer: number[] = []
+  const pauses: number[] = []
+  let t = 0
+  for (let i = 0; i < records.length; i++) {
+    if (i > 0) {
+      const a = records[i - 1].ts
+      const b = records[i].ts
+      const inPause = paused.reduce((acc, [s, e]) => acc + Math.max(0, Math.min(b, e) - Math.max(a, s)), 0)
+      let dt = b - a - inPause
+      if (inPause > 0 || (!paused.length && dt > GAP_S)) {
+        if (!paused.length) dt = 1
+        pauses.push(t + dt)
+      }
+      t += Math.max(0, dt)
+    }
+    timer.push(t)
+  }
+  const total = t
+  if (total <= 0) return null
+  const step = Math.max(1, Math.ceil(total / STREAM_MAX_POINTS))
+  const n = Math.floor(total / step) + 1
+
+  const hrSum = new Array<number>(n).fill(0)
+  const hrN = new Array<number>(n).fill(0)
+  const spSum = new Array<number>(n).fill(0)
+  const spN = new Array<number>(n).fill(0)
+  const distFirst = new Array<number | null>(n).fill(null)
+  const distLast = new Array<number | null>(n).fill(null)
+  const timeFirst = new Array<number>(n).fill(0)
+  const timeLast = new Array<number>(n).fill(0)
+  records.forEach((r, i) => {
+    const k = Math.min(n - 1, Math.floor(timer[i] / step))
+    if (r.hr !== null && r.hr > 0) (hrSum[k] += r.hr), hrN[k]++
+    if (r.speed !== null && r.speed >= 0) (spSum[k] += r.speed), spN[k]++
+    if (r.dist !== null) {
+      if (distFirst[k] === null) (distFirst[k] = r.dist), (timeFirst[k] = timer[i])
+      ;(distLast[k] = r.dist), (timeLast[k] = timer[i])
+    }
+  })
+  // Distance d'un pas = de son dernier enregistrement à celui du pas précédent (pas de trou entre deux pas).
+  let prevDist: number | null = null
+  let prevTime = 0
+  const speed = Array.from({ length: n }, (_, k) => {
+    let v: number | null = spN[k] ? spSum[k] / spN[k] : null
+    if (distLast[k] !== null) {
+      const d0 = prevDist ?? distFirst[k]!
+      const t0 = prevDist !== null ? prevTime : timeFirst[k]
+      const dt = timeLast[k] - t0
+      if (dt > 0 && distLast[k]! >= d0) v = (distLast[k]! - d0) / dt
+      prevDist = distLast[k]
+      prevTime = timeLast[k]
+    }
+    return v === null ? null : Math.round(v * 100) / 100
+  })
+  const hr = hrSum.map((s, k) => (hrN[k] ? Math.round(s / hrN[k]) : null))
+  if (!hr.some((v) => v !== null) && !speed.some((v) => v !== null)) return null
+  return { step, hr, speed, pauses: pauses.map((p) => Math.round(p)) }
+}
+
+export async function streamFromActivityFile(file: Uint8Array) {
+  const fit = await fitBytes(file)
+  return fit ? streamFromFit(fit) : null
+}

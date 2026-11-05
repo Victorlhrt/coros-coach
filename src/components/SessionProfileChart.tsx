@@ -3,6 +3,7 @@ import { formatDuration, formatPace, paceUnit, type Units } from '@/lib/coach/fo
 import { flatten } from '@/lib/coach/metrics'
 import type { Block, Zone } from '@/lib/coach/schema'
 import type { Lap } from '@/lib/coros/laps'
+import { smooth, type ActivityStream } from '@/lib/coros/stream'
 import { STEP_LABEL } from '@/lib/coach/ui'
 import { ZONE_NAMES } from '@/lib/coach/zones'
 
@@ -38,23 +39,34 @@ function zoneToPace(v: number, zones: Zone[]) {
   return z.paceSlow - (v - z.zone + 0.5) * Math.max(1, z.paceSlow - z.paceFast)
 }
 
-/** Profil d'intensité de la séance (Arc LineChart) : zone visée minute par minute, survol pour l'étape et l'allure. Avec les tours de l'activité liée, la courbe réelle se superpose à la théorique. */
-export function SessionProfileChart({ blocks, zones, units, laps, className }: { blocks: Block[]; zones: Zone[]; units: Units; laps?: Lap[]; className?: string }) {
+/** Sous cette vitesse (≈ 16:40 /km), le coureur est arrêté ou marche : pas d'allure à placer sur l'échelle. */
+const MIN_SPEED = 1
+
+/**
+ * Profil d'intensité de la séance (Arc LineChart) : zone visée minute par minute, survol pour l'étape et l'allure.
+ * Avec l'activité liée, la courbe réelle se superpose à la théorique : allure seconde par seconde (fichier FIT, lissée
+ * sur 30 s) quand elle est disponible, sinon allure de chaque tour.
+ */
+export function SessionProfileChart({ blocks, zones, units, laps, stream, className }: { blocks: Block[]; zones: Zone[]; units: Units; laps?: Lap[]; stream?: ActivityStream | null; className?: string }) {
   const steps = flatten(blocks, zones)
   const planned = steps.reduce((a, s) => a + s.seconds, 0)
   if (!planned) return null
-  // Tours réels cumulés dans le temps (on ignore ceux sans allure ni durée).
-  const real = (laps ?? []).filter((l) => l.seconds && l.paceSecPerKm)
+  const speeds = stream?.speed.some((v) => v !== null) ? smooth(stream.speed, stream.step, 30) : null
+  // Tours réels cumulés dans le temps (on ignore ceux sans allure ni durée), seulement sans courbe seconde par seconde.
+  const real = speeds ? [] : (laps ?? []).filter((l) => l.seconds && l.paceSecPerKm)
   let acc = 0
   const lapEnds = real.map((l) => (acc += l.seconds ?? 0))
-  const realTotal = acc
+  const realTotal = speeds && stream ? speeds.length * stream.step : acc
+  let lastActual: number | undefined
+  // Courbe seconde par seconde : deux fois plus de points pour garder le dessin des répétitions.
+  const samples = speeds ? SAMPLES * 2 : SAMPLES
   const total = Math.max(planned, realTotal)
   const tick = total > 75 * 60 ? 15 * 60 : total > 35 * 60 ? 10 * 60 : 5 * 60
   let next = tick
   let i = 0
   let end = steps[0].seconds
-  const data = Array.from({ length: SAMPLES + 1 }, (_, n) => {
-    const t = (n / SAMPLES) * total
+  const data = Array.from({ length: samples + 1 }, (_, n) => {
+    const t = (n / samples) * total
     while (t >= end && i < steps.length - 1) end += steps[++i].seconds
     const s = steps[i]
     const inPlan = t <= planned
@@ -65,17 +77,30 @@ export function SessionProfileChart({ blocks, zones, units, laps, className }: {
     while (t >= next) next += tick
     // Libellé court pour que l'infobulle reste dans la carte : l'allure réelle est dans les valeurs.
     const planLabel = inPlan ? `${STEP_LABEL[s.kind]}${s.rep ? ` ${s.rep}` : ''}` : 'After the plan'
-    const lapLabel = lap && t <= realTotal ? ` · lap ${lap.index}${lap.avgHr ? ` · ${Math.round(lap.avgHr)} bpm` : ''}` : ''
+    let actual: number | undefined
+    let realLabel = ''
+    if (speeds && stream) {
+      const k = Math.min(speeds.length - 1, Math.floor(t / stream.step))
+      const v = speeds[k]
+      // Arrêt (feu, pause) : la courbe tombe en bas de l'échelle plutôt que de garder l'allure d'avant.
+      actual = v !== null && v >= MIN_SPEED ? paceToZone(1000 / v, zones) : v !== null ? 0.5 : lastActual
+      lastActual = actual
+      const hr = stream.hr[k]
+      realLabel = t <= realTotal && hr ? ` · ${hr} bpm` : ''
+    } else {
+      actual = lap ? paceToZone(lap.paceSecPerKm!, zones) : undefined
+      realLabel = lap && t <= realTotal ? ` · lap ${lap.index}${lap.avgHr ? ` · ${Math.round(lap.avgHr)} bpm` : ''}` : ''
+    }
     return {
       key: String(n),
-      label: `${clock(t)} · ${planLabel}${lapLabel}`,
+      label: `${clock(t)} · ${planLabel}${realLabel}`,
       axisLabel: n === 0 ? '0' : mark,
-      values: { zone: s.zone, actual: lap ? paceToZone(lap.paceSecPerKm!, zones) : undefined },
+      values: { zone: s.zone, actual },
     }
   })
-  const withActual = real.length > 0
+  const withActual = real.length > 0 || !!speeds
   // Séance tenue : au moins 80 % du temps prévu couru dans la zone visée ou plus vite, et 90 % de la durée faite.
-  const compared = data.filter((d, n) => (n / SAMPLES) * total <= Math.min(planned, realTotal) && d.values.actual !== undefined)
+  const compared = data.filter((d, n) => (n / samples) * total <= Math.min(planned, realTotal) && d.values.actual !== undefined)
   const hit = compared.filter((d) => (d.values.actual ?? 0) >= d.values.zone - 0.5).length
   const met = withActual && realTotal >= planned * 0.9 && compared.length > 0 && hit / compared.length >= 0.8
   const series = withActual ? [...SERIES, { key: 'actual', label: met ? 'Actual · on target' : 'Actual · off target', area: false, color: met ? ACTUAL_COLOR.good : ACTUAL_COLOR.off }] : SERIES

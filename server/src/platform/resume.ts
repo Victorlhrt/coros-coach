@@ -72,7 +72,8 @@ const FLOW: { id: string; shown?: (a: Record<string, unknown>) => boolean }[] = 
   { id: 'pains' },
   { id: 'events' },
   { id: 'days' },
-  { id: 'duration' },
+  { id: 'recommend' },
+  { id: 'duration', shown: (a) => (a.volume_plan as { choice?: string } | undefined)?.choice === 'reduce' },
   { id: 'gear' },
   { id: 'generate' },
 ]

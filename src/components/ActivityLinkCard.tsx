@@ -12,6 +12,8 @@ import type { Session } from '@/lib/coach/schema'
 import type { Activity } from '@/lib/coros/activities'
 import { useActivities } from '@/lib/coros/activity-hooks'
 import { useLaps, type Lap } from '@/lib/coros/laps'
+import { useActivityStream } from '@/lib/coros/stream'
+import { ActivityCurves } from './ActivityCurves'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
 import { cn } from '@/lib/utils'
@@ -20,7 +22,7 @@ import { Skeleton } from './ui/skeleton'
 
 const NONE = '__none'
 
-/** Activité COROS liée à la séance (auto ou choisie) : chiffres clés, tours en barres, splits et chaussure portée. */
+/** Activité liée à la séance (auto ou choisie) : chiffres clés, courbes d'allure et de FC, tours en barres, splits et chaussure portée. */
 export function ActivityLinkCard({ session }: { session: Session }) {
   const { links, setLinks } = usePlan()
   const units = useSettings((s) => s.units)
@@ -29,6 +31,7 @@ export function ActivityLinkCard({ session }: { session: Session }) {
   const activity = linkedActivity(session, links, activities)
   const link = links[session.id]
   const laps = useLaps(activity?.labelId, activity?.sportType, activity?.meters)
+  const stream = useActivityStream(activity?.labelId, activity?.sportType)
 
   // Toutes les activités chargées (6 semaines), les plus proches de la date prévue d'abord : une séance faite en avance ou en retard reste liable.
   const candidates = [...activities].sort((a, b) => Math.abs(diffDays(session.date, a.date)) - Math.abs(diffDays(session.date, b.date)))
@@ -78,6 +81,18 @@ export function ActivityLinkCard({ session }: { session: Session }) {
             <Kpi icon={<Gauge />} label={`Pace ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
             <Kpi icon={<HeartPulse />} label="Avg HR" value={activity.avgHr ? `${Math.round(activity.avgHr)}` : '—'} unit={activity.avgHr ? 'bpm' : undefined} />
           </div>
+
+          {stream.isLoading && (
+            <PanelSection divided>
+              <Skeleton className="h-40" />
+            </PanelSection>
+          )}
+          {stream.data && <ActivityCurves stream={stream.data} units={units} />}
+          {stream.error && (
+            <PanelSection divided>
+              <p className="text-muted-foreground text-xs">Pace and heart-rate curves unavailable: {stream.error.message}</p>
+            </PanelSection>
+          )}
 
           {laps.isLoading && (
             <PanelSection divided>
