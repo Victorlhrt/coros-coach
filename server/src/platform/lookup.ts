@@ -192,6 +192,14 @@ const DIST: Record<string, (km: number) => boolean> = {
   ultra: (km) => km >= 100,
 }
 
+const EUROPE = /switzerland|suisse|italy|italie|spain|espagne|andorra|andorre|austria|autriche|germany|allemagne|portugal|madeira|belgium|belgique|united kingdom|england|scotland|wales|slovenia|croatia|greece|norway|sweden|finland|poland|czech|netherlands/i
+
+/** 0 : France (ou événement Mont-Blanc, sans lieu dans l'API), 1 : Europe, 2 : ailleurs. */
+function nearness(detail: string, url?: string | null) {
+  if (/france/i.test(detail) || /montblanc\.utmb/i.test(url ?? '')) return 0
+  return EUROPE.test(detail) ? 1 : 2
+}
+
 type RaceOut = { id: string; name: string; detail: string; km: number; elevation: number; date: string | null; source: 'raice' | 'utmb'; url?: string | null }
 
 lookupRoutes.get('/races', async (c) => {
@@ -200,7 +208,7 @@ lookupRoutes.get('/races', async (c) => {
   const type = c.req.query('type') === 'trail' ? 'trail' : 'road'
   const inDist = DIST[c.req.query('dist') ?? ''] ?? (() => true)
 
-  const known: RaceOut[] = KNOWN_RACES.filter((r) => r.terrain === type && (!q || normalize(`${r.name} ${r.city}`).includes(q))).flatMap((r) =>
+  const known: RaceOut[] = KNOWN_RACES.filter((r) => r.terrain === type && (!q || normalize(`${r.name} ${r.city} ${r.distances.map((d) => d.label).join(' ')}`).includes(q))).flatMap((r) =>
     r.distances.map((d) => ({
       id: `${r.id}:${d.km}`,
       name: r.name,
@@ -215,23 +223,28 @@ lookupRoutes.get('/races', async (c) => {
   if (type === 'trail') {
     try {
       const data = await cached(`utmb:races:${q}`, async () => {
-        const res = await fetch(`https://api.utmb.world/search/races?lang=fr&limit=50${q ? `&search=${encodeURIComponent(q)}` : ''}`, { headers: { 'user-agent': UA } })
+        const res = await fetch(`https://api.utmb.world/search/races?lang=fr&limit=300${q ? `&search=${encodeURIComponent(q)}` : ''}`, { headers: { 'user-agent': UA } })
         if (!res.ok) throw new Error(`UTMB ${res.status}`)
         return (await res.json()) as UtmbRaces
       })
       utmb = data.races
         .map((r) => {
           const stat = (n: string) => Number(r.details?.statsUp?.find((s) => s.name === n)?.value ?? 0)
-          const detail = [`${stat('distance')} km`, `${stat('elevationGain')} m D+`, r.startLocation].filter(Boolean).join(' · ')
+          const detail = [`${stat('distance')} km`, `${stat('elevationGain')} m D+`, r.startLocation === 'undefined' ? null : r.startLocation].filter(Boolean).join(' · ')
           return { id: `utmb:${r.id}`, name: r.name, detail, km: stat('distance'), elevation: stat('elevationGain'), date: frenchDate(r.startDate), source: 'utmb' as const, url: r.slug ?? null }
         })
         // L'API UTMB ne filtre pas toujours sur le nom : on le fait ici.
         .filter((r) => !q || normalize(`${r.name} ${r.detail}`).includes(q))
+        // Coureurs surtout français : France d'abord, puis le reste de l'Europe, puis le monde (ordre des dates gardé).
+        .map((r, i) => ({ r, i, rank: nearness(r.detail, r.url) }))
+        .sort((x, y) => x.rank - y.rank || x.i - y.i)
+        .map((x) => x.r)
     } catch {
       // UTMB indisponible : on garde les courses connues.
     }
   }
-  return c.json([...known, ...utmb].filter((r) => inDist(r.km)).slice(0, 30))
+  // Le client affiche les courses par pages de 4 : on renvoie assez de résultats pour atteindre les courses UTMB.
+  return c.json([...known, ...utmb].filter((r) => inDist(r.km)).slice(0, 150))
 })
 
 /** Page de course UTMB (https://<événement>.utmb.world/…) et liens des GPX officiels qu'elle publie. */
