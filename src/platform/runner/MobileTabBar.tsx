@@ -1,4 +1,5 @@
-import { BarChart3Icon, CalendarDaysIcon, EllipsisIcon, HomeIcon, MessageCircleIcon } from 'lucide-react'
+import { BarChart3Icon, CalendarDaysIcon, EllipsisIcon, HomeIcon } from 'lucide-react'
+import { CoachIcon } from '../onboarding/CoachAvatar'
 import { useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/shadcn/sheet'
@@ -13,7 +14,7 @@ const TABS = [
   { title: 'Home', path: '/account/home', icon: <HomeIcon /> },
   { title: 'Plan', path: '/account/plan', icon: <CalendarDaysIcon /> },
   { title: 'Analytics', path: '/account/analytics', icon: <BarChart3Icon /> },
-  { title: 'Coach', path: '/account/coach', icon: <MessageCircleIcon /> },
+  { title: 'Coach', path: '/account/coach', icon: <CoachIcon className="size-5" /> },
 ]
 
 export function MobileTabBar({ more }: { more: { title: string; path: string; icon: ReactNode }[] }) {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, CreditCardIcon, FootprintsIcon, LogOutIcon, MessageCircleIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, TrophyIcon, UserIcon } from 'lucide-react'
+import { ActivityIcon, HomeIcon, BarChart3Icon, CalendarDaysIcon, CreditCardIcon, FootprintsIcon, LogOutIcon, PencilIcon, PlusIcon, SettingsIcon, ShieldIcon, TrophyIcon, UserIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { RunnerAvatar } from './RunnerAvatar'
@@ -33,6 +33,7 @@ import {
 import { cn } from '@/lib/utils'
 import { api } from '../api'
 import { BRAND } from '../brand'
+import { CoachIcon } from '../onboarding/CoachAvatar'
 import type { CompleteAnswers } from '../onboarding/CompleteOnboarding'
 import { formatDuration, formatPace } from '../onboarding/estimate'
 import { ShareButtons } from '../invite/ShareButtons'
@@ -93,7 +94,7 @@ const NAV: NavItem[] = [
     ],
   },
   { title: 'Leaderboard', path: '/account/leaderboard', icon: <TrophyIcon /> },
-  { title: 'Coach', path: '/account/coach', icon: <MessageCircleIcon /> },
+  { title: 'Coach', path: '/account/coach', icon: <CoachIcon /> },
   { title: 'Equipment', path: '/account/equipment', icon: <FootprintsIcon /> },
 ]
 const FOOTER_NAV: NavItem[] = [

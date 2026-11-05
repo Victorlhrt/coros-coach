@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity as ActivityIcon, CalendarCheck, Compass, Loader2, Smile, Sparkles, TriangleAlert } from 'lucide-react'
+import { Activity as ActivityIcon, CalendarCheck, Compass, Loader2, Smile, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { Panel, PanelHeader, PanelSection } from '@/components/raice/panel'
@@ -12,6 +12,7 @@ import { useActivities } from '@/lib/coros/activity-hooks'
 import { api } from '@/platform/api'
 import { usePlan } from '@/lib/store/plan'
 import { cn } from '@/lib/utils'
+import { CoachIcon } from '../onboarding/CoachAvatar'
 
 /**
  * Onglet Coach : récap IA de la semaine écoulée (plan respecté, ressentis, douleurs, charge).
@@ -69,8 +70,8 @@ export function WeeklyRecap({ className }: { className?: string }) {
         title={`Week ${week.number} recap`}
         subtitle={range}
         actions={
-          <Badge size="sm" icon={<Sparkles className="size-3" />}>
-            AI recap
+          <Badge size="sm" icon={<CoachIcon className="size-3.5" />}>
+            By Josh
           </Badge>
         }
       />

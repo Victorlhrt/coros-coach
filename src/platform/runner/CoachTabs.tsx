@@ -85,7 +85,7 @@ export function HomeTab() {
         {(review?.status === 'pending' || toRate) && (
           <div className="flex flex-col gap-4">
             {review?.status === 'pending' && (
-              <Notice to={ROUTES.adjust} icon={<Wand2 />} title="Your weekly review is ready" color="var(--session-long)">
+              <Notice to={ROUTES.adjust} icon={<CoachAvatar className="size-10 rounded-full border-0" />} title="Your weekly review is ready" color="var(--session-long)">
                 {review.adjustment.changes.length > 0 ? `${review.adjustment.changes.length} suggested change${review.adjustment.changes.length > 1 ? 's' : ''}` : 'Nothing to change, read the analysis'}
               </Notice>
             )}
