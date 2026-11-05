@@ -5,45 +5,54 @@ import { usePlan } from '@/lib/store/plan'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
-import { Card, CardTitle } from './ui/card'
+import { Dialog, DialogContent } from './arc/dialog/dialog'
 import { Chip } from './ui/chip'
 
-/** Note et ressenti d'une séance réalisée. */
-export function FeedbackCard({ sessionId }: { sessionId: string }) {
+/**
+ * Ressenti d'une séance réalisée : une ligne compacte en haut de la séance (« How it felt » + note si remplie),
+ * le formulaire s'ouvre dans une modale. `openOnMount` l'ouvre directement (lien #ressenti).
+ */
+export function FeedbackCard({ sessionId, openOnMount }: { sessionId: string; openOnMount?: boolean }) {
+  const saved = usePlan((s) => s.feedback[sessionId])
+  const [open, setOpen] = useState<boolean>(!!openOnMount && !saved)
+
+  return (
+    <section id="ressenti" className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border bg-card px-5 py-3.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+        <p className="font-medium text-sm">How it felt</p>
+        {saved && (
+          <>
+            <Stars value={saved.rating} />
+            <span className="text-muted-foreground text-sm">
+              RPE {saved.rpe}/10 · {RPE_LABELS[saved.rpe]}
+              {saved.tags.length > 0 && ` · ${saved.tags.map((t) => FEELING_TAG_LABEL[t as FeelingTag] ?? t).join(', ')}`}
+            </span>
+          </>
+        )}
+      </div>
+      <Button size="sm" variant={saved ? 'secondary' : 'default'} onClick={() => setOpen(true)}>
+        {saved ? 'Edit' : 'Complete'}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent title="How it felt" description="Your coach reads this to adjust the next sessions.">
+          {open && <FeedbackForm sessionId={sessionId} onSaved={() => setOpen(false)} />}
+        </DialogContent>
+      </Dialog>
+    </section>
+  )
+}
+
+function FeedbackForm({ sessionId, onSaved }: { sessionId: string; onSaved: () => void }) {
   const saved = usePlan((s) => s.feedback[sessionId])
   const setFeedback = usePlan((s) => s.setFeedback)
-  const [editing, setEditing] = useState(!saved)
   const [draft, setDraft] = useState<Omit<Feedback, 'at'>>(saved ?? { rating: 0, rpe: 5, tags: [], comment: '' })
-
-  if (saved && !editing) {
-    return (
-      <Card id="ressenti">
-        <div className="flex items-center justify-between">
-          <CardTitle>How it felt</CardTitle>
-          <button className="text-sm font-medium text-accent" onClick={() => setEditing(true)}>
-            Edit
-          </button>
-        </div>
-        <div className="mt-2 flex items-center gap-3">
-          <Stars value={saved.rating} />
-          <span className="text-sm font-medium">
-            RPE {saved.rpe}/10 · {RPE_LABELS[saved.rpe]}
-          </span>
-        </div>
-        {saved.tags.length > 0 && <p className="mt-2 text-sm text-muted-foreground">{saved.tags.map((t) => FEELING_TAG_LABEL[t as FeelingTag] ?? t).join(' · ')}</p>}
-        {saved.comment && <p className="mt-2 text-sm">“{saved.comment}”</p>}
-      </Card>
-    )
-  }
 
   const toggleTag = (t: string) =>
     setDraft((d) => ({ ...d, tags: d.tags.includes(t) ? d.tags.filter((x) => x !== t) : [...d.tags, t] }))
 
   return (
-    <Card id="ressenti">
-      <CardTitle>How was it?</CardTitle>
-
-      <p className="mt-4 text-sm font-medium text-muted-foreground">Rating</p>
+    <div>
+      <p className="text-sm font-medium text-muted-foreground">Rating</p>
       <Stars value={draft.rating} onChange={(rating) => setDraft((d) => ({ ...d, rating }))} size="lg" />
 
       <div className="mt-4 flex items-baseline justify-between">
@@ -84,13 +93,13 @@ export function FeedbackCard({ sessionId }: { sessionId: string }) {
         disabled={draft.rating === 0}
         onClick={() => {
           setFeedback(sessionId, { ...draft, at: new Date().toISOString() })
-          setEditing(false)
+          onSaved()
           toast.success('Feedback saved ✓')
         }}
       >
         Save
       </Button>
-    </Card>
+    </div>
   )
 }
 

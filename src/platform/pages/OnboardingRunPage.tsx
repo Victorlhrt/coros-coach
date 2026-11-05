@@ -81,7 +81,7 @@ export function OnboardingRunPage() {
     retry: false,
   })
   const resuming = (!!resumeToken || !!reloadId) && resume.isPending
-  // Lien expiré ou déjà utilisé : nouveau départ, Pacer le dit.
+  // Lien expiré ou déjà utilisé : nouveau départ, Josh le dit.
   const resumeFailed = !!resumeToken && resume.isError
   // L'onboarding est toujours le parcours Complet (en conversation avec le coach), sauf parcours forcé.
   const forced = resume.data?.variantId ?? params.get('variant') ?? 'complet'

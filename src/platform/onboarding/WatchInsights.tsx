@@ -2,7 +2,7 @@ import { formatDuration, type Performance } from './estimate'
 
 /**
  * Aperçu de la montre connectée pendant l'onboarding (même forme que server/src/platform/watch-insights.ts) :
- * lu en arrière-plan dès la connexion, il pré-remplit les réponses et Pacer en montre 2 ou 3 chiffres.
+ * lu en arrière-plan dès la connexion, il pré-remplit les réponses et Josh en montre 2 ou 3 chiffres.
  */
 
 export type WatchBest = { label: '5 km' | '10 km' | 'Half' | 'Marathon'; meters: number; seconds: number; date: string | null }
@@ -69,7 +69,7 @@ export function insightTiles(w: WatchInsights): Tile[] {
   return tiles.filter((t): t is Tile => t !== null).slice(0, 3)
 }
 
-/** Carte de Pacer : 2 ou 3 tuiles monochromes, sans texte. */
+/** Carte de Josh : 2 ou 3 tuiles monochromes, sans texte. */
 export function InsightTiles({ insights }: { insights: WatchInsights }) {
   const tiles = insightTiles(insights)
   return (

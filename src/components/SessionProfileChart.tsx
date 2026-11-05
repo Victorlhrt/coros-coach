@@ -103,26 +103,45 @@ export function SessionProfileChart({ blocks, zones, units, laps, stream, classN
   const compared = data.filter((d, n) => (n / samples) * total <= Math.min(planned, realTotal) && d.values.actual !== undefined)
   const hit = compared.filter((d) => (d.values.actual ?? 0) >= d.values.zone - 0.5).length
   const met = withActual && realTotal >= planned * 0.9 && compared.length > 0 && hit / compared.length >= 0.8
+  // Précision vs le plan (0–100) : à chaque instant, écart entre la zone courue et la zone visée (tolérance de ±45 s pour
+  // un léger décalage des répétitions) ; plein crédit dans la zone, zéro à 1,5 zone d'écart. Pondéré par la durée faite.
+  const slack = Math.round((45 / total) * samples)
+  const scores = compared.map((d) => {
+    const n = Number(d.key)
+    let err = Infinity
+    for (let k = Math.max(0, n - slack); k <= Math.min(samples, n + slack); k++) err = Math.min(err, Math.abs((d.values.actual ?? 0) - data[k].values.zone))
+    return Math.max(0, Math.min(1, 1.5 - err))
+  })
+  const accuracy = withActual && scores.length ? Math.round((scores.reduce((a, x) => a + x, 0) / scores.length) * Math.min(1, realTotal / planned) * 100) : null
   const series = withActual ? [...SERIES, { key: 'actual', label: met ? 'Actual · on target' : 'Actual · off target', area: false, color: met ? ACTUAL_COLOR.good : ACTUAL_COLOR.off }] : SERIES
   return (
-    <LineChart
-      className={className}
-      data={data}
-      series={series}
-      label={withActual ? 'Planned and actual intensity' : 'Session intensity profile'}
-      height={withActual ? 200 : 180}
-      max={withActual ? 6.5 : 6}
-      legend={withActual}
-      curve="linear"
-      categoryLabel="Time"
-      formatValue={(v, line) => {
-        if (line.key === 'actual') {
-          const p = zoneToPace(v, zones)
-          return p ? `${formatPace(p, units)} ${paceUnit(units)}` : `Z${v}`
-        }
-        return `Z${v} ${ZONE_NAMES[v] ?? ''}`
-      }}
-      formatTick={(v) => (v > 0 && v <= 6 && Number.isInteger(v) ? `Z${v}` : '')}
-    />
+    <div className={className}>
+      {accuracy !== null && (
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <span className="text-muted-foreground text-sm">Accuracy vs plan</span>
+          <span className="font-medium text-2xl tabular-nums tracking-tight" style={{ color: accuracy >= 80 ? ACTUAL_COLOR.good : accuracy >= 60 ? ACTUAL_COLOR.off : '#e5534b' }}>
+            {accuracy}%
+          </span>
+        </div>
+      )}
+      <LineChart
+        data={data}
+        series={series}
+        label={withActual ? 'Planned and actual intensity' : 'Session intensity profile'}
+        height={withActual ? 200 : 180}
+        max={withActual ? 6.5 : 6}
+        legend={withActual}
+        curve="linear"
+        categoryLabel="Time"
+        formatValue={(v, line) => {
+          if (line.key === 'actual') {
+            const p = zoneToPace(v, zones)
+            return p ? `${formatPace(p, units)} ${paceUnit(units)}` : `Z${v}`
+          }
+          return `Z${v} ${ZONE_NAMES[v] ?? ''}`
+        }}
+        formatTick={(v) => (v > 0 && v <= 6 && Number.isInteger(v) ? `Z${v}` : '')}
+      />
+    </div>
   )
 }

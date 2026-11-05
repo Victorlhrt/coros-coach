@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Moon, Star, Wand2, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Moon, Star, Wand2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BarChart } from '@/components/arc/bar-chart/bar-chart'
+import { Countdown } from '@/components/arc/countdown/countdown'
 import { ActivityTerrain } from '@/components/raice/activity-terrain'
 import { MetricsDashboard, type Kpi } from '@/components/raice/metrics-dashboard'
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
@@ -24,7 +25,7 @@ import { useStravaImportStatus } from '@/lib/strava/imported'
 import { useHasRunData, useHasWatch } from '@/lib/watch'
 import { allSessions, usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
-import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weekRings, weeklyMetrics } from './coach-data'
+import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain, weekDays, weeklyMetrics } from './coach-data'
 
 /**
  * Onglets du coach dans l'espace coureur, construits avec les panneaux Raice (style Arc) :
@@ -32,9 +33,6 @@ import { INTENSITY, WEEKDAY_LABELS, currentWeek, isDone, lastWeeks, planTerrain,
  * et Analytics › Runs (indicateurs, journal).
  */
 
-const RING_COLORS = { volume: '#6c7cf5', sessions: '#f2a33a', time: '#43b581' }
-/** Couleur de chaque phase du plan (barre de progression de l'objectif). */
-const PHASE_COLORS = { base: 'var(--session-easy)', build: 'var(--session-long)', peak: 'var(--session-interval)', taper: 'var(--session-recovery)', race: 'var(--session-race)' } as const
 
 /** Bouton d'actualisation de l'en-tête : relance la lecture COROS, l'icône tourne le temps du chargement. */
 function RefreshAction({ onRefresh }: { onRefresh: () => Promise<unknown> }) {
@@ -85,7 +83,7 @@ export function HomeTab() {
         <StravaOffer />
 
         {(review?.status === 'pending' || toRate) && (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-4">
             {review?.status === 'pending' && (
               <Notice to={ROUTES.adjust} icon={<Wand2 />} title="Your weekly review is ready" color="var(--session-long)">
                 {review.adjustment.changes.length > 0 ? `${review.adjustment.changes.length} suggested change${review.adjustment.changes.length > 1 ? 's' : ''}` : 'Nothing to change, read the analysis'}
@@ -140,24 +138,12 @@ export function HomeTab() {
   )
 }
 
-/**
- * La semaine en cours : trois jauges colorées (volume, séances, temps) puis les 7 jours en tuiles
- * teintées de la couleur de la séance ; un clic sur un jour affiche ses séances dessous.
- */
+/** La semaine en cours, sans couleur : seulement les séances qu'il reste à faire. */
 function ThisWeek({ week, now }: { week: Week; now: string }) {
   const { zones, links, feedback } = usePlan()
   const units = useSettings((s) => s.units)
-  const activities = useActivities()
-  const navigate = useNavigate()
   const days = weekDays(week)
-  const [selected, setSelected] = useState(days.includes(now) ? now : days[0])
-  const rings = weekRings(week, zones, activities.data?.activities ?? [], links, feedback)
-  const daySessions = week.sessions.filter((s) => s.date === selected)
-  const meters = [
-    { label: 'Volume', value: rings.volume.value, detail: `${formatDistance(rings.volume.done, units)} of ${formatDistance(rings.volume.planned, units, 0)}`, color: RING_COLORS.volume },
-    { label: 'Sessions', value: rings.sessions.value, detail: `${rings.sessions.done} of ${rings.sessions.planned} done`, color: RING_COLORS.sessions },
-    { label: 'Time', value: rings.time.value, detail: `${formatDuration(rings.time.done)} of ${formatDuration(rings.time.planned)}`, color: RING_COLORS.time },
-  ]
+  const left = week.sessions.filter((s) => s.date >= now && !isDone(s, links, feedback))
   return (
     <Panel>
       <PanelHeader
@@ -171,97 +157,25 @@ function ThisWeek({ week, now }: { week: Week; now: string }) {
           </Button>
         }
       />
-      <div className="grid grid-cols-3 divide-x border-t">
-        {meters.map((m) => (
-          <div key={m.label} className="flex flex-col gap-2 px-4 py-4 sm:px-6">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-muted-foreground text-xs">{m.label}</p>
-              <p className="font-medium text-lg tabular-nums tracking-tight" style={{ color: m.color }}>
-                {Math.round(m.value * 100)}%
-              </p>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
-              <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.min(100, m.value * 100)}%`, background: m.color }} />
-            </div>
-            <p className="hidden truncate text-muted-foreground text-xs tabular-nums sm:block">{m.detail}</p>
-          </div>
-        ))}
+      <div className="border-t">
+        <p className="px-6 pt-4 pb-1 text-muted-foreground text-xs">
+          {left.length ? `${left.length} session${left.length > 1 ? 's' : ''} left this week` : 'All sessions done this week'}
+        </p>
+        {left.map((s) => {
+          const t = sessionTotals(s, zones)
+          return (
+            <Link key={s.id} to={ROUTES.session(s.id)} className="flex items-center gap-4 border-t px-6 py-3 transition-colors first-of-type:border-t-0 hover:bg-foreground/[0.03]">
+              <span className="w-24 shrink-0 text-muted-foreground text-sm">{s.date === now ? 'Today' : formatDay(s.date, { weekday: 'short', day: 'numeric' })}</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-sm">{s.title}</span>
+              <span className="shrink-0 text-muted-foreground text-sm tabular-nums">
+                {formatDuration(t.seconds)}
+                {t.meters > 0 ? ` · ${formatDistance(t.meters, units)}` : ''}
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          )
+        })}
       </div>
-      <PanelSection divided>
-        <div className="no-scrollbar -mx-6 -my-1 flex gap-2 overflow-x-auto px-6 py-1 sm:mx-0 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
-          {days.map((d, i) => {
-            const sessions = week.sessions.filter((s) => s.date === d)
-            const main = sessions[0]
-            const color = main ? TYPE_META[main.type].color : undefined
-            const done = sessions.length > 0 && sessions.every((s) => isDone(s, links, feedback))
-            const isSel = d === selected
-            return (
-              <button
-                key={d}
-                type="button"
-                aria-pressed={isSel}
-                onClick={() => setSelected(d)}
-                className={`relative flex min-h-28 w-24 shrink-0 flex-col rounded-2xl border p-3 text-left transition-colors sm:w-auto ${isSel ? 'ring-2 ring-foreground/60' : 'hover:border-foreground/30'} ${!main ? 'border-dashed' : ''}`}
-                style={color ? { background: `color-mix(in srgb, ${color} 13%, transparent)`, borderColor: `color-mix(in srgb, ${color} 35%, transparent)` } : undefined}
-              >
-                <span className="flex items-center justify-between text-xs">
-                  <span className={d === now ? 'font-medium text-foreground' : 'text-muted-foreground'}>
-                    {WEEKDAY_LABELS[i]} {Number(d.slice(8))}
-                  </span>
-                  {done && <Check className="size-3.5 text-emerald-400" aria-label="Done" />}
-                </span>
-                {main ? (
-                  <span className="mt-auto">
-                    <span className="block truncate font-medium text-xs" style={{ color }}>
-                      {TYPE_META[main.type].label}
-                    </span>
-                    <span className="block font-medium text-sm tabular-nums">
-                      {(() => {
-                        const t = sessionTotals(main, zones)
-                        return t.meters > 0 ? formatDistance(t.meters, units) : formatDuration(t.seconds)
-                      })()}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="mt-auto text-muted-foreground text-xs">Rest</span>
-                )}
-                {d === now && <span aria-hidden className="absolute top-3 right-3 size-1.5 rounded-full bg-foreground" style={done ? { display: 'none' } : undefined} />}
-              </button>
-            )
-          })}
-        </div>
-        <div className="mt-4">
-          {daySessions.length ? (
-            <div className="grid gap-2 md:grid-cols-2">
-              {daySessions.map((s) => {
-                const t = sessionTotals(s, zones)
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => navigate(ROUTES.session(s.id))}
-                    className="flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors hover:bg-foreground/[0.04]"
-                  >
-                    <span aria-hidden className="h-9 w-1 shrink-0 rounded-full" style={{ background: TYPE_META[s.type].color }} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-sm">{s.title}</span>
-                      <span className="block truncate text-muted-foreground text-xs">
-                        {formatDay(s.date, { weekday: 'long', day: 'numeric', month: 'short' })} · {formatDuration(t.seconds)}
-                        {t.meters > 0 ? ` · ${formatDistance(t.meters, units)}` : ''}
-                      </span>
-                    </span>
-                    {isDone(s, links, feedback) ? <Check className="size-4 text-emerald-400" aria-label="Done" /> : <ArrowRight className="size-4 text-muted-foreground" />}
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="rounded-2xl border border-dashed px-4 py-3 text-muted-foreground text-sm">
-              <span className="font-medium text-foreground">{formatDay(selected, { weekday: 'long' })}</span> · Rest day. Recovery is part of training.
-            </p>
-          )}
-        </div>
-      </PanelSection>
     </Panel>
   )
 }
@@ -366,15 +280,11 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
 
 function GoalPanel() {
   const { plan, goal } = usePlan()
-  const [now] = useState(today)
   if (!plan) return null
-  const daysLeft = Math.max(0, Math.round((Date.parse(plan.raceDate) - Date.parse(now)) / 86_400_000))
-  const current = currentWeek(plan, now)?.number ?? (now > plan.raceDate ? plan.weeks.length : 0)
-  const pct = Math.round((current / plan.weeks.length) * 100)
   return (
     <Panel className="flex flex-col">
       <PanelHeader
-        title="Goal"
+        title={plan.name}
         subtitle={formatDay(plan.raceDate, { weekday: 'long', day: 'numeric', month: 'long' })}
         actions={
           <Link to={ROUTES.goal} className="text-muted-foreground text-sm hover:text-foreground">
@@ -382,41 +292,15 @@ function GoalPanel() {
           </Link>
         }
       />
-      <PanelSection className="pt-0">
-        <p className="font-heading font-medium text-xl leading-snug tracking-tight">{plan.name}</p>
+      <PanelSection divided className="flex flex-1 items-center justify-center py-8">
+        <Countdown target={`${plan.raceDate}T08:00:00`} timeZone="Europe/Paris" units={['days', 'hours', 'minutes']} label="Until the race" completeLabel="It’s race day" className="w-full" />
       </PanelSection>
-      <div className="grid flex-1 grid-cols-2 items-center divide-x border-t">
-        <div className="px-6 py-5">
-          <p className="text-muted-foreground text-xs">Race day</p>
-          <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl" style={{ color: 'var(--session-race)' }}>
-            {daysLeft === 0 ? 'Today' : `D-${daysLeft}`}
-          </p>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-muted-foreground text-xs">Target time</p>
-          <p className="mt-1 whitespace-nowrap font-medium text-3xl tabular-nums tracking-tight sm:text-4xl">{goal?.targetTime ? formatDuration(goal.targetTime) : '—'}</p>
-        </div>
-      </div>
-      <PanelFooter>
-        <div className="flex w-full flex-col gap-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">
-              Week {current} of {plan.weeks.length}
-            </span>
-            <span className="tabular-nums">{pct}%</span>
-          </div>
-          <div className="flex gap-1">
-            {plan.weeks.map((w) => (
-              <span
-                key={w.number}
-                title={`Week ${w.number} · ${PHASE_LABEL[w.phase]}`}
-                className="h-1.5 flex-1 rounded-full"
-                style={{ background: w.number <= current ? PHASE_COLORS[w.phase] : `color-mix(in srgb, ${PHASE_COLORS[w.phase]} 22%, transparent)` }}
-              />
-            ))}
-          </div>
-        </div>
-      </PanelFooter>
+      {goal?.targetTime ? (
+        <PanelFooter>
+          <span className="text-muted-foreground text-sm">Target time</span>
+          <span className="font-medium tabular-nums">{formatDuration(goal.targetTime)}</span>
+        </PanelFooter>
+      ) : null}
     </Panel>
   )
 }
@@ -579,7 +463,7 @@ export function PlanTab() {
               <PanelSection divided className="flex gap-4">
                 <CoachAvatar className="size-10 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm">Pacer</p>
+                  <p className="font-medium text-sm">Josh</p>
                   <RaceStrategy text={plan.raceStrategy} />
                 </div>
               </PanelSection>
@@ -791,7 +675,7 @@ function withPaces(text: string) {
 }
 
 /**
- * Stratégie de course rédigée par Pacer, mise en forme : phrase d'intro, puis un segment par tronçon
+ * Stratégie de course rédigée par Josh, mise en forme : phrase d'intro, puis un segment par tronçon
  * (« km 2-5 : … ») sous forme de frise, et l'objectif final en encadré. Retombe sur le texte brut sinon.
  */
 function RaceStrategy({ text }: { text: string }) {

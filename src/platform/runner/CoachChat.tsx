@@ -21,9 +21,9 @@ import { CoachAvatar } from '../onboarding/CoachAvatar'
 import { currentWeek, isDone } from './coach-data'
 
 /**
- * Pacer, en fenêtre de chat. Le coach conversationnel n'est pas encore branché : les réponses sont écrites
+ * Josh, en fenêtre de chat. Le coach conversationnel n'est pas encore branché : les réponses sont écrites
  * à l'avance et calculées sur le plan du coureur, sans appel à l'IA (aucun token dépensé). Chaque réponse
- * montre d'abord ce que Pacer a « consulté », façon appel d'outil, puis le message.
+ * montre d'abord ce que Josh a « consulté », façon appel d'outil, puis le message.
  */
 
 type Step = { icon: ReactNode; label: string; meta?: string }
@@ -243,7 +243,7 @@ export function CoachChat({ firstName, className }: { firstName?: string; classN
     {
       id: nextId++,
       from: 'pacer',
-      text: `Hi${firstName ? ` ${firstName}` : ''}! I’m Pacer, your coach. ${plan ? `We’re working towards ${plan.name}.` : 'Your plan is on its way.'} Ask me about your plan:`,
+      text: `Hi${firstName ? ` ${firstName}` : ''}! I’m Josh, your coach. ${plan ? `We’re working towards ${plan.name}.` : 'Your plan is on its way.'} Ask me about your plan:`,
     },
   ])
   const [busy, setBusy] = useState(false)
@@ -276,9 +276,9 @@ export function CoachChat({ firstName, className }: { firstName?: string; classN
   return (
     <section className={cn('flex min-h-0 flex-col overflow-hidden rounded-[28px] border bg-card', className)}>
       <header className="flex items-center gap-3 border-b px-5 py-3.5">
-        <CoachAvatar className="size-9" />
+        <CoachAvatar className="size-9" motion="idle" />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm">Pacer</p>
+          <p className="font-medium text-sm">Josh</p>
         </div>
         <Badge size="sm" tone="info" icon={<Sparkles className="size-3" />}>
           Full chat soon
@@ -337,7 +337,7 @@ export function CoachChat({ firstName, className }: { firstName?: string; classN
             ask(draft)
           }}
         >
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Pacer about your plan…" aria-label="Message Pacer" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground" />
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Josh about your plan…" aria-label="Message Josh" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground" />
           <button type="submit" disabled={!draft.trim() || busy} aria-label="Send" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-30">
             <ArrowUp className="size-4" />
           </button>
@@ -347,7 +347,7 @@ export function CoachChat({ firstName, className }: { firstName?: string; classN
   )
 }
 
-/** Carte « appel d'outil » façon Arc : ce que Pacer a consulté, une ligne par étape, coche à droite. */
+/** Carte « appel d'outil » façon Arc : ce que Josh a consulté, une ligne par étape, coche à droite. */
 function ToolCard({ steps, running }: { steps: Step[]; running?: boolean }) {
   return (
     <div className="max-w-[34rem] overflow-hidden rounded-2xl border bg-background">

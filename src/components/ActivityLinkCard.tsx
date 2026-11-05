@@ -32,6 +32,7 @@ export function ActivityLinkCard({ session }: { session: Session }) {
   const link = links[session.id]
   const laps = useLaps(activity?.labelId, activity?.sportType, activity?.meters)
   const stream = useActivityStream(activity?.labelId, activity?.sportType)
+  const cadence = activity?.avgCadence ?? stream.data?.cadence ?? null
 
   // Toutes les activités chargées (6 semaines), les plus proches de la date prévue d'abord : une séance faite en avance ou en retard reste liable.
   const candidates = [...activities].sort((a, b) => Math.abs(diffDays(session.date, a.date)) - Math.abs(diffDays(session.date, b.date)))
@@ -75,11 +76,18 @@ export function ActivityLinkCard({ session }: { session: Session }) {
 
       {activity && (
         <>
-          <div className="grid grid-cols-2 gap-px border-t bg-border @lg:grid-cols-4">
+          <div className={cn('grid grid-cols-2 gap-px border-t bg-border', cadence ? '@lg:grid-cols-3' : '@lg:grid-cols-4')}>
             <Kpi icon={<Route />} label="Distance" value={activity.meters ? formatDistance(activity.meters, units, 2) : '—'} />
             <Kpi icon={<Timer />} label="Time" value={activity.seconds ? formatDuration(activity.seconds) : '—'} />
             <Kpi icon={<Gauge />} label={`Pace ${paceUnit(units)}`} value={activity.paceSecPerKm ? formatPace(activity.paceSecPerKm, units) : '—'} />
             <Kpi icon={<HeartPulse />} label="Avg HR" value={activity.avgHr ? `${Math.round(activity.avgHr)}` : '—'} unit={activity.avgHr ? 'bpm' : undefined} />
+            {cadence ? (
+              <>
+                <Kpi icon={<Footprints />} label="Avg cadence" value={String(cadence)} unit="spm" />
+                {/* Longueur de foulée : distance par pas, de la vitesse moyenne et de la cadence. */}
+                <Kpi icon={<Zap />} label="Stride length" value={activity.meters && activity.seconds ? `${(activity.meters / ((activity.seconds / 60) * cadence)).toFixed(2)}` : '—'} unit="m" />
+              </>
+            ) : null}
           </div>
 
           {stream.isLoading && (

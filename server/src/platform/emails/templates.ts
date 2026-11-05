@@ -104,7 +104,7 @@ export function invited(p: { name: string; app: string; code: string }): Email {
     blocks: [
       { kind: 'eyebrow', text: 'Invite' },
       { kind: 'title', text: `It’s your turn, ${first(p.name)}.` },
-      { kind: 'paragraph', text: `Your access code: ${p.code}. Answer a few questions from Pacer, your coach, and your plan is ready in minutes.` },
+      { kind: 'paragraph', text: `Your access code: ${p.code}. Answer a few questions from Josh, your coach, and your plan is ready in minutes.` },
       { kind: 'button', label: 'Create my plan', href: `${p.app}/onboarding?code=${encodeURIComponent(p.code)}` },
     ],
   })

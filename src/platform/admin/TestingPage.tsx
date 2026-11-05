@@ -33,7 +33,7 @@ export function TestingPage() {
   const [run, setRun] = useState(0)
   const [workflow, setWorkflow] = useState('default')
   const current = usable.find((v) => v.id === selected) ?? usable.find((v) => v.id === 'complet') ?? usable[0]
-  // Les branches de test n'existent que dans le parcours Complet (conversation avec Pacer).
+  // Les branches de test n'existent que dans le parcours Complet (conversation avec Josh).
   const flow = current?.id === 'complet' && workflow !== 'default' ? workflow : null
   const url = current ? `/onboarding?variant=${encodeURIComponent(current.id)}&preview=1${flow ? `&flow=${flow}` : ''}` : null
 

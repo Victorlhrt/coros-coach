@@ -15,6 +15,7 @@ export interface Activity {
   paceSecPerKm: number | null
   place: string | null
   avgHr: number | null
+  avgCadence?: number | null
 }
 
 export type Obj = Record<string, unknown>
@@ -118,7 +119,7 @@ function parseTextRecords(text: string): Obj[] {
 /** Normalise la réponse de querySportRecords : texte du serveur COROS, ou JSON (lecture tolérante). */
 export function normalizeActivities(raw: unknown): Activity[] {
   return (typeof raw === 'string' ? parseTextRecords(raw) : findRecords(raw))
-    .map((o) => {
+    .map((o): Activity | null => {
       const date = parseDate(o)
       if (!date) return null
       const meters = parseMeters(o)
@@ -138,6 +139,7 @@ export function normalizeActivities(raw: unknown): Activity[] {
         seconds,
         paceSecPerKm: pace,
         avgHr: num(pick(o, /^(avg|average).?(heart.?rate|hr)$/i)),
+        avgCadence: num(pick(o, /^(avg|average).?(running.?)?cadence$/i)),
       }
     })
     .filter((a): a is Activity => a !== null)

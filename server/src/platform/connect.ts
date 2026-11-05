@@ -143,7 +143,7 @@ connectRoutes.get('/coros/callback', async (c) => {
     insert into wearable_connections (provider, onboarding_session_id, user_id, tokens)
     values ('coros', ${pending.onboarding_session_id}, ${userId}, ${db.json(provider.tokensValue as never)})
     on conflict (provider, onboarding_session_id) do update set tokens = excluded.tokens, updated_at = now()`
-  return c.html(page('COROS connected', 'You can close this window and go back to your chat with Pacer.'))
+  return c.html(page('COROS connected', 'You can close this window and go back to your chat with Josh.'))
 })
 
 /** État des connexions d'un parcours (interrogé pendant que la fenêtre COROS est ouverte). */

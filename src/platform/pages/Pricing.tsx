@@ -32,7 +32,7 @@ export const PLANS: PricingPlan[] = [
       { label: 'Leaderboard', value: true },
       { label: 'Analytics', value: 'Basic' },
       { label: 'Weekly review', value: false },
-      { label: 'Pacer coach chat', value: false },
+      { label: 'Josh coach chat', value: false },
     ],
   },
   {
@@ -48,7 +48,7 @@ export const PLANS: PricingPlan[] = [
       { label: 'Leaderboard', value: true },
       { label: 'Fitness analytics & GPX race strategy', value: true },
       { label: 'Weekly review that adapts your plan', value: true },
-      { label: 'Pacer coach chat', value: 'Limited' },
+      { label: 'Josh coach chat', value: 'Limited' },
     ],
   },
   {
@@ -59,7 +59,7 @@ export const PLANS: PricingPlan[] = [
     cta: 'Go Expert',
     features: [
       { label: 'Everything in Pro', value: true },
-      { label: 'Pacer coach chat', value: 'Unlimited' },
+      { label: 'Josh coach chat', value: 'Unlimited' },
       { label: 'Expert mode: test new studies on your plan', value: 'Soon' },
     ],
   },

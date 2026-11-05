@@ -12,6 +12,8 @@ export interface ActivityStream {
   speed: (number | null)[]
   /** Temps chronométré (s) où reprend chaque pause. */
   pauses: number[]
+  /** Cadence moyenne (pas par minute), absente des courbes gardées avant son ajout. */
+  cadence?: number | null
 }
 
 const CACHE_PREFIX = 'stream:'
@@ -81,6 +83,42 @@ export function useActivityStream(labelId: string | null | undefined, sportType 
     enabled: !!labelId && !labelId.startsWith('strava:'),
     staleTime: Infinity,
     retry: 1,
+  })
+}
+
+/** Cadence moyenne d'une sortie déjà lue (courbes gardées dans le navigateur), sinon null. */
+export function cachedCadence(labelId: string) {
+  return readCache(labelId)?.cadence ?? null
+}
+
+/**
+ * Cadence des sorties récentes : la liste COROS ne la donne pas, elle vient du fichier FIT. On lit au plus `max`
+ * fichiers manquants par visite (COROS limite à 50 par jour) ; une fois lus, ils restent dans le navigateur.
+ */
+export function useCadenceBackfill(acts: { labelId: string; sportType: number; avgCadence?: number | null }[], max = 8) {
+  const missing = acts
+    .filter((a) => a.avgCadence == null && !a.labelId.startsWith('strava:'))
+    .filter((a) => {
+      const hit = readCache(a.labelId)
+      // Courbes gardées avant l'ajout de la cadence : on relit le fichier une fois.
+      return hit === undefined || (hit !== null && hit.cadence === undefined)
+    })
+    .slice(0, max)
+  return useQuery({
+    queryKey: ['activity', 'cadence-backfill', missing.map((a) => a.labelId)],
+    queryFn: async () => {
+      let read = 0
+      for (const a of missing) {
+        const stream = await fetchStream(a.labelId, a.sportType).catch(() => undefined)
+        if (stream === undefined) continue
+        writeCache(a.labelId, stream)
+        read++
+      }
+      return read
+    },
+    enabled: missing.length > 0,
+    staleTime: Infinity,
+    retry: false,
   })
 }
 

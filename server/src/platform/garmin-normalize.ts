@@ -18,6 +18,8 @@ export interface GarminActivity {
   seconds: number | null
   paceSecPerKm: number | null
   avgHr: number | null
+  /** Cadence moyenne (pas par minute). */
+  avgCadence: number | null
   /** Départ en UTC (epoch ms), pour dédoublonner une sortie présente aussi sur COROS. */
   startMs: number | null
 }
@@ -102,6 +104,7 @@ export function normalizeGarminActivities(raw: unknown): GarminActivity[] {
         seconds: seconds && seconds > 0 ? seconds : null,
         paceSecPerKm: meters && seconds && meters > 0 ? seconds / (meters / 1000) : null,
         avgHr: num(o.averageHR),
+        avgCadence: spm(num(o.averageRunningCadenceInStepsPerMinute)),
         startMs: startMs(o),
       }
     })
@@ -189,6 +192,28 @@ export interface ActivityStream {
   speed: (number | null)[]
   /** Temps chronométré (s) où reprend chaque pause, pour la marquer sur le graphique. */
   pauses: number[]
+  /** Cadence moyenne de la sortie (pas par minute), null sans capteur. */
+  cadence?: number | null
+}
+
+/** Cadence plausible en course (pas/min), arrondie ; sinon null. */
+function spm(v: number | null) {
+  return v !== null && v >= 100 && v <= 260 ? Math.round(v) : null
+}
+
+/**
+ * Cadence moyenne d'un FIT en pas par minute. Le FIT compte les cycles d'une jambe (×2 pour des pas) : moyenne du
+ * message `session`, sinon moyenne des enregistrements en mouvement (vitesse ≥ 1 m/s).
+ */
+function fitCadence(messages: { sessionMesgs?: unknown }, records: Obj[]) {
+  const session = ((messages.sessionMesgs ?? []) as Obj[])[0]
+  const avg = session ? (num(session.avgRunningCadence) ?? num(session.avgCadence)) : null
+  if (avg) return spm((avg + (num(session!.avgFractionalCadence) ?? 0)) * 2)
+  const moving = records
+    .filter((r) => (num(r.enhancedSpeed) ?? num(r.speed) ?? 0) >= 1)
+    .map((r) => num(r.cadence))
+    .filter((c): c is number => c !== null && c > 0)
+  return moving.length ? spm((moving.reduce((a, b) => a + b, 0) / moving.length) * 2) : null
 }
 
 const STREAM_MAX_POINTS = 1500
@@ -288,7 +313,7 @@ export function streamFromFit(fit: Uint8Array): ActivityStream | null {
   })
   const hr = hrSum.map((s, k) => (hrN[k] ? Math.round(s / hrN[k]) : null))
   if (!hr.some((v) => v !== null) && !speed.some((v) => v !== null)) return null
-  return { step, hr, speed, pauses: pauses.map((p) => Math.round(p)) }
+  return { step, hr, speed, pauses: pauses.map((p) => Math.round(p)), cadence: fitCadence(messages, (messages.recordMesgs ?? []) as Obj[]) }
 }
 
 export async function streamFromActivityFile(file: Uint8Array) {

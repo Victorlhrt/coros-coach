@@ -9,7 +9,7 @@ import { formatDay, today } from '@/lib/coach/dates'
 import { buildRecap, lastFinishedWeek, type Recap } from '@/lib/coach/recap'
 import type { WeeklyRecap as RecapText } from '@/lib/coach/schema'
 import { useActivities } from '@/lib/coros/activity-hooks'
-import { api } from '@/lib/server/api'
+import { api } from '@/platform/api'
 import { usePlan } from '@/lib/store/plan'
 import { cn } from '@/lib/utils'
 
@@ -83,7 +83,7 @@ export function WeeklyRecap({ className }: { className?: string }) {
       ) : (
         <PanelSection divided className="space-y-3">
           <p className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Loader2 className="size-4 animate-spin" /> Pacer is going over your week…
+            <Loader2 className="size-4 animate-spin" /> Josh is going over your week…
           </p>
           <Skeleton className="h-6 w-2/3" />
           <Skeleton className="h-12" />

@@ -8,7 +8,7 @@ import { CoachBubble, TypingBubble, UserBubble } from './ChatBubbles'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
-/** Pacer « tape » ses répliques avant de les afficher : `ready` passe à vrai après un court délai, à chaque changement de `key`. */
+/** Josh « tape » ses répliques avant de les afficher : `ready` passe à vrai après un court délai, à chaque changement de `key`. */
 function useTyped(key: string) {
   const [ready, setReady] = useState(false)
   useEffect(() => {
@@ -20,7 +20,7 @@ function useTyped(key: string) {
 }
 
 /**
- * Première question de l'onboarding (accès sur invitation) : le code, dans la conversation avec Pacer.
+ * Première question de l'onboarding (accès sur invitation) : le code, dans la conversation avec Josh.
  * Un lien `?code=` est vérifié tout seul ; sans code, la personne rejoint la liste d'attente (avec le `?ref=`
  * d'un ami) et reçoit son lien de parrainage. Le parcours ne démarre côté serveur qu'avec un code valide.
  */
@@ -135,7 +135,7 @@ export function CodeStep({
     <>
       <UserBubble>I don’t have a code</UserBubble>
       {status && !joined ? (
-        // Déjà inscrit depuis cet appareil : Pacer redonne le rang sans redemander l'e-mail.
+        // Déjà inscrit depuis cet appareil : Josh redonne le rang sans redemander l'e-mail.
         <Joined status={status} first={first} typed={typed} again onBack={() => setMode('code')} />
       ) : (
         !typed && !joined ? (

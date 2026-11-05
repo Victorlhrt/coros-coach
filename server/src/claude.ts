@@ -18,7 +18,7 @@ claudeRoutes.post('/v1/messages', async (c) => {
   if (budget.blocked) {
     // Même forme qu'une erreur Anthropic : le SDK l'affiche telle quelle.
     return c.json(
-      { type: 'error', error: { type: 'budget_exceeded', message: `This month’s AI budget (€${budget.capEur}) is used up. Pacer is paused until next month or until an admin raises the budget.` } },
+      { type: 'error', error: { type: 'budget_exceeded', message: `This month’s AI budget (€${budget.capEur}) is used up. Josh is paused until next month or until an admin raises the budget.` } },
       402,
     )
   }

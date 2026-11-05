@@ -167,7 +167,7 @@ export type CompleteAnswers = {
   strava_need?: string
   /** Aperçu de la montre connectée (volume, records, VO2max…), lu en arrière-plan ; repris par la génération du plan. */
   watch_insights?: WatchInsights | null
-  /** Réponses pré-remplies depuis la montre (« weekly_km », « days ») : Pacer le dit dans sa question. */
+  /** Réponses pré-remplies depuis la montre (« weekly_km », « days ») : Josh le dit dans sa question. */
   watch_prefilled?: string[]
 }
 
@@ -444,7 +444,7 @@ export function CompleteOnboarding({
   /** Aperçu seulement : parcours de test (`coros`, `garmin`, `strava`). */
   preset?: string | null
   resume?: ResumeState | null
-  /** Petit mot de Pacer avant la première question (lien de relance expiré…). */
+  /** Petit mot de Josh avant la première question (lien de relance expiré…). */
   notice?: string
 }) {
   const [init] = useState(() => initialState({ gate, preset, resume }))
@@ -533,7 +533,7 @@ export function CompleteOnboarding({
 
   /**
    * Dès qu'une montre est connectée, son aperçu est lu en arrière-plan pendant que la conversation continue.
-   * À l'arrivée : réponses pré-remplies (si pas encore données) et carte de Pacer à l'étape en cours.
+   * À l'arrivée : réponses pré-remplies (si pas encore données) et carte de Josh à l'étape en cours.
    */
   const watch = (a.connected ?? []).find((c) => c === 'coros' || c === 'garmin')
   const watchInsights = useQuery({
@@ -563,7 +563,7 @@ export function CompleteOnboarding({
       </div>
     ) : null
 
-  // Pacer écrit ses bulles une à une, avec un temps de frappe ; la zone de réponse vient ensuite.
+  // Josh écrit ses bulles une à une, avec un temps de frappe ; la zone de réponse vient ensuite.
   const linesFor = (id: string) => {
     const l = coachLines(id, a, ctx)
     return notice && id === flow[0]?.id ? [l[0], notice, ...l.slice(1)] : l
@@ -595,9 +595,9 @@ export function CompleteOnboarding({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3 border-b pb-4">
-        <CoachAvatar className="size-11" />
+        <CoachAvatar className="size-14" motion="hello" />
         <div className="flex-1">
-          <p className="font-medium">Pacer</p>
+          <p className="font-medium">Josh</p>
           <p className="text-muted-foreground text-xs">{typing && !ready2 ? 'typing…' : `Your coach · ${Math.min(index + 1, flow.length)} / ${flow.length}`}</p>
         </div>
         <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
@@ -748,7 +748,7 @@ function QuickReplies({
 
 // ---------- Conversation ----------
 
-/** Ce que dit Pacer à chaque étape (peut dépendre des réponses précédentes). */
+/** Ce que dit Josh à chaque étape (peut dépendre des réponses précédentes). */
 const REASON_PRAISE: Record<string, string> = {
   race: 'A race in your sights is the best motivation there is.',
   progress: 'You want to get better: we’re going to get along just fine.',
@@ -765,7 +765,7 @@ function volumePraise(km: number, pct: number | null) {
   return 'We’ll start from zero, nice and easy. That’s the best way to begin.'
 }
 
-/** Répliques de Pacer : un petit mot sur la réponse précédente, puis la question. */
+/** Répliques de Josh : un petit mot sur la réponse précédente, puis la question. */
 function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number | null; gated: boolean; referred: boolean }): string[] {
   const first = a.identity?.firstName.trim()
   const race = a.goal?.race
@@ -773,14 +773,14 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
   switch (step) {
     case 'code':
       return [
-        'Hi! I’m Pacer, your running coach.',
+        'Hi! I’m Josh, your running coach.',
         ctx.referred
           ? 'A friend sent you here. Raice.run is invite-only for now: what’s your invite code?'
           : 'Raice.run is invite-only for now, opening in small waves. What’s your invite code?',
       ]
     case 'identity':
       return [
-        ctx.gated ? 'You’re in, welcome!' : 'Hi! I’m Pacer, your running coach.',
+        ctx.gated ? 'You’re in, welcome!' : 'Hi! I’m Josh, your running coach.',
         'First, let’s get to know each other: your first name, last name and email.',
       ]
     case 'reason':

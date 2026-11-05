@@ -43,7 +43,7 @@ export function TodayPage() {
               </Link>
             }
           >
-            {connected ? 'Set your goal and Pacer builds your plan from your COROS data.' : 'First, connect your COROS watch in Settings.'}
+            {connected ? 'Set your goal and Josh builds your plan from your COROS data.' : 'First, connect your COROS watch in Settings.'}
           </EmptyState>
         </Card>
       </>

@@ -13,6 +13,7 @@ import { RECORD_DISTANCES, predictTime, thresholdPace, vdot } from '@/lib/coach/
 import type { Activity } from '@/lib/coros/activities'
 import { useActivityHistory } from '@/lib/coros/activity-hooks'
 import { corosRead } from '@/lib/coros/client'
+import { cachedCadence, useCadenceBackfill } from '@/lib/coros/stream'
 import { useHasRunData } from '@/lib/watch'
 import { usePlan } from '@/lib/store/plan'
 import { useSettings } from '@/lib/store/settings'
@@ -28,7 +29,12 @@ const RANGES = [
   { value: '8', label: '8W' },
   { value: '16', label: '16W' },
 ]
-/** VO2max donnée par la montre COROS (calculée avec la fréquence cardiaque), si elle est connectée. */
+const VO2_KEY = 'coros.vo2max'
+
+/**
+ * VO2max donnée par la montre COROS (calculée avec la fréquence cardiaque), si elle est connectée. La dernière valeur
+ * est gardée dans le navigateur : la tuile l'affiche tout de suite au lieu de passer de la VDOT à la valeur montre.
+ */
 function useWatchVo2max() {
   return useQuery({
     queryKey: ['coros', 'vo2max'],
@@ -37,8 +43,24 @@ function useWatchVo2max() {
       const text = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '')
       const m = text.match(/vo2\s*_?max[^0-9\n]{0,24}(\d{2}(?:[.,]\d+)?)(?![\d.])/i)
       const v = m ? parseFloat(m[1].replace(',', '.')) : null
-      return v !== null && v >= 20 && v <= 90 ? v : null
+      const value = v !== null && v >= 20 && v <= 90 ? v : null
+      try {
+        if (value === null) localStorage.removeItem(VO2_KEY)
+        else localStorage.setItem(VO2_KEY, String(value))
+      } catch {
+        /* sans stockage, la valeur sera relue à chaque visite */
+      }
+      return value
     },
+    initialData: () => {
+      try {
+        const v = Number(localStorage.getItem(VO2_KEY))
+        return v > 0 ? v : undefined
+      } catch {
+        return undefined
+      }
+    },
+    initialDataUpdatedAt: 0,
     staleTime: 60 * 60_000,
     retry: false,
   })
@@ -70,6 +92,10 @@ function weeklyFitness(starts: string[], acts: Activity[]) {
     // Mètres parcourus par battement : plus c'est haut, plus le moteur aérobie est efficace.
     const hrMeters = sum(hr.map((a) => a.meters ?? 0))
     const efficiency = hrSeconds && avgHr ? hrMeters / ((hrSeconds / 60) * avgHr) : 0
+    // Cadence moyenne pondérée par la durée : liste de la montre (Garmin) ou fichier FIT déjà lu (COROS).
+    const cad = week.map((a) => ({ c: a.avgCadence ?? cachedCadence(a.labelId), s: a.seconds ?? 0 })).filter((x) => x.c && x.s)
+    const cadSeconds = sum(cad.map((x) => x.s))
+    const cadence = cadSeconds ? sum(cad.map((x) => x.c! * x.s)) / cadSeconds : 0
     return {
       start,
       label: formatDay(start, { day: 'numeric', month: 'short' }),
@@ -81,6 +107,7 @@ function weeklyFitness(starts: string[], acts: Activity[]) {
       pace: meters ? seconds / (meters / 1000) : 0,
       hr: avgHr,
       efficiency,
+      cadence,
     }
   })
 }
@@ -96,8 +123,13 @@ export function FitnessDashboard() {
   const [range, setRange] = useState('16')
   const [open, setOpen] = useState('vo2')
   const [now] = useState(today)
-  const watchVo2 = useWatchVo2max().data ?? null
+  const watchQuery = useWatchVo2max()
+  const watchVo2 = watchQuery.data ?? null
+  // Tant que la montre n'a pas répondu (et sans valeur gardée), on n'affiche pas la VDOT pour ne pas la voir sauter.
+  const vo2Pending = watchQuery.isPending
   const acts = activities.data ?? []
+  // Relit les fichiers des sorties récentes sans cadence ; la fin de la lecture relance le calcul.
+  useCadenceBackfill(acts.filter((a) => a.date >= addDays(now, -28)))
   const weeks = weeklyFitness(lastWeeks(now, Number(range)), acts)
 
   // VO2max actuelle : meilleure sortie des 4 dernières semaines, ou les records si c'est mieux.
@@ -124,6 +156,8 @@ export function FitnessDashboard() {
   const pacePts = series((w) => w.pace, 0)
   const hrPts = series((w) => w.hr, 0)
   const effPts = series((w) => w.efficiency, 2)
+  const cadPts = series((w) => w.cadence, 0)
+  const [cadNow, cadThen] = firstLast(cadPts)
   const [paceNow, paceThen] = firstLast(pacePts)
   const [hrNow, hrThen] = firstLast(hrPts)
   const [effNow, effThen] = firstLast(effPts)
@@ -146,7 +180,7 @@ export function FitnessDashboard() {
       id: 'vo2',
       // La montre l'emporte (comme dans COROS) ; la VDOT, plus prudente, reste la base des prédictions ci-dessous.
       label: watchVo2 ? 'VO2max' : 'Estimated VO2max',
-      value: watchVo2 ? formatNumber(round1(watchVo2)) : current ? formatNumber(round1(current)) : '—',
+      value: watchVo2 ? formatNumber(round1(watchVo2)) : current && !vo2Pending ? formatNumber(round1(current)) : '—',
       unit: watchVo2 || current ? 'ml/kg/min' : undefined,
       delta: watchVo2 ? undefined : pct(current, past),
       trend: watchVo2 ? 'flat' : trend(current, past),
@@ -225,6 +259,17 @@ export function FitnessDashboard() {
       format: (v) => v.toFixed(2),
     },
     {
+      id: 'cadence',
+      label: 'Average cadence',
+      value: cadNow ? String(Math.round(cadNow)) : '—',
+      unit: cadNow ? 'spm' : undefined,
+      delta: pct(cadNow, cadThen),
+      trend: trend(cadNow, cadThen),
+      hint: 'Steps per minute, all runs of the week weighted by duration. Read from your watch files',
+      points: cadPts,
+      format: (v) => `${Math.round(v)} spm`,
+    },
+    {
       id: 'load',
       label: 'Training load',
       value: acwr ? acwr.toFixed(2) : '—',
@@ -254,13 +299,13 @@ export function FitnessDashboard() {
       {(() => {
         const empty = connected ? 'Not enough runs in this period' : 'No watch connected'
         const active = rows.find((r) => r.id === open) ?? rows[0]
-        const span: Record<string, string> = { vo2: 'col-span-2', predict: 'col-span-2', load: 'col-span-2 lg:col-span-1' }
+        const span: Record<string, string> = { vo2: 'col-span-2', predict: 'col-span-2' }
         return (
           <div className="grid grid-cols-2 gap-3 border-t p-4 sm:p-6 lg:grid-cols-4">
             {rows.map((r) => (
               <MetricTile key={r.id} row={r} active={active.id === r.id} big={r.id === 'vo2' || r.id === 'predict'} className={span[r.id]} onSelect={() => setOpen(r.id)} />
             ))}
-            <div className="col-span-2 flex min-w-0 flex-col gap-3 rounded-[20px] border p-4 lg:col-span-3">
+            <div className="col-span-2 flex min-w-0 flex-col gap-3 rounded-[20px] border p-4">
               <p className="font-medium text-sm">{active.label}</p>
               <LineChart kpi={active} showCompare={false} emptyLabel={empty} />
             </div>

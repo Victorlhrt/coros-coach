@@ -404,7 +404,7 @@ function NoOnboarding() {
   return (
     <EmptyState
       title="No plan yet"
-      description="Answer Pacer’s questions and we’ll build your plan."
+      description="Answer Josh’s questions and we’ll build your plan."
       action={
         <LinkButton asChild>
           <Link to="/onboarding">Create my plan</Link>
@@ -531,12 +531,12 @@ function OnboardingAnalytics() {
 
 // ---------- Coach ----------
 
-/** Pacer : le récap IA de la semaine écoulée en tête, puis la conversation. */
+/** Josh : le récap IA de la semaine écoulée en tête, puis la conversation. */
 function CoachTab() {
   const { data } = useOverview()
   const me = useMe().data
   const first = data?.answers?.identity?.firstName ?? me?.name.split(' ')[0]
-  if (me?.entitlements?.coachChat === 'none') return <UpgradePrompt title="Pacer coach chat is on Pro" />
+  if (me?.entitlements?.coachChat === 'none') return <UpgradePrompt title="Josh coach chat is on Pro" />
   return (
     <div className="flex w-full flex-col gap-4">
       <WeeklyRecap />

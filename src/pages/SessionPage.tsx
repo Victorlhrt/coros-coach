@@ -74,6 +74,8 @@ export function SessionPage() {
         </LinkButton>
       </header>
 
+      {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} openOnMount={location.hash === '#ressenti'} />}
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Panel>
           <PanelHeader title="Structure" subtitle={session.blocks.length ? `${steps} step${steps > 1 ? 's' : ''} · ${formatDuration(seconds)}${meters > 0 ? ` · ${formatDistance(meters, units)}` : ''}` : 'Strength'} />
@@ -124,7 +126,6 @@ export function SessionPage() {
           {session.type !== 'strength' && <ActivityLinkCard session={session} />}
         </div>
       </div>
-      {(session.date <= today() || links[session.id]?.labelId) && <FeedbackCard sessionId={session.id} />}
     </div>
   )
 }

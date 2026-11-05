@@ -33,6 +33,7 @@ export function mergeActivities(primary: GarminActivity[], secondary: GarminActi
       seconds,
       paceSecPerKm: p.paceSecPerKm ?? twin.paceSecPerKm ?? (meters && seconds ? seconds / (meters / 1000) : null),
       avgHr: p.avgHr ?? twin.avgHr,
+      avgCadence: p.avgCadence ?? twin.avgCadence,
       place: p.place ?? twin.place,
     }
   })
