@@ -214,7 +214,7 @@ ${trail ? 'Plan trail : renseigne elevationGain pour chaque séance (0 sur le pl
             else {
               errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`, { zones, goalPace: goalPace(goal) }))
               // Dernière tentative : volume accepté à ±25 % plutôt que d'échouer toute la génération.
-              errors.push(...checkWeekTotals(w, got.sessions, zones, last ? 0.25 : 0.15))
+              errors.push(...checkWeekTotals(w, got.sessions, zones, last ? 0.25 : 0.15, last))
               errors.push(...checkQuality(w, got.sessions, slots.length))
               if (trail) errors.push(...checkWeekGain(w, got.sessions, last ? 0.35 : 0.2))
             }
@@ -351,7 +351,7 @@ export function checkLongRuns(weeks: Skeleton['weeks']) {
 }
 
 /** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 % par défaut). */
-export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[], tolerance = 0.15) {
+export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[], tolerance = 0.15, last = false) {
   // Semaine de course : son volume dépend surtout de la course, la fourchette ne s'applique pas.
   if (!week.targetKm || sessions.some((s) => s.type === 'race')) return []
   const each = sessions.map((s) => ({ s, km: sessionTotals({ ...s, id: '' }, zones).meters / 1000 }))
@@ -369,10 +369,12 @@ export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zon
     const longest = Math.max(0, ...sessions.filter((s) => s.type === 'long' || s.type === 'race').map((s) => sessionTotals({ ...s, id: '' }, zones).meters / 1000))
     if (longest < week.longRunKm * 0.8) errors.push(`Semaine ${week.number} : la sortie longue fait ${longest.toFixed(1)} km au lieu de ${week.longRunKm} km.`)
     // La sortie longue reste la plus longue sortie de la semaine.
+    // Dernière tentative : un léger dépassement (≤ 15 % + 1 km, ex. 9,0 km contre 8,4) est accepté plutôt que d'échouer toute la génération.
+    const max = last ? longest * 1.15 + 1 : longest + 0.5
     for (const s of sessions) {
       if (s.type === 'long' || s.type === 'race') continue
       const km = sessionTotals({ ...s, id: '' }, zones).meters / 1000
-      if (km > longest + 0.5) errors.push(`Semaine ${week.number} : la séance du ${s.date} (${km.toFixed(1)} km) est plus longue que la sortie longue (${longest.toFixed(1)} km). Raccourcis-la et reporte le volume sur la sortie longue.`)
+      if (km > max) errors.push(`Semaine ${week.number} : la séance du ${s.date} (${km.toFixed(1)} km) est plus longue que la sortie longue (${longest.toFixed(1)} km). Raccourcis-la et reporte le volume sur la sortie longue.`)
     }
   }
   return errors
