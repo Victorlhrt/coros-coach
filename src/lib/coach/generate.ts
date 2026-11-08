@@ -156,6 +156,7 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
         if (s.planName.length > 60) errors.push('planName : 60 caractères maximum.')
         if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
         errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
+        errors.push(...checkPeak(s.weeks, goal.peakWeeklyKm ?? null))
         errors.push(...checkLongRuns(s.weeks))
         if (trail) errors.push(...checkGains(s.weeks, goal.currentWeeklyGain ?? null))
         if (slots.length <= 6 && s.weeks.some((w) => w.phase === 'base')) errors.push(`Plan de ${slots.length} semaines : pas de phase base, commence en build.`)
@@ -316,6 +317,15 @@ export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
   return errors
 }
 
+/** Le volume de pointe visé (accepté par le coureur) est atteint, à 10 % près, avant l'affûtage. */
+export function checkPeak(weeks: Skeleton['weeks'], peak: number | null) {
+  if (!peak) return []
+  const max = Math.max(0, ...weeks.filter((w) => w.phase !== 'taper' && w.phase !== 'race').map((w) => w.targetKm))
+  return max >= peak * 0.9
+    ? []
+    : [`La semaine la plus chargée fait ${max} km, alors que le volume de pointe visé est de ${peak} km : monte jusqu'à ${peak} km (à 10 % près) sur la ou les dernières semaines avant l'affûtage, en progressant de +10 % ou jusqu'à +5 km par semaine.`]
+}
+
 /** Trail : D+ de la semaine 1 proche de l'actuel, puis +15 % au plus d'une semaine à l'autre (hors affûtage). */
 export function checkGains(weeks: Skeleton['weeks'], current: number | null) {
   const errors: string[] = []
@@ -365,11 +375,14 @@ export function fitWeekVolume(week: Week, sessions: SessionInput[], zones: Zone[
     const now = km(long)
     if (now < week.longRunKm * 0.9 || now > week.longRunKm * 1.15) scaleSession(long, week.longRunKm - now, zones)
   }
-  const total = sessions.reduce((a, s) => a + km(s), 0)
-  if (Math.abs(total - week.targetKm) <= week.targetKm * 0.1) return
-  const easy = sessions.filter((s) => s.type === 'easy' || s.type === 'recovery' || (!long && s.type === 'long'))
-  const scalable = easy.reduce((a, s) => a + km(s), 0)
-  if (scalable > 0) easy.forEach((s) => scaleSession(s, ((week.targetKm - total) * km(s)) / scalable, zones))
+  // Deux passes : les arrondis (minute, 100 m) et les bornes laissent souvent un reste après la première.
+  for (let pass = 0; pass < 2; pass++) {
+    const total = sessions.reduce((a, s) => a + km(s), 0)
+    if (Math.abs(total - week.targetKm) <= week.targetKm * 0.1) return
+    const easy = sessions.filter((s) => s.type === 'easy' || s.type === 'recovery' || (!long && s.type === 'long'))
+    const scalable = easy.reduce((a, s) => a + km(s), 0)
+    if (scalable > 0) easy.forEach((s) => scaleSession(s, ((week.targetKm - total) * km(s)) / scalable, zones))
+  }
 }
 
 /** Allonge ou raccourcit une séance d'environ `deltaKm` (étapes hors répétitions, ×0,5 à ×1,5), en mettant à jour la distance annoncée dans le titre et la consigne. */
@@ -381,7 +394,7 @@ function scaleSession(s: SessionInput, deltaKm: number, zones: Zone[]) {
   const factor = Math.min(1.5, Math.max(0.5, 1 + deltaKm / steps))
   for (const b of s.blocks) {
     if (b.kind === 'repeat') continue
-    b.value = b.target === 'distance' ? Math.max(500, Math.round((b.value * factor) / 100) * 100) : Math.max(300, Math.round((b.value * factor) / 60) * 60)
+    b.value = b.target === 'distance' ? Math.max(200, Math.round((b.value * factor) / 100) * 100) : Math.max(60, Math.round((b.value * factor) / 60) * 60)
   }
   const after = km()
   const fix = (text: string) =>

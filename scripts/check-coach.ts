@@ -1,7 +1,7 @@
 // Tests hors ligne des règles du coach : volume, liaison automatique, records.
 import './node-env'
 import { addDays, today } from '../src/lib/coach/dates'
-import { checkGains, checkLongRuns, checkVolumes, checkWeekGain, checkWeekTotals, fitWeekVolume } from '../src/lib/coach/generate'
+import { checkGains, checkLongRuns, checkPeak, checkVolumes, checkWeekGain, checkWeekTotals, fitWeekVolume } from '../src/lib/coach/generate'
 import { courseShape } from '../src/lib/coach/course-shape'
 import { analyzePoints } from '../src/lib/coach/gpx'
 import { autoLinks } from '../src/lib/coach/links'
@@ -51,6 +51,8 @@ expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run
   fitWeekVolume(w2, s2, zones)
   expect(checkWeekTotals(w2, s2, zones).length === 0, 'semaine 2 recalée acceptée')
 }
+expect(checkPeak([wk(1, 13), wk(2, 38), { ...wk(3, 20), phase: 'taper' }], 60).length === 1, 'pic à 38 km pour 60 visés refusé')
+expect(checkPeak([wk(1, 13), wk(2, 56), { ...wk(3, 70), phase: 'taper' }], 60).length === 0, 'pic à 56 km pour 60 visés accepté (affûtage ignoré)')
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 6 }]).length === 1, 'sortie longue trop courte dans la structure refusée')
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 10 }, { ...wk(2, 20, 'taper'), longRunKm: 4 }]).length === 0, 'sortie longue à ~33 % acceptée, affûtage libre')
 expect(checkLongRuns([{ ...wk(1, 28), longRunKm: 7 }]).length === 1, 'sortie longue de 7 km pour 28 km refusée (25 %)')
