@@ -213,7 +213,8 @@ ${trail ? 'Plan trail : renseigne elevationGain pour chaque séance (0 sur le pl
             if (!got) errors.push(`Semaine ${w.number} manquante.`)
             else {
               errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`, { zones, goalPace: goalPace(goal) }))
-              // Dernière tentative : volume accepté à ±25 % plutôt que d'échouer toute la génération.
+              // Dernière tentative : footings et sortie longue recalés sur le volume visé, puis volume accepté à ±25 %, plutôt que d'échouer toute la génération.
+              if (last) fitWeekVolume(w, got.sessions, zones)
               errors.push(...checkWeekTotals(w, got.sessions, zones, last ? 0.25 : 0.15, last))
               errors.push(...checkQuality(w, got.sessions, slots.length))
               if (trail) errors.push(...checkWeekGain(w, got.sessions, last ? 0.35 : 0.2))
@@ -348,6 +349,37 @@ export function checkLongRuns(weeks: Skeleton['weeks']) {
       (w) =>
         `Semaine ${w.number} : sortie longue de ${w.longRunKm} km pour ${w.targetKm} km, c'est trop court — elle doit représenter 30 à 40 % du volume (au moins ${Math.ceil(w.targetKm * 0.3)} km) et rester la plus longue sortie de la semaine.`,
     )
+}
+
+/**
+ * Recale le volume d'une semaine hors fourchette (±10 %) en allongeant ou raccourcissant les footings, récups et sortie longue
+ * (étapes hors répétitions), sans toucher aux séances de qualité. Modifie les séances en place.
+ */
+export function fitWeekVolume(week: Week, sessions: SessionInput[], zones: Zone[]) {
+  if (!week.targetKm || sessions.some((s) => s.type === 'race')) return
+  const km = (s: SessionInput) => sessionTotals({ ...s, id: '' }, zones).meters / 1000
+  const total = sessions.reduce((a, s) => a + km(s), 0)
+  if (Math.abs(total - week.targetKm) <= week.targetKm * 0.1) return
+  const easy = sessions.filter((s) => s.type === 'easy' || s.type === 'recovery' || s.type === 'long')
+  const before = easy.map(km)
+  const scalable = easy.reduce((a, s) => a + s.blocks.reduce((b, x) => b + (x.kind === 'repeat' ? 0 : km({ ...s, blocks: [x] })), 0), 0)
+  if (scalable <= 0) return
+  const factor = Math.min(1.5, Math.max(0.5, 1 + (week.targetKm - total) / scalable))
+  easy.forEach((s, i) => {
+    for (const b of s.blocks) {
+      if (b.kind === 'repeat') continue
+      b.value = b.target === 'distance' ? Math.max(500, Math.round((b.value * factor) / 100) * 100) : Math.max(300, Math.round((b.value * factor) / 60) * 60)
+    }
+    // Le titre et la consigne annoncent souvent la distance (« Footing 6 km ») : on la met à jour si elle correspondait.
+    const after = km(s)
+    const fix = (text: string) =>
+      text.replace(/(\d+(?:[.,]\d+)?)\s?km/g, (m, n: string) => {
+        const v = Number(n.replace(',', '.'))
+        return Math.abs(v - before[i]) <= before[i] * 0.15 ? `${Number.isInteger(v) ? Math.round(after) : after.toFixed(1)} km` : m
+      })
+    s.title = fix(s.title)
+    s.description = fix(s.description)
+  })
 }
 
 /** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 % par défaut). */
