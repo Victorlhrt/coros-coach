@@ -51,7 +51,9 @@ export function planVolumes(weeks: number, goal: Pick<Goal, 'distance' | 'course
     const kind = recovery.has(w) ? 'recovery' : 'build'
     if (kind === 'build') top = Math.max(top, km)
     current = km
-    out.push({ number: w, kind, phase: w <= build * 0.4 && weeks >= 10 ? 'base' : w > build - 3 ? 'peak' : 'build', targetKm: km, longRunKm: Math.min(longMax, half(km * ratio)) })
+    // Semaine allégée : même phase que la semaine précédente (une semaine allégée n'est pas un « peak »).
+    const phase: Phase = kind === 'recovery' && out.length ? out[out.length - 1].phase : w <= build * 0.4 && weeks >= 10 ? 'base' : w > build - 3 ? 'peak' : 'build'
+    out.push({ number: w, kind, phase, targetKm: km, longRunKm: Math.min(longMax, half(km * ratio)) })
   }
   const tapers = taper === 2 ? [0.7, 0.5] : [0.6]
   tapers.forEach((f, i) => {
