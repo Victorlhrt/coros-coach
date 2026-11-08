@@ -9,6 +9,7 @@ import { SortableDataTable, type DataColumn } from '@/components/arc/sortable-da
 import { Switch } from '@/components/arc/switch/switch'
 import { api, type UserStatus } from '../api'
 import { USER_STATUS, formatDateTime } from '../format'
+import { OpenRunnerSpace } from './OpenRunnerSpace'
 import { ErrorNote, PageTitle } from './ui'
 
 /**
@@ -171,6 +172,7 @@ export function CustomersPage() {
         ),
     },
     { key: 'created_at', label: 'Signed up', sortable: true, render: (v) => formatDateTime(v as string) },
+    { key: 'id', label: 'Space', render: (_, c) => (c.role === 'admin' ? <span className="text-muted-foreground text-xs">—</span> : <OpenRunnerSpace userId={c.id} name={c.name} size="xs" />) },
   ]
 
   return (

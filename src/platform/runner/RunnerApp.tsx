@@ -180,6 +180,7 @@ export default function RunnerApp() {
       <RunnerSidebar />
       <SidebarInset>
         <RunnerHeader />
+        {me.data.impersonatedBy && <ImpersonationBanner name={me.data.name} />}
         {coros.status === 'error' && (
           <div className="mx-4 mt-4 rounded-[18px] border border-destructive/50 p-4 text-sm md:mx-8">
             <p className="font-medium">Couldn’t connect to COROS</p>
@@ -201,6 +202,26 @@ export default function RunnerApp() {
       <Toaster />
       <RunnerTabBar />
     </SidebarProvider>
+  )
+}
+
+/** Admin connecté à l'espace d'un coureur : tout ce qui est fait ici l'est sur son compte. */
+function ImpersonationBanner({ name }: { name: string }) {
+  const [busy, setBusy] = useState(false)
+  const back = async () => {
+    setBusy(true)
+    await api('/auth/stop-impersonating', { method: 'POST' }).catch(() => undefined)
+    window.location.assign('/admin/customers')
+  }
+  return (
+    <div className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-amber-500/50 bg-amber-500/10 p-3 text-sm md:mx-8">
+      <p>
+        You’re viewing <span className="font-medium">{name}</span>’s space as an admin. Anything you change here changes their account.
+      </p>
+      <button type="button" className="font-medium underline" disabled={busy} onClick={back}>
+        Back to admin
+      </button>
+    </div>
   )
 }
 

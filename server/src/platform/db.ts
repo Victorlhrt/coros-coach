@@ -305,6 +305,8 @@ export async function migratePlatform() {
     update plans p set status = 'active', updated_at = now()
     from coach_state cs
     where cs.user_id = p.user_id and p.status in ('requested', 'generating') and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array'`
+  // Session ouverte par un admin sur le compte d'un coureur (« voir en tant que ») : courte, jamais prolongée.
+  await db`alter table user_sessions add column if not exists impersonated_by uuid references users(id) on delete cascade`
   await db`delete from user_sessions where expires_at < now()`
   await db`delete from password_resets where expires_at < now() - interval '1 day'`
 }

@@ -8,6 +8,7 @@ import { api } from '../api'
 import { DISTANCE_LABELS, LEVEL_LABELS, PLAN_STATUS, formatDate, formatDateTime } from '../format'
 import type { Plan as CoachPlan, Zone } from '@/lib/coach/schema'
 import { CoachPlanWeeks } from './CoachPlanWeeks'
+import { OpenRunnerSpace } from './OpenRunnerSpace'
 import { ErrorNote, PageTitle, Panel } from './ui'
 
 type Plan = {
@@ -29,6 +30,7 @@ type Plan = {
   source: 'onboarding' | 'coach'
   /** Plan lié : le plan généré dans le coach pour une demande, la demande d'inscription pour un plan du coach. */
   linked_id: string | null
+  user_id: string
   /** Demande d'inscription : le plan généré ensuite dans le coach, affiché sous la demande. */
   coach_plan?: { plan: CoachPlan; zones: Zone[] | null } | null
 }
@@ -49,11 +51,14 @@ export function PlanDetailPage() {
         title={p?.title ?? 'Plan'}
         description={p ? `${p.name} · ${p.email}` : undefined}
         actions={
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/admin/plans">
-              <ArrowLeftIcon /> All plans
-            </Link>
-          </Button>
+          <>
+            {p && <OpenRunnerSpace userId={p.user_id} name={p.name} />}
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/admin/plans">
+                <ArrowLeftIcon /> All plans
+              </Link>
+            </Button>
+          </>
         }
       />
       <ErrorNote error={plan.error ?? setStatus.error} />

@@ -35,7 +35,7 @@ export type Entitlements = {
   coachChat: 'none' | 'limited' | 'unlimited'
   expertMode: boolean
 }
-export type Me = { id: string; email: string; name: string; role: UserRole; status: UserStatus; plan?: PlanId; entitlements?: Entitlements }
+export type Me = { id: string; email: string; name: string; role: UserRole; status: UserStatus; plan?: PlanId; entitlements?: Entitlements; impersonatedBy?: string | null }
 export type Billing = {
   configured: boolean
   plan: PlanId

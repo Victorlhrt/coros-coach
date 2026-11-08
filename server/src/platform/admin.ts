@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { requireAdmin, type SessionUser } from './auth.js'
+import { impersonate, requireAdmin, type SessionUser } from './auth.js'
 import { config } from '../config.js'
 import { audit, db, getSetting } from './db.js'
 import { billingEnforced } from './entitlements.js'
@@ -109,6 +109,18 @@ adminRoutes.patch('/users/:id', async (c) => {
 })
 
 // ---------- Clients (offres et abonnements) ----------
+
+/** Ouvre l'espace du coureur pour l'admin (2 h, bandeau « Back to admin »). Pas sur un compte admin. */
+adminRoutes.post('/users/:id/impersonate', async (c) => {
+  const me = c.get('user')
+  if (me.impersonatedBy) return c.json({ error: 'Already viewing a runner space' }, 400)
+  const [target] = await db<{ id: string; email: string; role: string }[]>`select id, email, role from users where id = ${c.req.param('id')}`
+  if (!target) return c.json({ error: 'Account not found' }, 404)
+  if (target.role === 'admin') return c.json({ error: 'Can’t open another admin’s space' }, 400)
+  await impersonate(c, me.id, target.id)
+  await audit(me.id, 'user.impersonate', target.email, {})
+  return c.json({ ok: true })
+})
 
 adminRoutes.get('/customers', async (c) => {
   const rows = await db`
@@ -327,7 +339,7 @@ adminRoutes.get('/plans/:id', async (c) => {
              cs.data->'plan'->'goal'->>'level' level, jsonb_array_length(cs.data->'plan'->'plan'->'weeks') weeks,
              jsonb_array_length(cs.data->'plan'->'goal'->'days') sessions_per_week, 'active' status, null model,
              jsonb_build_object('goal', cs.data->'plan'->'goal', 'plan', cs.data->'plan'->'plan', 'zones', cs.data->'plan'->'zones') data,
-             coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, cs.updated_at, u.email, u.name, null variant_id,
+             coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, cs.updated_at, u.id user_id, u.email, u.name, null variant_id,
              (select p.id::text from plans p where p.user_id = u.id order by p.created_at desc limit 1) linked_id
       from coach_state cs join users u on u.id = cs.user_id
       where u.id::text = ${id.slice('coach-'.length)} and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array'`

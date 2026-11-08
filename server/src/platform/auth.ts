@@ -37,17 +37,18 @@ async function verifyPassword(password: string, stored: string) {
   return timingSafeEqual(actual, expected)
 }
 
-export type SessionUser = { id: string; email: string; name: string; role: UserRole; status: UserStatus }
+export type SessionUser = { id: string; email: string; name: string; role: UserRole; status: UserStatus; impersonatedBy?: string | null }
 
 export async function currentUser(c: Context): Promise<SessionUser | null> {
   const token = getCookie(c, SESSION_COOKIE)
   if (!token) return null
   const [user] = await db<(SessionUser & { stale: boolean })[]>`
-    select u.id, u.email, u.name, u.role, u.status, s.expires_at < now() + ${`${SESSION_DAYS - 1} days`}::interval as stale
+    select u.id, u.email, u.name, u.role, u.status, s.impersonated_by "impersonatedBy",
+           s.expires_at < now() + ${`${SESSION_DAYS - 1} days`}::interval as stale
     from user_sessions s join users u on u.id = s.user_id
     where s.token_hash = ${hashToken(token)} and s.expires_at > now()`
   if (!user) return null
-  if (user.stale) {
+  if (user.stale && !user.impersonatedBy) {
     await db`update user_sessions set expires_at = now() + ${`${SESSION_DAYS} days`}::interval where token_hash = ${hashToken(token)}`
     setCookie(c, SESSION_COOKIE, token, { ...cookieOpts, maxAge: SESSION_DAYS * 86400 })
   }
@@ -79,6 +80,33 @@ async function startSession(c: Context, userId: string) {
   const token = randomBytes(32).toString('base64url')
   await db`insert into user_sessions (token_hash, user_id, expires_at) values (${hashToken(token)}, ${userId}, now() + ${`${SESSION_DAYS} days`}::interval)`
   setCookie(c, SESSION_COOKIE, token, { ...cookieOpts, maxAge: SESSION_DAYS * 86400 })
+}
+
+/** Cookie qui garde la session de l'admin pendant qu'il voit l'espace d'un coureur. */
+const ADMIN_COOKIE = 'psid_admin'
+const IMPERSONATE_HOURS = 2
+
+/** Ouvre l'espace d'un coureur pour l'admin : session courte sur son compte, session admin mise de côté. */
+export async function impersonate(c: Context, adminId: string, userId: string) {
+  const adminToken = getCookie(c, SESSION_COOKIE)
+  if (!adminToken) return
+  const token = randomBytes(32).toString('base64url')
+  await db`
+    insert into user_sessions (token_hash, user_id, expires_at, impersonated_by)
+    values (${hashToken(token)}, ${userId}, now() + ${`${IMPERSONATE_HOURS} hours`}::interval, ${adminId})`
+  setCookie(c, ADMIN_COOKIE, adminToken, { ...cookieOpts, maxAge: SESSION_DAYS * 86400 })
+  setCookie(c, SESSION_COOKIE, token, { ...cookieOpts, maxAge: IMPERSONATE_HOURS * 3600 })
+}
+
+/** Ferme la session « en tant que » et rend sa session à l'admin. `false` si ce n'en était pas une. */
+async function stopImpersonating(c: Context) {
+  const adminToken = getCookie(c, ADMIN_COOKIE)
+  if (!adminToken) return false
+  const token = getCookie(c, SESSION_COOKIE)
+  if (token) await db`delete from user_sessions where token_hash = ${hashToken(token)} and impersonated_by is not null`
+  deleteCookie(c, ADMIN_COOKIE, cookieOpts)
+  setCookie(c, SESSION_COOKIE, adminToken, { ...cookieOpts, maxAge: SESSION_DAYS * 86400 })
+  return true
 }
 
 /** Freine les essais de mot de passe par adresse IP (mémoire du process). */
@@ -114,6 +142,10 @@ platformAuthRoutes.get('/me', async (c) => {
   if (!user) return c.json({ user })
   const { plan, entitlements } = await userEntitlements(user.id, user.role)
   return c.json({ user: { ...user, plan, entitlements } })
+})
+
+platformAuthRoutes.post('/stop-impersonating', async (c) => {
+  return (await stopImpersonating(c)) ? c.json({ ok: true }) : c.json({ error: 'Not viewing a runner space' }, 400)
 })
 
 platformAuthRoutes.post('/signup', async (c) => {
@@ -194,6 +226,8 @@ platformAuthRoutes.post('/login', async (c) => {
 })
 
 platformAuthRoutes.post('/logout', async (c) => {
+  // Déconnexion depuis l'espace d'un coureur : on revient simplement à la session admin.
+  if (await stopImpersonating(c)) return c.json({ ok: true })
   const token = getCookie(c, SESSION_COOKIE)
   if (token) await db`delete from user_sessions where token_hash = ${hashToken(token)}`
   deleteCookie(c, SESSION_COOKIE, cookieOpts)
