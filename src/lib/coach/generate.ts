@@ -17,6 +17,7 @@ import {
 import { goalPace } from './repace'
 import { validateSessions } from './validate'
 import { sessionTotals } from './metrics'
+import { planVolumes } from './progression'
 import type { RaceRecord } from './vdot'
 
 /** Profil coureur extrait des réponses brutes de COROS (formats non documentés → on laisse Claude lire). */
@@ -132,6 +133,14 @@ async function buildPlan(
   saveDraft(draft)
 
   onProgress({ step: 'Plan structure', done: 0, total })
+  // Volume de pointe accepté par le coureur : la progression semaine par semaine est calculée par l'app, Claude écrit autour.
+  const volumes = goal.peakWeeklyKm ? planVolumes(slots.length, goal) : null
+  const KIND = { build: 'montée', recovery: 'semaine allégée', taper: 'affûtage', race: 'course' }
+  const imposed = volumes
+    ? `Volumes imposés (calculés par l’app, recopie-les tels quels dans targetKm et longRunKm, phase indiquée) :
+${volumes.map((v) => `Semaine ${v.number} : ${v.phase}, ${KIND[v.kind]}, ${v.targetKm} km, sortie longue ${v.longRunKm} km`).join('\n')}
+Écris l’objectif (focus) de chaque semaine en cohérence avec ces volumes${trail ? ', et fais suivre au D+ (targetGain) la même progression (recul les semaines allégées)' : ''}.`
+    : ''
   const skeleton =
     draft.skeleton ??
     (await callStructured({
@@ -142,6 +151,8 @@ Le plan compte ${slots.length} semaines (lundi-dimanche), du ${start} à la sema
 ${slots.map((s) => `Semaine ${s.number} : ${s.start} → ${s.end}`).join('\n')}
 
 ${periodizationRules(slots.length, goal)}
+
+${imposed}
 
 Conçois la structure : phase, objectif, volume et sortie longue pour chaque semaine${trail ? ', et le D+ hebdomadaire (targetGain)' : ' (targetGain à 0, ce n’est pas un plan trail)'}. La dernière semaine contient la course, et son volume inclut la distance de la course.
 Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parcours : où gérer, où relancer, allure cible par portion.`,
@@ -155,15 +166,26 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
         })
         if (s.planName.length > 60) errors.push('planName : 60 caractères maximum.')
         if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
-        errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
-        // Dernière tentative : un pic un peu court ne fait pas échouer toute la génération.
-        if (!last) errors.push(...checkPeak(s.weeks, goal.peakWeeklyKm ?? null))
-        errors.push(...checkLongRuns(s.weeks))
+        // Volumes imposés : remplacés par ceux de l'app juste après, inutile de les contrôler.
+        if (!volumes) {
+          errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
+          // Dernière tentative : un pic un peu court ne fait pas échouer toute la génération.
+          if (!last) errors.push(...checkPeak(s.weeks, goal.peakWeeklyKm ?? null))
+          errors.push(...checkLongRuns(s.weeks))
+        }
         if (trail) errors.push(...checkGains(s.weeks, goal.currentWeeklyGain ?? null))
         if (slots.length <= 6 && s.weeks.some((w) => w.phase === 'base')) errors.push(`Plan de ${slots.length} semaines : pas de phase base, commence en build.`)
         return errors
       },
     }))
+  if (volumes)
+    skeleton.weeks.forEach((w, i) => {
+      const v = volumes[i]
+      if (!v) return
+      w.phase = v.phase
+      w.targetKm = v.targetKm
+      w.longRunKm = v.longRunKm
+    })
   draft.skeleton = skeleton
   saveDraft(draft)
 

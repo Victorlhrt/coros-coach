@@ -1,6 +1,7 @@
 // Tests hors ligne des règles du coach : volume, liaison automatique, records.
 import './node-env'
 import { addDays, today } from '../src/lib/coach/dates'
+import { planVolumes } from '../src/lib/coach/progression'
 import { checkGains, checkLongRuns, checkPeak, checkVolumes, checkWeekGain, checkWeekTotals, fitWeekVolume } from '../src/lib/coach/generate'
 import { courseShape } from '../src/lib/coach/course-shape'
 import { analyzePoints } from '../src/lib/coach/gpx'
@@ -53,6 +54,15 @@ expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run
 }
 expect(checkPeak([wk(1, 13), wk(2, 38), { ...wk(3, 20), phase: 'taper' }], 60).length === 1, 'pic à 38 km pour 60 visés refusé')
 expect(checkPeak([wk(1, 13), wk(2, 56), { ...wk(3, 70), phase: 'taper' }], 60).length === 0, 'pic à 56 km pour 60 visés accepté (affûtage ignoré)')
+// Progression calculée par l'app : 12 km/semaine, trail de 67 km en 13 semaines, pic visé 50 km.
+{
+  const v = planVolumes(13, { distance: 'trail', courseKm: 67.2, currentWeeklyKm: 12, peakWeeklyKm: 50, terrain: 'trail' })
+  const sk = v.map((x) => ({ ...wk(x.number, x.targetKm, x.phase), longRunKm: x.longRunKm }))
+  expect(v.length === 13 && v[0].targetKm === 12, 'progression : 13 semaines, départ au volume actuel')
+  expect(Math.max(...v.filter((x) => x.kind === 'build').map((x) => x.targetKm)) >= 45, `progression : pic à ${Math.max(...v.map((x) => (x.kind === 'build' ? x.targetKm : 0)))} km (≥ 45)`)
+  expect(v.filter((x) => x.kind === 'recovery').length === 2 && v.at(-1)!.kind === 'race', 'progression : deux semaines allégées, course en dernière semaine')
+  expect(checkVolumes(sk, 12).length === 0 && checkLongRuns(sk).length === 0 && checkPeak(sk, 50).length === 0, 'progression conforme aux règles de volume et de sortie longue')
+}
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 6 }]).length === 1, 'sortie longue trop courte dans la structure refusée')
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 10 }, { ...wk(2, 20, 'taper'), longRunKm: 4 }]).length === 0, 'sortie longue à ~33 % acceptée, affûtage libre')
 expect(checkLongRuns([{ ...wk(1, 28), longRunKm: 7 }]).length === 1, 'sortie longue de 7 km pour 28 km refusée (25 %)')
