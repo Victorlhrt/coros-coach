@@ -10,6 +10,17 @@ type Variant = { id: string; name: string; description: string; status: string; 
 
 const DISTANCE_LABELS: Record<string, string> = { '5k': '5 km', '10k': '10 km', half: 'Half marathon', marathon: 'Marathon', trail: 'Trail' }
 
+/** Distance et titre de la demande : un trail (terrain trail, ex. 67,2 km) reste un trail, quelle que soit la distance route la plus proche. */
+export function planRequestLabel(a: Record<string, unknown>) {
+  const goal = a.goal as { terrain?: unknown; race?: { km?: unknown } | null } | undefined
+  if (goal?.terrain === 'trail' || a.distance === 'trail') {
+    const km = typeof goal?.race?.km === 'number' ? goal.race.km : null
+    return { distance: 'trail', title: km ? `Trail ${km} km plan` : 'Trail plan' }
+  }
+  const distance = typeof a.distance === 'string' ? a.distance : 'unknown'
+  return { distance, title: `${DISTANCE_LABELS[distance] ?? distance} plan` }
+}
+
 /** Demande de plan créée à la fin d'un onboarding, dès qu'un compte y est rattaché (une seule par parcours). */
 export async function createPlanFromSession(sessionId: string, userId: string) {
   const [s] = await db<{ answers: Record<string, unknown>; completed_at: Date | null }[]>`
@@ -19,13 +30,13 @@ export async function createPlanFromSession(sessionId: string, userId: string) {
   if (existing) return
 
   const a = s.answers
-  const distance = typeof a.distance === 'string' ? a.distance : 'unknown'
+  const { distance, title } = planRequestLabel(a)
   const raceDate = typeof a.race_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.race_date) ? a.race_date : null
   const days = Array.isArray(a.days) ? a.days.length : null
   const weeks = raceDate ? Math.max(1, Math.round((Date.parse(raceDate) - Date.now()) / (7 * 86400_000))) : null
   await db`
     insert into plans (user_id, onboarding_session_id, title, goal_distance, goal_date, level, weeks, sessions_per_week, status, data)
-    values (${userId}, ${sessionId}, ${`${DISTANCE_LABELS[distance] ?? distance} plan`}, ${distance}, ${raceDate},
+    values (${userId}, ${sessionId}, ${title}, ${distance}, ${raceDate},
             ${typeof a.level === 'string' ? a.level : null}, ${weeks}, ${days}, 'requested', ${db.json({ answers: a } as never)})`
 }
 

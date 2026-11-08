@@ -71,7 +71,12 @@ stateRoutes.put('/', async (c) => {
             update coach_state set version = version + 1, data = ${json}, updated_at = now()
             where user_id = ${user.id} and version = ${baseVersion}
             returning version, data, updated_at`
-    if (row) return c.json({ version: row.version, updated_at: row.updated_at })
+    if (row) {
+      // Plan généré dans le coach : la demande faite à l'inscription passe en active (sans e-mail, le coureur l'a sous les yeux).
+      const plan = (data as { plan?: { plan?: { weeks?: unknown } | null } }).plan?.plan
+      if (Array.isArray(plan?.weeks)) await db`update plans set status = 'active', updated_at = now() where user_id = ${user.id} and status in ('requested', 'generating')`
+      return c.json({ version: row.version, updated_at: row.updated_at })
+    }
     return c.json({ error: 'Version conflict', current: await readUserState(user) }, 409)
   }
 

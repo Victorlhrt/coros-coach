@@ -327,17 +327,19 @@ adminRoutes.get('/plans/:id', async (c) => {
              cs.data->'plan'->'goal'->>'level' level, jsonb_array_length(cs.data->'plan'->'plan'->'weeks') weeks,
              jsonb_array_length(cs.data->'plan'->'goal'->'days') sessions_per_week, 'active' status, null model,
              jsonb_build_object('goal', cs.data->'plan'->'goal', 'plan', cs.data->'plan'->'plan') data,
-             coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, cs.updated_at, u.email, u.name, null variant_id
+             coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, cs.updated_at, u.email, u.name, null variant_id,
+             (select p.id::text from plans p where p.user_id = u.id order by p.created_at desc limit 1) linked_id
       from coach_state cs join users u on u.id = cs.user_id
       where u.id::text = ${id.slice('coach-'.length)} and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array'`
     return plan ? c.json({ ...plan, source: 'coach' }) : c.json({ error: 'Plan not found' }, 404)
   }
   const [plan] = await db`
-    select p.*, to_char(p.goal_date, 'YYYY-MM-DD') goal_date, u.email, u.name, os.variant_id
+    select p.*, to_char(p.goal_date, 'YYYY-MM-DD') goal_date, u.email, u.name, os.variant_id,
+           (select 'coach-' || cs.user_id from coach_state cs where cs.user_id = p.user_id and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array') linked_id
     from plans p join users u on u.id = p.user_id
     left join onboarding_sessions os on os.id = p.onboarding_session_id
-    where p.id = ${c.req.param('id')}`
-  return plan ? c.json(plan) : c.json({ error: 'Plan not found' }, 404)
+    where p.id = ${id}`
+  return plan ? c.json({ ...plan, source: 'onboarding' }) : c.json({ error: 'Plan not found' }, 404)
 })
 
 adminRoutes.patch('/plans/:id', async (c) => {

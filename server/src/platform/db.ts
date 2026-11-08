@@ -295,6 +295,16 @@ export async function migratePlatform() {
   await db`insert into app_settings (key, value) values ('billing_enforced', ${db.json(false)}) on conflict (key) do nothing`
   // Relances d'onboarding : seulement les parcours abandonnés après la mise en service (pas les anciens leads).
   await db`insert into app_settings (key, value) values ('onboarding_reminders_since', ${db.json(new Date().toISOString())}) on conflict (key) do nothing`
+  // Demandes de trail enregistrées en « Marathon plan » avant la correction : titre et distance trail.
+  await db`
+    update plans set goal_distance = 'trail',
+      title = case when data->'answers'->'goal'->'race'->>'km' is not null then 'Trail ' || (data->'answers'->'goal'->'race'->>'km') || ' km plan' else 'Trail plan' end
+    where data->'answers'->'goal'->>'terrain' = 'trail' and goal_distance <> 'trail'`
+  // Demandes dont le plan a déjà été généré dans le coach : actives.
+  await db`
+    update plans p set status = 'active', updated_at = now()
+    from coach_state cs
+    where cs.user_id = p.user_id and p.status in ('requested', 'generating') and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array'`
   await db`delete from user_sessions where expires_at < now()`
   await db`delete from password_resets where expires_at < now() - interval '1 day'`
 }

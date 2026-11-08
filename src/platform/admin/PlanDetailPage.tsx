@@ -25,6 +25,8 @@ type Plan = {
   name: string
   variant_id: string | null
   source: 'onboarding' | 'coach'
+  /** Plan lié : le plan généré dans le coach pour une demande, la demande d'inscription pour un plan du coach. */
+  linked_id: string | null
 }
 
 export function PlanDetailPage() {
@@ -64,6 +66,11 @@ export function PlanDetailPage() {
               <Item label="Model" value={p.model ?? '—'} />
               <Item label="Created" value={formatDateTime(p.created_at)} />
             </dl>
+            {p.linked_id && (
+              <Button asChild size="sm" variant="secondary" className="mt-5">
+                <Link to={`/admin/plans/${p.linked_id}`}>{p.source === 'coach' ? 'Onboarding request' : 'Plan generated in the coach'}</Link>
+              </Button>
+            )}
             {/* Plan du coach : son statut n'est pas géré ici. */}
             <div className="mt-5" hidden={p.source === 'coach'}>
               <Select
