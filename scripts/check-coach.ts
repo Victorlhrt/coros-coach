@@ -32,14 +32,6 @@ expect(checkWeekTotals(week, [run(today(), 6), run(addDays(today(), 2), 6)], zon
 expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 9), run(addDays(today(), 5), 13, 'long')], zones).length === 0, 'semaine au bon volume acceptée')
 // Le cas signalé : sortie longue du dimanche plus courte qu'un footing de semaine → refusé.
 expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run(addDays(today(), 5), 10, 'long')], zones).some((e) => e.includes('plus longue que la sortie longue')), 'footing plus long que la sortie longue refusé')
-// Cas signalé (semaine 5) : séance de 9,0 km pour une sortie longue de 8,4 km → refusée d'abord, tolérée à la dernière tentative.
-{
-  const w5: Week = { ...week, targetKm: 28, longRunKm: 8.4 }
-  const s5 = [run(today(), 5), run(addDays(today(), 2), 9), run(addDays(today(), 4), 5.5), run(addDays(today(), 6), 8.4, 'long')]
-  expect(checkWeekTotals(w5, s5, zones).some((e) => e.includes('plus longue que la sortie longue')), 'léger dépassement refusé hors dernière tentative')
-  expect(!checkWeekTotals(w5, s5, zones, 0.25, true).some((e) => e.includes('plus longue que la sortie longue')), 'léger dépassement toléré à la dernière tentative')
-  expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run(addDays(today(), 5), 10, 'long')], zones, 0.25, true).some((e) => e.includes('plus longue que la sortie longue')), 'gros dépassement refusé même à la dernière tentative')
-}
 // Cas signalé (semaine 5) : 25,8 km pour 20 km visés → footings et sortie longue recalés à la dernière tentative, fractionné intact.
 {
   const w5: Week = { ...week, targetKm: 20, longRunKm: 8 }
@@ -47,9 +39,17 @@ expect(checkWeekTotals(week, [run(today(), 8), run(addDays(today(), 2), 13), run
   const s5 = [{ ...run(today(), 6), title: 'Footing 6 km' }, tempo, { ...run(addDays(today(), 4), 2.8), type: 'recovery' as const }, { ...run(addDays(today(), 6), 10.3, 'long'), title: 'Sortie longue 10 km' }]
   expect(checkWeekTotals(w5, s5, zones, 0.25).some((e) => e.includes('totalisent')), 'semaine à 25,8 km pour 20 km refusée')
   fitWeekVolume(w5, s5, zones)
-  expect(checkWeekTotals(w5, s5, zones, 0.15, true).length === 0, 'semaine recalée acceptée')
+  expect(checkWeekTotals(w5, s5, zones).length === 0, 'semaine recalée acceptée')
   expect(s5[1].blocks[0].kind === 'repeat' && s5[1].blocks[0].steps[0].value === 2200, 'séance de qualité intacte')
-  expect(s5[0].title === 'Footing 4 km' && s5[3].title === 'Sortie longue 7 km', `titres mis à jour (${s5[0].title}, ${s5[3].title})`)
+  expect(s5[0].title === 'Footing 4 km' && s5[3].title === 'Sortie longue 8 km', `titres mis à jour (${s5[0].title}, ${s5[3].title})`)
+}
+// Cas signalé (semaine 2) : sortie longue de 4,9 km pour 6,5 km prévus → ramenée à 6,5 km, footings réduits pour garder le volume.
+{
+  const w2: Week = { ...week, targetKm: 18, longRunKm: 6.5 }
+  const s2 = [run(today(), 6), run(addDays(today(), 2), 5), run(addDays(today(), 4), 4), run(addDays(today(), 6), 4.9, 'long')]
+  expect(checkWeekTotals(w2, s2, zones).some((e) => e.includes('sortie longue fait')), 'sortie longue de 4,9 km pour 6,5 refusée')
+  fitWeekVolume(w2, s2, zones)
+  expect(checkWeekTotals(w2, s2, zones).length === 0, 'semaine 2 recalée acceptée')
 }
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 6 }]).length === 1, 'sortie longue trop courte dans la structure refusée')
 expect(checkLongRuns([{ ...wk(1, 30), longRunKm: 10 }, { ...wk(2, 20, 'taper'), longRunKm: 4 }]).length === 0, 'sortie longue à ~33 % acceptée, affûtage libre')

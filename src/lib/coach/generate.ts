@@ -213,11 +213,12 @@ ${trail ? 'Plan trail : renseigne elevationGain pour chaque séance (0 sur le pl
             if (!got) errors.push(`Semaine ${w.number} manquante.`)
             else {
               errors.push(...validateSessions(got.sessions, new Set(allowed.get(w.number)), `Semaine ${w.number}`, { zones, goalPace: goalPace(goal) }))
-              // Dernière tentative : footings et sortie longue recalés sur le volume visé, puis volume accepté à ±25 %, plutôt que d'échouer toute la génération.
+              // Dernière tentative : sortie longue et volume recalés automatiquement ; les règles de coaching restantes
+              // (volume, qualité, D+) ne bloquent plus, plutôt que de faire échouer toute la génération.
               if (last) fitWeekVolume(w, got.sessions, zones)
-              errors.push(...checkWeekTotals(w, got.sessions, zones, last ? 0.25 : 0.15, last))
-              errors.push(...checkQuality(w, got.sessions, slots.length))
-              if (trail) errors.push(...checkWeekGain(w, got.sessions, last ? 0.35 : 0.2))
+              const soft = [...checkWeekTotals(w, got.sessions, zones), ...checkQuality(w, got.sessions, slots.length), ...(trail ? checkWeekGain(w, got.sessions) : [])]
+              if (!last) errors.push(...soft)
+              else if (soft.length) console.warn('Plan accepté malgré :', soft)
             }
           }
           return errors
@@ -352,38 +353,47 @@ export function checkLongRuns(weeks: Skeleton['weeks']) {
 }
 
 /**
- * Recale le volume d'une semaine hors fourchette (±10 %) en allongeant ou raccourcissant les footings, récups et sortie longue
- * (étapes hors répétitions), sans toucher aux séances de qualité. Modifie les séances en place.
+ * Recale une semaine sur la structure : la sortie longue sur sa distance prévue, puis le volume (±10 %) en allongeant
+ * ou raccourcissant footings et récups (étapes hors répétitions), sans toucher aux séances de qualité. Modifie les séances en place.
  */
 export function fitWeekVolume(week: Week, sessions: SessionInput[], zones: Zone[]) {
   if (!week.targetKm || sessions.some((s) => s.type === 'race')) return
   const km = (s: SessionInput) => sessionTotals({ ...s, id: '' }, zones).meters / 1000
+  const long = sessions.find((s) => s.type === 'long')
+  if (long && week.longRunKm > 0) {
+    const now = km(long)
+    if (now < week.longRunKm * 0.9 || now > week.longRunKm * 1.15) scaleSession(long, week.longRunKm - now, zones)
+  }
   const total = sessions.reduce((a, s) => a + km(s), 0)
   if (Math.abs(total - week.targetKm) <= week.targetKm * 0.1) return
-  const easy = sessions.filter((s) => s.type === 'easy' || s.type === 'recovery' || s.type === 'long')
-  const before = easy.map(km)
-  const scalable = easy.reduce((a, s) => a + s.blocks.reduce((b, x) => b + (x.kind === 'repeat' ? 0 : km({ ...s, blocks: [x] })), 0), 0)
-  if (scalable <= 0) return
-  const factor = Math.min(1.5, Math.max(0.5, 1 + (week.targetKm - total) / scalable))
-  easy.forEach((s, i) => {
-    for (const b of s.blocks) {
-      if (b.kind === 'repeat') continue
-      b.value = b.target === 'distance' ? Math.max(500, Math.round((b.value * factor) / 100) * 100) : Math.max(300, Math.round((b.value * factor) / 60) * 60)
-    }
-    // Le titre et la consigne annoncent souvent la distance (« Footing 6 km ») : on la met à jour si elle correspondait.
-    const after = km(s)
-    const fix = (text: string) =>
-      text.replace(/(\d+(?:[.,]\d+)?)\s?km/g, (m, n: string) => {
-        const v = Number(n.replace(',', '.'))
-        return Math.abs(v - before[i]) <= before[i] * 0.15 ? `${Number.isInteger(v) ? Math.round(after) : after.toFixed(1)} km` : m
-      })
-    s.title = fix(s.title)
-    s.description = fix(s.description)
-  })
+  const easy = sessions.filter((s) => s.type === 'easy' || s.type === 'recovery' || (!long && s.type === 'long'))
+  const scalable = easy.reduce((a, s) => a + km(s), 0)
+  if (scalable > 0) easy.forEach((s) => scaleSession(s, ((week.targetKm - total) * km(s)) / scalable, zones))
+}
+
+/** Allonge ou raccourcit une séance d'environ `deltaKm` (étapes hors répétitions, ×0,5 à ×1,5), en mettant à jour la distance annoncée dans le titre et la consigne. */
+function scaleSession(s: SessionInput, deltaKm: number, zones: Zone[]) {
+  const km = () => sessionTotals({ ...s, id: '' }, zones).meters / 1000
+  const before = km()
+  const steps = s.blocks.reduce((a, x) => a + (x.kind === 'repeat' ? 0 : sessionTotals({ ...s, blocks: [x], id: '' }, zones).meters / 1000), 0)
+  if (steps <= 0) return
+  const factor = Math.min(1.5, Math.max(0.5, 1 + deltaKm / steps))
+  for (const b of s.blocks) {
+    if (b.kind === 'repeat') continue
+    b.value = b.target === 'distance' ? Math.max(500, Math.round((b.value * factor) / 100) * 100) : Math.max(300, Math.round((b.value * factor) / 60) * 60)
+  }
+  const after = km()
+  const fix = (text: string) =>
+    text.replace(/(\d+(?:[.,]\d+)?)\s?km/g, (m, n: string) => {
+      const v = Number(n.replace(',', '.'))
+      return Math.abs(v - before) <= before * 0.15 ? `${Number.isInteger(v) ? Math.round(after) : after.toFixed(1)} km` : m
+    })
+  s.title = fix(s.title)
+  s.description = fix(s.description)
 }
 
 /** Les séances d'une semaine doivent correspondre au volume prévu par la structure (±15 % par défaut). */
-export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[], tolerance = 0.15, last = false) {
+export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zone[], tolerance = 0.15) {
   // Semaine de course : son volume dépend surtout de la course, la fourchette ne s'applique pas.
   if (!week.targetKm || sessions.some((s) => s.type === 'race')) return []
   const each = sessions.map((s) => ({ s, km: sessionTotals({ ...s, id: '' }, zones).meters / 1000 }))
@@ -401,12 +411,10 @@ export function checkWeekTotals(week: Week, sessions: SessionInput[], zones: Zon
     const longest = Math.max(0, ...sessions.filter((s) => s.type === 'long' || s.type === 'race').map((s) => sessionTotals({ ...s, id: '' }, zones).meters / 1000))
     if (longest < week.longRunKm * 0.8) errors.push(`Semaine ${week.number} : la sortie longue fait ${longest.toFixed(1)} km au lieu de ${week.longRunKm} km.`)
     // La sortie longue reste la plus longue sortie de la semaine.
-    // Dernière tentative : un léger dépassement (≤ 15 % + 1 km, ex. 9,0 km contre 8,4) est accepté plutôt que d'échouer toute la génération.
-    const max = last ? longest * 1.15 + 1 : longest + 0.5
     for (const s of sessions) {
       if (s.type === 'long' || s.type === 'race') continue
       const km = sessionTotals({ ...s, id: '' }, zones).meters / 1000
-      if (km > max) errors.push(`Semaine ${week.number} : la séance du ${s.date} (${km.toFixed(1)} km) est plus longue que la sortie longue (${longest.toFixed(1)} km). Raccourcis-la et reporte le volume sur la sortie longue.`)
+      if (km > longest + 0.5) errors.push(`Semaine ${week.number} : la séance du ${s.date} (${km.toFixed(1)} km) est plus longue que la sortie longue (${longest.toFixed(1)} km). Raccourcis-la et reporte le volume sur la sortie longue.`)
     }
   }
   return errors
