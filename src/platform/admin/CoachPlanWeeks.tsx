@@ -1,8 +1,7 @@
 import { Badge, type BadgeTone } from '@/components/arc/badge/badge'
 import { DEFAULT_ZONES } from '@/lib/coach/zones'
 import { sessionTotals } from '@/lib/coach/metrics'
-import type { Plan, Session, Zone } from '@/lib/coach/schema'
-import { formatDate } from '../format'
+import type { Plan, Zone } from '@/lib/coach/schema'
 import { Panel } from './ui'
 
 const TYPE: Record<string, { label: string; tone: BadgeTone }> = {
@@ -15,56 +14,39 @@ const TYPE: Record<string, { label: string; tone: BadgeTone }> = {
   race: { label: 'Race', tone: 'danger' },
 }
 
-function sessionLine(s: Session, zones: Zone[]) {
-  const t = sessionTotals(s, zones)
-  if (s.type === 'strength') return `${s.strengthMinutes ?? 30} min`
-  const parts = [`${(t.meters / 1000).toFixed(1)} km`, `${Math.round(t.seconds / 60)} min`]
-  if (s.elevationGain) parts.push(`${s.elevationGain} m D+`)
-  return parts.join(' · ')
-}
+const day = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 
-/** Plan généré dans le coach, semaine par semaine : ce que le coureur voit dans son app. */
+/** Plan généré dans le coach, en bref : chaque semaine et ses séances avec leur distance. */
 export function CoachPlanWeeks({ plan, zones }: { plan: Plan; zones?: Zone[] | null }) {
   const z = zones?.length ? zones : DEFAULT_ZONES
+  const km = (s: Plan['weeks'][number]['sessions'][number]) => sessionTotals(s, z).meters / 1000
   return (
-    <div className="flex flex-col gap-4">
-      {plan.overview && (
-        <Panel title="Overview">
-          <p className="text-sm">{plan.overview}</p>
-          {plan.raceStrategy && <p className="mt-3 text-muted-foreground text-sm">{plan.raceStrategy}</p>}
-        </Panel>
-      )}
-      {plan.weeks.map((w) => {
-        const km = w.sessions.reduce((a, s) => a + sessionTotals(s, z).meters / 1000, 0)
-        return (
-          <Panel
-            key={w.number}
-            title={`Week ${w.number} · ${w.phase}`}
-            description={`${formatDate(w.start)} → ${formatDate(w.end)} · ${w.targetKm} km planned (${km.toFixed(1)} km in sessions) · long run ${w.longRunKm} km${w.targetGain ? ` · ${w.targetGain} m D+` : ''}`}
-          >
-            {w.focus && <p className="mb-3 text-muted-foreground text-sm">{w.focus}</p>}
-            <ul className="divide-y">
+    <Panel title={plan.name} description={`${plan.weeks.length} weeks`}>
+      <div className="flex flex-col divide-y">
+        {plan.weeks.map((w) => (
+          <div key={w.number} className="py-3 first:pt-0 last:pb-0">
+            <div className="mb-2 flex items-baseline justify-between gap-2 text-sm">
+              <span className="font-medium">
+                Week {w.number} <span className="font-normal text-muted-foreground">· {w.phase}</span>
+              </span>
+              <span className="tabular-nums">{w.sessions.reduce((a, s) => a + km(s), 0).toFixed(0)} km</span>
+            </div>
+            <ul className="flex flex-col gap-1">
               {[...w.sessions]
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map((s) => (
-                  <li key={s.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4">
-                    <div className="flex shrink-0 items-center gap-2 sm:w-44 sm:flex-col sm:items-start">
-                      <span className="text-muted-foreground text-xs">{formatDate(s.date)}</span>
-                      <Badge size="sm" tone={TYPE[s.type]?.tone ?? 'neutral'}>
-                        {TYPE[s.type]?.label ?? s.type}
-                      </Badge>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm">{s.title}</div>
-                      <div className="text-muted-foreground text-xs">{sessionLine(s, z)}</div>
-                      <p className="mt-1 text-sm">{s.description}</p>
-                    </div>
+                  <li key={s.id} className="flex items-center gap-3 text-sm">
+                    <span className="w-24 shrink-0 text-muted-foreground text-xs">{day.format(new Date(`${s.date}T00:00:00`))}</span>
+                    <Badge size="sm" tone={TYPE[s.type]?.tone ?? 'neutral'}>
+                      {TYPE[s.type]?.label ?? s.type}
+                    </Badge>
+                    <span className="ml-auto tabular-nums">{s.type === 'strength' ? `${s.strengthMinutes ?? 30} min` : `${km(s).toFixed(1)} km`}</span>
                   </li>
                 ))}
             </ul>
-          </Panel>
-        )
-      })}
-    </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
   )
 }
