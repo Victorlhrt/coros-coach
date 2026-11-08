@@ -6,6 +6,8 @@ import { Select } from '@/components/arc/select/select'
 import { Button } from '@/components/shadcn/button'
 import { api } from '../api'
 import { DISTANCE_LABELS, LEVEL_LABELS, PLAN_STATUS, formatDate, formatDateTime } from '../format'
+import type { Plan as CoachPlan, Zone } from '@/lib/coach/schema'
+import { CoachPlanWeeks } from './CoachPlanWeeks'
 import { ErrorNote, PageTitle, Panel } from './ui'
 
 type Plan = {
@@ -81,9 +83,13 @@ export function PlanDetailPage() {
               />
             </div>
           </Panel>
-          <Panel title="Plan data" description="Onboarding answers and, once generated, weeks and sessions.">
-            <JsonViewer data={p.data ?? {}} rootName="plan" defaultExpandDepth={2} searchable copyable maxHeight={560} label="Plan data" />
-          </Panel>
+          {p.source === 'coach' ? (
+            <CoachPlanWeeks plan={(p.data as { plan: CoachPlan }).plan} zones={(p.data as { zones?: Zone[] | null }).zones} />
+          ) : (
+            <Panel title="Onboarding answers">
+              <JsonViewer data={p.data ?? {}} rootName="plan" defaultExpandDepth={2} searchable copyable maxHeight={560} label="Onboarding answers" />
+            </Panel>
+          )}
         </div>
       )}
     </>

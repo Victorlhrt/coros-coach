@@ -326,7 +326,7 @@ adminRoutes.get('/plans/:id', async (c) => {
              cs.data->'plan'->'goal'->>'distance' goal_distance, cs.data->'plan'->'plan'->>'raceDate' goal_date,
              cs.data->'plan'->'goal'->>'level' level, jsonb_array_length(cs.data->'plan'->'plan'->'weeks') weeks,
              jsonb_array_length(cs.data->'plan'->'goal'->'days') sessions_per_week, 'active' status, null model,
-             jsonb_build_object('goal', cs.data->'plan'->'goal', 'plan', cs.data->'plan'->'plan') data,
+             jsonb_build_object('goal', cs.data->'plan'->'goal', 'plan', cs.data->'plan'->'plan', 'zones', cs.data->'plan'->'zones') data,
              coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, cs.updated_at, u.email, u.name, null variant_id,
              (select p.id::text from plans p where p.user_id = u.id order by p.created_at desc limit 1) linked_id
       from coach_state cs join users u on u.id = cs.user_id
