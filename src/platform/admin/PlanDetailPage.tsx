@@ -24,6 +24,7 @@ type Plan = {
   email: string
   name: string
   variant_id: string | null
+  source: 'onboarding' | 'coach'
 }
 
 export function PlanDetailPage() {
@@ -59,11 +60,12 @@ export function PlanDetailPage() {
               <Item label="Level" value={p.level ? (LEVEL_LABELS[p.level] ?? p.level) : '—'} />
               <Item label="Weeks" value={p.weeks ?? '—'} />
               <Item label="Days / week" value={p.sessions_per_week ?? '—'} />
-              <Item label="Flow" value={p.variant_id ?? '—'} />
+              <Item label="Flow" value={p.source === 'coach' ? 'Coach' : (p.variant_id ?? '—')} />
               <Item label="Model" value={p.model ?? '—'} />
               <Item label="Created" value={formatDateTime(p.created_at)} />
             </dl>
-            <div className="mt-5">
+            {/* Plan du coach : son statut n'est pas géré ici. */}
+            <div className="mt-5" hidden={p.source === 'coach'}>
               <Select
                 label="Status"
                 value={p.status}

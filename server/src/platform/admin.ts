@@ -303,10 +303,35 @@ adminRoutes.get('/plans', async (c) => {
     left join onboarding_sessions os on os.id = p.onboarding_session_id
     where (${status ?? null}::text is null or p.status = ${status ?? null})
     order by p.created_at desc limit 1000`
-  return c.json(rows)
+  // Plans générés dans le coach (bouton « Generate my plan ») : stockés dans l'état du coach, pas dans la table plans.
+  const coach =
+    !status || status === 'active'
+      ? await db`
+          select 'coach-' || u.id id, coalesce(cs.data->'plan'->'plan'->>'name', 'Coach plan') title,
+                 cs.data->'plan'->'goal'->>'distance' goal_distance, cs.data->'plan'->'plan'->>'raceDate' goal_date,
+                 cs.data->'plan'->'goal'->>'level' level, jsonb_array_length(cs.data->'plan'->'plan'->'weeks') weeks,
+                 jsonb_array_length(cs.data->'plan'->'goal'->'days') sessions_per_week, 'active' status, null model,
+                 coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, u.email, u.name, null variant_id
+          from coach_state cs join users u on u.id = cs.user_id
+          where jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array'`
+      : []
+  return c.json([...rows.map((r) => ({ ...r, source: 'onboarding' })), ...coach.map((r) => ({ ...r, source: 'coach' }))])
 })
 
 adminRoutes.get('/plans/:id', async (c) => {
+  const id = c.req.param('id')
+  if (id.startsWith('coach-')) {
+    const [plan] = await db`
+      select 'coach-' || u.id id, coalesce(cs.data->'plan'->'plan'->>'name', 'Coach plan') title,
+             cs.data->'plan'->'goal'->>'distance' goal_distance, cs.data->'plan'->'plan'->>'raceDate' goal_date,
+             cs.data->'plan'->'goal'->>'level' level, jsonb_array_length(cs.data->'plan'->'plan'->'weeks') weeks,
+             jsonb_array_length(cs.data->'plan'->'goal'->'days') sessions_per_week, 'active' status, null model,
+             jsonb_build_object('goal', cs.data->'plan'->'goal', 'plan', cs.data->'plan'->'plan') data,
+             coalesce(cs.data->'plan'->'plan'->>'createdAt', cs.updated_at::text) created_at, cs.updated_at, u.email, u.name, null variant_id
+      from coach_state cs join users u on u.id = cs.user_id
+      where u.id::text = ${id.slice('coach-'.length)} and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array'`
+    return plan ? c.json({ ...plan, source: 'coach' }) : c.json({ error: 'Plan not found' }, 404)
+  }
   const [plan] = await db`
     select p.*, to_char(p.goal_date, 'YYYY-MM-DD') goal_date, u.email, u.name, os.variant_id
     from plans p join users u on u.id = p.user_id
