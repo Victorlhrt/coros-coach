@@ -335,7 +335,9 @@ adminRoutes.get('/plans/:id', async (c) => {
   }
   const [plan] = await db`
     select p.*, to_char(p.goal_date, 'YYYY-MM-DD') goal_date, u.email, u.name, os.variant_id,
-           (select 'coach-' || cs.user_id from coach_state cs where cs.user_id = p.user_id and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array') linked_id
+           (select 'coach-' || cs.user_id from coach_state cs where cs.user_id = p.user_id and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array') linked_id,
+           (select jsonb_build_object('plan', cs.data->'plan'->'plan', 'zones', cs.data->'plan'->'zones') from coach_state cs
+            where cs.user_id = p.user_id and jsonb_typeof(cs.data->'plan'->'plan'->'weeks') = 'array') coach_plan
     from plans p join users u on u.id = p.user_id
     left join onboarding_sessions os on os.id = p.onboarding_session_id
     where p.id = ${id}`

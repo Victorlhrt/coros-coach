@@ -29,6 +29,8 @@ type Plan = {
   source: 'onboarding' | 'coach'
   /** Plan lié : le plan généré dans le coach pour une demande, la demande d'inscription pour un plan du coach. */
   linked_id: string | null
+  /** Demande d'inscription : le plan généré ensuite dans le coach, affiché sous la demande. */
+  coach_plan?: { plan: CoachPlan; zones: Zone[] | null } | null
 }
 
 export function PlanDetailPage() {
@@ -86,9 +88,12 @@ export function PlanDetailPage() {
           {p.source === 'coach' ? (
             <CoachPlanWeeks plan={(p.data as { plan: CoachPlan }).plan} zones={(p.data as { zones?: Zone[] | null }).zones} />
           ) : (
-            <Panel title="Onboarding answers">
-              <JsonViewer data={p.data ?? {}} rootName="plan" defaultExpandDepth={2} searchable copyable maxHeight={560} label="Onboarding answers" />
-            </Panel>
+            <div className="flex min-w-0 flex-col gap-4">
+              {p.coach_plan && <CoachPlanWeeks plan={p.coach_plan.plan} zones={p.coach_plan.zones} />}
+              <Panel title="Onboarding answers">
+                <JsonViewer data={p.data ?? {}} rootName="plan" defaultExpandDepth={p.coach_plan ? 1 : 2} searchable copyable maxHeight={560} label="Onboarding answers" />
+              </Panel>
+            </div>
           )}
         </div>
       )}
