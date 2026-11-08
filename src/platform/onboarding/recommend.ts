@@ -10,7 +10,8 @@ import { distanceCategory, effortKm } from './estimate'
  *   confirmé ×1,15) et l'ambition (objectif plus rapide que la prédiction → plus de volume, et l'inverse, modérément).
  * Puis borné par :
  * - le temps disponible : +6 % par semaine en moyenne, ou selon le niveau +2 km (débutant), +3 km (intermédiaire),
- *   +5 km (confirmé), semaines allégées comprises, jusqu'à deux semaines de la course ; sans date, +30 % (ou +10 km) ;
+ *   +5 km (confirmé) par semaine de montée (une semaine allégée sur quatre), jusqu'à deux semaines de la course ;
+ *   sans date, +30 % (ou +10 km) ;
  * - le nombre de jours : au plus ~16 km par jour couru en moyenne.
  * Jamais en dessous du volume actuel : on ne recommande pas de courir moins.
  */
@@ -75,8 +76,10 @@ export function recommendVolume(i: RecommendInput): Recommendation {
   const start = Math.max(current, 10)
   if (i.daysToRace !== null) {
     const weeks = Math.max(0, Math.floor(i.daysToRace / 7) - 2)
+    // Une semaine allégée toutes les 4 : elle ne fait pas monter le volume (même règle que le coach).
+    const build = weeks - Math.floor(weeks / 4)
     const step = LEVEL_STEP[i.level ?? 'intermediaire'] ?? 3
-    peak = Math.min(peak, Math.max(start * Math.pow(1.06, weeks), start + step * weeks))
+    peak = Math.min(peak, Math.max(start * Math.pow(1.06, weeks), start + step * build))
   } else peak = Math.min(peak, Math.max(start * 1.3, start + 10))
 
   const peakKm = Math.max(round5(peak), Math.round(current))

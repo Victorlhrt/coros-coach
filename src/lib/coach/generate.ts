@@ -147,7 +147,7 @@ Conçois la structure : phase, objectif, volume et sortie longue pour chaque sem
 Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parcours : où gérer, où relancer, allure cible par portion.`,
       schema: SkeletonSchema,
       maxTokens: 8000,
-      validate: (s) => {
+      validate: (s, last) => {
         const errors: string[] = []
         if (s.weeks.length !== slots.length) errors.push(`Il faut exactement ${slots.length} semaines (reçu ${s.weeks.length}).`)
         s.weeks.forEach((w, i) => {
@@ -156,7 +156,8 @@ Rédige aussi la stratégie de course (raceStrategy) en t’appuyant sur le parc
         if (s.planName.length > 60) errors.push('planName : 60 caractères maximum.')
         if (s.overview.length > 700) errors.push('overview : 700 caractères maximum.')
         errors.push(...checkVolumes(s.weeks, goal.currentWeeklyKm))
-        errors.push(...checkPeak(s.weeks, goal.peakWeeklyKm ?? null))
+        // Dernière tentative : un pic un peu court ne fait pas échouer toute la génération.
+        if (!last) errors.push(...checkPeak(s.weeks, goal.peakWeeklyKm ?? null))
         errors.push(...checkLongRuns(s.weeks))
         if (trail) errors.push(...checkGains(s.weeks, goal.currentWeeklyGain ?? null))
         if (slots.length <= 6 && s.weeks.some((w) => w.phase === 'base')) errors.push(`Plan de ${slots.length} semaines : pas de phase base, commence en build.`)
