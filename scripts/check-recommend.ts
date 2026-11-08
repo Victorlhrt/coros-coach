@@ -7,8 +7,10 @@ const expect = (ok: boolean, label: string) => {
 }
 
 // Cas signalé : 12 km/semaine, trail de 67 km dans 90 jours, confirmé, 5 jours → pic de 20 km avant la correction.
-const william = recommendVolume({ currentKm: 12, raceKm: 67.2, elevation: 0, daysToRace: 90, level: 'confirme', runDays: 5 })
-expect(william.peakKm >= 35, `petit volume, course longue : pic à ${william.peakKm} km (≥ 35)`)
+const william = recommendVolume({ currentKm: 12, raceKm: 67.2, elevation: 0, trail: true, daysToRace: 90, level: 'confirme', runDays: 5 })
+expect(william.peakKm === 60 && william.idealKm === 65, `confirmé à 12 km, trail de 67 km : pic à ${william.peakKm} km (60), idéal ${william.idealKm} (65), moyenne ${william.averageKm}`)
+const inter = recommendVolume({ currentKm: 12, raceKm: 67.2, trail: true, daysToRace: 90, level: 'intermediaire', runDays: 5 })
+expect(inter.peakKm === 40, `intermédiaire, même cas : pic à ${inter.peakKm} km (40)`)
 // Gros volume : la progression en pourcentage reste la règle.
 const big = recommendVolume({ currentKm: 50, raceKm: 42.195, daysToRace: 84, level: 'intermediaire', runDays: 5 })
 expect(big.peakKm === 70, `50 km/semaine, marathon dans 12 semaines : pic à ${big.peakKm} km (70)`)

@@ -898,16 +898,18 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
           : n >= 3
             ? `${n} days is perfect for making progress.`
             : 'Few days but well used, that works really well.'
+      // Temps trop court pour atteindre le volume idéal de la course : on le dit.
+      const short = r.idealKm > r.peakKm ? ` Ideally you’d reach ${r.idealKm} km for this race, but from ${current} km that’s the most we can safely build by race day.` : ''
       if (gain !== undefined)
         return [
           intro,
-          `Here’s what I’d recommend for your level, so you ${goal}: build up to ${r.peakKm} km and ${gain.toLocaleString('en-GB')} m of climbing a week at the peak, instead of ${current} km now. About ${formatMinutes(r.weeklyMinutes)} of running a week.`,
+          `Here’s what I’d recommend for your level, so you ${goal}: from ${current} km a week now, build up to ${r.peakKm} km and ${gain.toLocaleString('en-GB')} m of climbing in your biggest week, about ${r.averageKm} km a week on average.${short}`,
           'In trail, the climbing matters as much as the distance. That’s what gives you the best shot. Does it work for you?',
         ]
       return [
         intro,
         r.peakKm > current
-          ? `Here’s what I’d recommend for your level, so you improve and ${goal}: build up to ${r.peakKm} km a week instead of ${current} km now. That’s about ${formatMinutes(r.weeklyMinutes)} of running a week at the peak.`
+          ? `Here’s what I’d recommend for your level, so you improve and ${goal}: from ${current} km a week now, build up to ${r.peakKm} km in your biggest week, about ${r.averageKm} km a week on average.${short}`
           : `Here’s what I’d recommend for your level, so you ${goal}: keep around ${r.peakKm} km a week (about ${formatMinutes(r.weeklyMinutes)} of running), with more structure.`,
         'That’s the volume that gives you the best shot. Does it work for you?',
       ]
@@ -932,7 +934,7 @@ function coachLines(step: string, a: CompleteAnswers, ctx: { weeklyPct: number |
     case 'gear':
       return [
         a.volume_plan?.choice === 'accept'
-          ? `Deal, we build up to ${a.volume_plan.peakKm} km${a.volume_plan.peakGain ? ` and ${a.volume_plan.peakGain.toLocaleString('en-GB')} m of climbing` : ''} a week.`
+          ? `Deal, we build up to ${a.volume_plan.peakKm} km${a.volume_plan.peakGain ? ` and ${a.volume_plan.peakGain.toLocaleString('en-GB')} m of climbing` : ''} in your biggest week.`
           : a.volume_plan?.weeklyMinutes
             ? `Noted, I’ll fit your plan in ${formatMinutes(a.volume_plan.weeklyMinutes)} a week, around ${plannedKm(a)} km at the peak.`
             : 'Noted, I’ll fit your sessions around that.',
@@ -1935,6 +1937,7 @@ function recommendationFor(a: CompleteAnswers): Recommendation {
     currentKm: a.health?.weeklyKm ?? 20,
     raceKm: a.course?.distanceKm ?? race?.km ?? null,
     elevation: a.course?.gain ?? race?.elevation ?? 0,
+    trail: isTrail(a),
     daysToRace: date ? Math.round((Date.parse(`${date}T12:00:00`) - Date.now()) / 86_400_000) : null,
     level: EXPERIENCES.find((e) => e.value === a.experience)?.level,
     target: a.estimate?.target ?? null,

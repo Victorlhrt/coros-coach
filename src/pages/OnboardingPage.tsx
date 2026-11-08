@@ -259,7 +259,7 @@ export function OnboardingPage() {
           </p>
         </Field>
 
-        <Field label="Peak volume (km per week)">
+        <Field label="Biggest week (km)">
           <Input
             inputMode="numeric"
             placeholder="Coach decides"
@@ -267,7 +267,10 @@ export function OnboardingPage() {
             onChange={(e) => update({ peakWeeklyKm: Number(e.target.value.replace(',', '.')) || null })}
           />
           <p className="mt-1.5 text-sm text-muted-foreground">
-            {recommendedPeak ? `Recommended for your goal: ${recommendedPeak} km/wk at the peak, before the taper.` : 'Highest weekly volume before the taper. Leave empty to let the coach decide.'}
+            {goal.peakWeeklyKm && goal.currentWeeklyKm
+              ? `Your plan: from ${goal.currentWeeklyKm} km a week now to ${goal.peakWeeklyKm} km in the biggest week (a few weeks before the race), about ${Math.round((goal.currentWeeklyKm + goal.peakWeeklyKm) / 2)} km a week on average.`
+              : 'The most km you’ll run in a single week, a few weeks before the race. Leave empty to let the coach decide.'}
+            {recommendedPeak && goal.peakWeeklyKm !== recommendedPeak ? ` Recommended: ${recommendedPeak} km.` : ''}
           </p>
         </Field>
 

@@ -307,8 +307,9 @@ export function checkVolumes(weeks: Skeleton['weeks'], current: number | null) {
   }
   let peak = current ?? first?.targetKm ?? 0
   for (const w of weeks.slice(1)) {
-    if (w.phase !== 'taper' && w.phase !== 'race' && w.targetKm > peak * 1.12 + 2) {
-      errors.push(`Semaine ${w.number} : ${w.targetKm} km dépasse +10 % par rapport au plus haut volume précédent (${Math.round(peak)} km).`)
+    // +10 % par semaine, ou +5 km depuis un petit volume.
+    if (w.phase !== 'taper' && w.phase !== 'race' && w.targetKm > Math.max(peak * 1.12 + 2, peak + 6)) {
+      errors.push(`Semaine ${w.number} : ${w.targetKm} km dépasse +10 % (ou +5 km) par rapport au plus haut volume précédent (${Math.round(peak)} km).`)
     }
     peak = Math.max(peak, w.targetKm)
   }
