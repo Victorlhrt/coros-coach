@@ -51,50 +51,50 @@ function hashesFor(plan: Plan, dates: string[]) {
   return Object.fromEntries(dates.map((d) => [d, dayHash(plan, d)]))
 }
 
-function planDates(plan: Plan) {
-  return [...new Set(plan.weeks.flatMap((w) => w.sessions.map((s) => s.date)))]
-}
-
-/** Crée le plan complet sur COROS (une seule écriture confirmée). */
-export async function pushPlan(plan: Plan) {
+/**
+ * Premier envoi : crée sur COROS le calendrier du plan (semaines à venir, phases) avec les seules séances
+ * envoyées ; les autres n'arrivent sur la montre que lorsqu'on les envoie à leur tour.
+ */
+async function createWithDays(plan: Plan, dates: string[], label: string) {
   const now = today()
-  if (plan.startDate > addDays(now, 14)) throw new Error(`COROS only accepts a plan from 14 days before it starts (${plan.startDate}). Come back later.`)
-  // COROS refuse un début dans le passé : un plan déjà commencé part d'aujourd'hui, avec ses seuls jours à venir.
+  if (plan.startDate > addDays(now, 14)) throw new Error(`COROS only accepts sessions from 14 days before your plan starts (${plan.startDate}). Come back later.`)
+  // COROS refuse un début dans le passé : un plan déjà commencé part d'aujourd'hui.
   const start = plan.startDate < now ? now : plan.startDate
   if (plan.raceDate < start) throw new Error('Your plan is over: nothing left to send.')
 
   const inProgress = await corosRead('queryTrainingPlanLibrary', {}).catch(() => null)
   const hasOther = inProgress !== null && /plan\s*id|planId/i.test(JSON.stringify(inProgress))
-  const args = createPlanArgs(plan, start)
+  const full = createPlanArgs(plan, start)
+  const args = { ...full, courseList: full.courseList.filter((c) => dates.includes(addDays(start, c.dayNo))) }
+  if (args.courseList.length === 0) throw new Error('Nothing to send: strength sessions stay in the app (COROS doesn’t support them).')
   const result = await corosWrite(
     'createTrainingPlan',
     args,
-    `Create the plan “${plan.name}” on COROS: ${args.planInfo.totalWeeks} weeks, ${args.courseList.length} sessions, starting ${start}.` +
-      (hasOther ? ' Heads-up: another plan is already running on COROS, dates may overlap.' : '') +
-      ' Strength sessions stay in the app (COROS doesn’t support them).',
+    `Send ${label} to COROS (${args.courseList.length} session${args.courseList.length > 1 ? 's' : ''}). It appears in your watch’s training calendar.` +
+      (hasOther ? ' Heads-up: another plan is already running on COROS, dates may overlap.' : ''),
   )
   if (result === null) return false
 
   const planId = await locatePlanId(plan, result)
   usePlan.getState().setCoros({ planId, created: true, startDate: start })
-  usePlan.getState().markSynced(hashesFor(plan, planDates(plan).filter((d) => d >= start)))
+  usePlan.getState().markSynced(hashesFor(plan, dates))
   return true
 }
 
-/** Envoie des jours précis. Crée le plan s'il n'existe pas encore sur COROS. */
+/** Envoie des séances précises sur la montre (jours passés ignorés). */
 export async function pushDays(plan: Plan, dates: string[], label: string) {
   const { coros } = usePlan.getState()
-  if (!coros.created) return pushPlan(plan)
+  const future = [...new Set(dates)].filter((d) => d >= today()).sort()
+  if (future.length === 0) throw new Error('These days are in the past: nothing to send.')
+  if (!coros.created) return createWithDays(plan, future, label)
   if (!coros.planId) {
     throw new Error('COROS plan ID not found: can’t update the plan. Open /#/debug and check queryTrainingPlanLibrary.')
   }
-  const future = [...new Set(dates)].filter((d) => d >= today()).sort()
-  if (future.length === 0) throw new Error('These days are in the past: nothing to send.')
 
   const result = await corosWrite(
     'updateTrainingPlan',
     updateDaysArgs(plan, coros.planId, future, coros.startDate),
-    `Update ${label} on COROS (${future.length} day${future.length > 1 ? 's' : ''}). COROS ignores days already completed.`,
+    `Send ${label} to COROS (${future.length} day${future.length > 1 ? 's' : ''}).`,
   )
   if (result === null) return false
   usePlan.getState().markSynced(hashesFor(plan, future))

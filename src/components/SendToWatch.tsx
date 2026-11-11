@@ -43,7 +43,7 @@ export function SessionWatchPanel({ session }: { session: Session }) {
               disabled={push.isPending || status === 'synced'}
             >
               <Send className="size-4" />
-              {push.isPending ? 'Sending…' : !coros.created ? 'Send plan to COROS' : status === 'synced' ? 'Up to date' : 'Send to COROS'}
+              {push.isPending ? 'Sending…' : status === 'synced' ? 'On your watch' : status === 'modified' ? 'Resend to COROS' : 'Send to COROS'}
             </Button>
           )
         }
@@ -75,7 +75,7 @@ export function SendWeekButton({ week }: { week: Week }) {
   return (
     <Button variant="outline" size="sm" onClick={() => push.mutate({ dates, label: `week ${week.number}` })} disabled={push.isPending}>
       <Send className="size-4" />
-      {!coros.created ? 'Send plan to COROS' : pending > 0 ? `Send week (${pending} to update)` : 'Resend week'}
+      {pending > 0 ? `Send week (${pending})` : 'Resend week'}
     </Button>
   )
 }
