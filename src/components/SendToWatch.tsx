@@ -3,8 +3,9 @@ import { Send } from 'lucide-react'
 import { Panel, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { Button } from '@/components/shadcn/button'
 import { SyncBadge } from '@/components/SyncBadge'
-import { addDays, formatDay, today } from '@/lib/coach/dates'
-import type { Session, Week } from '@/lib/coach/schema'
+import { formatDay, today } from '@/lib/coach/dates'
+import type { Session } from '@/lib/coach/schema'
+import { useCorosAccountConnected } from '@/lib/coros/account'
 import { useCorosAuth } from '@/lib/coros/auth-store'
 import { pushDays, syncStatus } from '@/lib/coros/sync'
 import { usePlan } from '@/lib/store/plan'
@@ -12,7 +13,7 @@ import { toast } from '@/lib/toast'
 
 /**
  * Envoi des séances sur la montre. Seul COROS l'accepte (MCP en écriture) ; Garmin (clé Personal API)
- * et l'archive Strava sont en lecture seule, le bouton n'apparaît donc qu'avec COROS connecté.
+ * et l'archive Strava sont en lecture seule, le bouton n'apparaît donc qu'avec COROS connecté (navigateur ou compte).
  */
 function usePush() {
   return useMutation({
@@ -24,7 +25,9 @@ function usePush() {
 
 /** Panneau « Watch » d'une séance à venir : état sur la montre et bouton d'envoi (rien pour une séance passée). */
 export function SessionWatchPanel({ session }: { session: Session }) {
-  const connected = useCorosAuth((s) => s.connected)
+  const browser = useCorosAuth((s) => s.connected)
+  const account = useCorosAccountConnected()
+  const connected = browser || account
   const { plan, coros } = usePlan()
   const push = usePush()
   if (!connected || !plan || session.date < today()) return null
@@ -54,28 +57,5 @@ export function SessionWatchPanel({ session }: { session: Session }) {
         </PanelSection>
       )}
     </Panel>
-  )
-}
-
-/** Bouton d'envoi d'une semaine (jours passés ignorés) ; rien pour une semaine finie ou sans COROS. */
-export function SendWeekButton({ week }: { week: Week }) {
-  const connected = useCorosAuth((s) => s.connected)
-  const { plan, coros } = usePlan()
-  const push = usePush()
-  const now = today()
-  if (!connected || !plan || week.end < now) return null
-
-  const pending = week.sessions.filter((s) => {
-    const st = syncStatus(plan, coros.synced, s)
-    return (st === 'not-sent' || st === 'modified') && s.date >= now
-  }).length
-  const dates: string[] = []
-  for (let d = week.start; d <= week.end; d = addDays(d, 1)) dates.push(d)
-
-  return (
-    <Button variant="outline" size="sm" onClick={() => push.mutate({ dates, label: `week ${week.number}` })} disabled={push.isPending}>
-      <Send className="size-4" />
-      {pending > 0 ? `Send week (${pending})` : 'Resend week'}
-    </Button>
   )
 }

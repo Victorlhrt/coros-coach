@@ -2,6 +2,7 @@ import { auth } from '@modelcontextprotocol/sdk/client/auth.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
+import { ACCOUNT_TOOLS, callAccountTool } from './account'
 import { MCP_URL, SCOPES, isWriteTool } from './config'
 import { useConfirm } from './confirm-store'
 import { corosOAuth } from './oauth-provider'
@@ -97,6 +98,7 @@ function parseResult(result: Awaited<ReturnType<Client['callTool']>>): unknown {
 /** Lecture seule. Les outils d'écriture sont refusés ici : passer par `corosWrite`. */
 export async function corosRead<T = unknown>(tool: string, args: Record<string, unknown> = {}): Promise<T> {
   if (isWriteTool(tool)) throw new Error(`${tool} writes to COROS: use corosWrite.`)
+  if (!corosOAuth.tokens() && ACCOUNT_TOOLS.has(tool)) return (await callAccountTool(tool, args)) as T
   const client = await getClient()
   return parseResult(await client.callTool({ name: tool, arguments: args })) as T
 }
@@ -126,8 +128,8 @@ export async function corosWrite<T = unknown>(
   }
 
   try {
-    const client = await getClient()
-    const result = parseResult(await client.callTool({ name: tool, arguments: args }))
+    // Sans tokens dans le navigateur (COROS connecté à l'onboarding), l'écriture passe par le serveur du compte.
+    const result = corosOAuth.tokens() ? parseResult(await (await getClient()).callTool({ name: tool, arguments: args })) : await callAccountTool(tool, args)
     log({ ...base, status: 'ok', result })
     return result as T
   } catch (err) {

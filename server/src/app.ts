@@ -15,7 +15,7 @@ import { platformAuthRoutes } from './platform/auth.js'
 import { migratePlatform } from './platform/db.js'
 import { lookupRoutes } from './platform/lookup.js'
 import { inviteRoutes } from './platform/invites.js'
-import { connectRoutes } from './platform/connect.js'
+import { connectRoutes, corosAccountRoutes } from './platform/connect.js'
 import { activityStreamRoutes } from './platform/activity-stream.js'
 import { garminAccountRoutes, garminOnboardingRoutes } from './platform/garmin.js'
 import { onboardingRoutes } from './platform/onboarding.js'
@@ -61,6 +61,7 @@ app.route('/api/platform/connect', connectRoutes)
 app.route('/api/platform/admin/ai-usage', aiUsageRoutes)
 app.route('/api/platform/admin', adminRoutes)
 app.route('/api/platform/account/garmin', garminAccountRoutes)
+app.route('/api/platform/account/coros', corosAccountRoutes)
 app.route('/api/platform/account/streams', activityStreamRoutes)
 app.route('/api/platform/account', accountRoutes)
 app.route('/api/platform/billing', billingRoutes)

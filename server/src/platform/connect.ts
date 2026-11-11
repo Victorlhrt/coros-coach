@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js'
 import { Hono } from 'hono'
 import { config } from '../config.js'
+import { requireUser, type SessionUser } from './auth.js'
 import { db, getSetting } from './db.js'
 import type { GarminConnection } from './garmin.js'
 import { corosInsights, emptyInsights, garminInsights, hasData, parseToolResult, type ToolCaller, type WatchInsights } from './watch-insights.js'
@@ -209,4 +210,40 @@ connectRoutes.get('/insights', async (c) => {
   const insights = await pending
   if (hasData(insights)) await db`update onboarding_sessions set watch_insights = ${db.json(insights as never)} where id = ${sessionId}`.catch(() => undefined)
   return c.json(insights)
+})
+
+// ---------- Routes du compte : /api/platform/account/coros ----------
+
+/**
+ * COROS connecté pendant l'onboarding : les tokens sont sur le serveur, pas dans le navigateur. L'envoi des
+ * séances sur la montre passe donc par ici, limité aux outils du calendrier d'entraînement.
+ */
+const COROS_ACCOUNT_TOOLS = new Set(['queryTrainingPlanLibrary', 'createTrainingPlan', 'updateTrainingPlan'])
+
+async function corosConnectionForUser(userId: string) {
+  const [conn] = await db<{ id: string; tokens: OAuthTokens }[]>`
+    select id, tokens from wearable_connections
+    where provider = 'coros' and user_id = ${userId} and tokens is not null order by updated_at desc limit 1`
+  return conn ?? null
+}
+
+export const corosAccountRoutes = new Hono<{ Variables: { user: SessionUser } }>()
+corosAccountRoutes.use('*', requireUser)
+
+corosAccountRoutes.get('/status', async (c) => c.json({ connected: (await corosConnectionForUser(c.get('user').id)) !== null }))
+
+corosAccountRoutes.post('/tools/:name', async (c) => {
+  const name = c.req.param('name')
+  if (!COROS_ACCOUNT_TOOLS.has(name)) return c.json({ error: 'Tool not allowed' }, 400)
+  const conn = await corosConnectionForUser(c.get('user').id)
+  if (!conn) return c.json({ error: 'COROS isn’t connected.' }, 404)
+  const body = (await c.req.json().catch(() => null)) as { args?: Record<string, unknown> } | null
+  try {
+    const result = await withCorosTools(conn, (call) => call(name, body?.args ?? {}))
+    console.log('[coros] outil', name, 'utilisateur', c.get('user').id)
+    return c.json({ result })
+  } catch (e) {
+    console.error('[coros] outil', name, e)
+    return c.json({ error: e instanceof Error ? e.message : 'COROS returned an error.' }, 502)
+  }
 })

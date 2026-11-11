@@ -9,7 +9,6 @@ import { MetricsDashboard, type Kpi } from '@/components/raice/metrics-dashboard
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '@/components/raice/panel'
 import { RefreshButton } from '@/components/raice/stretch-refresh'
 import { WeekPicker, type PickerDay } from '@/components/raice/week-picker'
-import { SendWeekButton } from '@/components/SendToWatch'
 import { TypeBadge } from '@/components/TypeBadge'
 import { WeekView } from './WeekView'
 import { CoachAvatar } from '../onboarding/CoachAvatar'
@@ -368,12 +367,9 @@ export function PlanTab() {
             </p>
             <h1 className="font-heading font-medium text-2xl tracking-tight">{plan.name}</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <SendWeekButton week={week} />
-            <Button asChild variant="outline" size="sm">
-              <Link to={ROUTES.goal}>Goal</Link>
-            </Button>
-          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to={ROUTES.goal}>Goal</Link>
+          </Button>
         </header>
 
         <WeekPicker
