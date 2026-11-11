@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActivityLinkCard } from '@/components/ActivityLinkCard'
 import { EmptyState } from '@/components/EmptyState'
 import { FeedbackCard } from '@/components/FeedbackCard'
+import { SessionWatchPanel } from '@/components/SendToWatch'
 import { TypeBadge } from '@/components/TypeBadge'
 import { SessionProfileChart } from '@/components/SessionProfileChart'
 import { Card } from '@/components/ui/card'
@@ -122,6 +123,7 @@ export function SessionPage() {
         </Panel>
 
         <div className="flex flex-col gap-4 xl:[&>*:last-child]:flex-1">
+          <SessionWatchPanel session={session} />
           {session.blocks.length > 0 && <ZoneSplit blocks={session.blocks} zones={zones} />}
           {session.type !== 'strength' && <ActivityLinkCard session={session} />}
         </div>

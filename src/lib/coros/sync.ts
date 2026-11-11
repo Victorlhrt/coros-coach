@@ -58,24 +58,26 @@ function planDates(plan: Plan) {
 /** Crée le plan complet sur COROS (une seule écriture confirmée). */
 export async function pushPlan(plan: Plan) {
   const now = today()
-  if (plan.startDate < now) throw new Error('Your plan has already started: COROS only accepts a start date between today and D+14. Regenerate your plan.')
   if (plan.startDate > addDays(now, 14)) throw new Error(`COROS only accepts a plan from 14 days before it starts (${plan.startDate}). Come back later.`)
+  // COROS refuse un début dans le passé : un plan déjà commencé part d'aujourd'hui, avec ses seuls jours à venir.
+  const start = plan.startDate < now ? now : plan.startDate
+  if (plan.raceDate < start) throw new Error('Your plan is over: nothing left to send.')
 
   const inProgress = await corosRead('queryTrainingPlanLibrary', {}).catch(() => null)
   const hasOther = inProgress !== null && /plan\s*id|planId/i.test(JSON.stringify(inProgress))
-  const args = createPlanArgs(plan)
+  const args = createPlanArgs(plan, start)
   const result = await corosWrite(
     'createTrainingPlan',
     args,
-    `Create the plan “${plan.name}” on COROS: ${plan.weeks.length} weeks, ${args.courseList.length} sessions, starting ${plan.startDate}.` +
+    `Create the plan “${plan.name}” on COROS: ${args.planInfo.totalWeeks} weeks, ${args.courseList.length} sessions, starting ${start}.` +
       (hasOther ? ' Heads-up: another plan is already running on COROS, dates may overlap.' : '') +
       ' Strength sessions stay in the app (COROS doesn’t support them).',
   )
   if (result === null) return false
 
   const planId = await locatePlanId(plan, result)
-  usePlan.getState().setCoros({ planId, created: true })
-  usePlan.getState().markSynced(hashesFor(plan, planDates(plan)))
+  usePlan.getState().setCoros({ planId, created: true, startDate: start })
+  usePlan.getState().markSynced(hashesFor(plan, planDates(plan).filter((d) => d >= start)))
   return true
 }
 
@@ -91,7 +93,7 @@ export async function pushDays(plan: Plan, dates: string[], label: string) {
 
   const result = await corosWrite(
     'updateTrainingPlan',
-    updateDaysArgs(plan, coros.planId, future),
+    updateDaysArgs(plan, coros.planId, future, coros.startDate),
     `Update ${label} on COROS (${future.length} day${future.length > 1 ? 's' : ''}). COROS ignores days already completed.`,
   )
   if (result === null) return false

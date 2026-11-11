@@ -16,6 +16,8 @@ interface CorosSync {
   planId: string | null
   /** true si le plan a été créé sur COROS, même si son ID n'a pas pu être retrouvé. */
   created: boolean
+  /** Premier jour du plan sur COROS (jour 0 des séances) : début du plan, ou jour de l'envoi si le plan avait déjà commencé. */
+  startDate?: string
   /** Empreinte de chaque jour au moment de l'envoi. */
   synced: Record<string, string>
 }
