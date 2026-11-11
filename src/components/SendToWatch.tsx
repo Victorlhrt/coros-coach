@@ -22,34 +22,36 @@ function usePush() {
   })
 }
 
-/** Panneau « Watch » d'une séance : état sur la montre et bouton d'envoi. */
+/** Panneau « Watch » d'une séance à venir : état sur la montre et bouton d'envoi (rien pour une séance passée). */
 export function SessionWatchPanel({ session }: { session: Session }) {
   const connected = useCorosAuth((s) => s.connected)
   const { plan, coros } = usePlan()
   const push = usePush()
-  if (!connected || !plan) return null
+  if (!connected || !plan || session.date < today()) return null
 
   const status = syncStatus(plan, coros.synced, session)
   return (
     <Panel>
-      <PanelHeader title="Watch" actions={<SyncBadge status={status} />} />
-      {status === 'app-only' ? (
-        <PanelSection divided>
-          <p className="text-muted-foreground text-sm">COROS doesn’t support strength sessions: follow this one in the app.</p>
-        </PanelSection>
-      ) : (
-        session.date >= today() && (
-          <PanelSection divided>
+      <PanelHeader
+        title="Watch"
+        subtitle={<SyncBadge status={status} />}
+        actions={
+          status !== 'app-only' && (
             <Button
-              className="w-full"
+              size="sm"
               onClick={() => push.mutate({ dates: [session.date], label: `the session on ${formatDay(session.date)}` })}
               disabled={push.isPending || status === 'synced'}
             >
               <Send className="size-4" />
-              {!coros.created ? 'Send the plan to COROS' : status === 'synced' ? 'Up to date on your watch' : 'Send to COROS'}
+              {push.isPending ? 'Sending…' : !coros.created ? 'Send plan to COROS' : status === 'synced' ? 'Up to date' : 'Send to COROS'}
             </Button>
-          </PanelSection>
-        )
+          )
+        }
+      />
+      {status === 'app-only' && (
+        <PanelSection divided>
+          <p className="text-muted-foreground text-sm">COROS doesn’t support strength sessions: follow this one in the app.</p>
+        </PanelSection>
       )}
     </Panel>
   )
