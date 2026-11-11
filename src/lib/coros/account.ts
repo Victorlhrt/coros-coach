@@ -8,15 +8,14 @@ import { ApiError, api } from '@/platform/api'
 export const ACCOUNT_TOOLS = new Set(['queryTrainingPlanLibrary', 'createTrainingPlan', 'updateTrainingPlan'])
 
 export function useCorosAccountConnected() {
-  return (
-    useQuery({
-      queryKey: ['coros-account', 'status'],
-      queryFn: () =>
-        api<{ connected: boolean }>('/account/coros/status').catch((e) => (e instanceof ApiError && e.status === 401 ? { connected: false } : Promise.reject(e))),
-      staleTime: 5 * 60 * 1000,
-      retry: false,
-    }).data?.connected ?? false
-  )
+  const q = useQuery({
+    queryKey: ['coros-account', 'status'],
+    queryFn: () =>
+      api<{ connected: boolean }>('/account/coros/status').catch((e) => (e instanceof ApiError && e.status === 401 ? { connected: false } : Promise.reject(e))),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  return { connected: q.data?.connected ?? false, loading: q.isPending }
 }
 
 export async function callAccountTool(tool: string, args: Record<string, unknown>) {
